@@ -387,34 +387,6 @@ def search_road_from_road_map(hard_mode=False):
 
     if len(road) != 0:
         return road, ["unknown"]
-
-    all_nodes_layer = divide_the_area_by_x(all_nodes)
-    all_road = divide_the_area_by_x(identify_road(bus[0]))
-
-    route_graph = RouteGraph(
-        all_nodes_layer, initial_bus_pos=initial_bus_pos, hard_mode=hard_mode
-    )
-    route_graph.init_road(all_road, bus[0], bus_pos[1])
-
-    min_weight, path = route_graph.find_min_weight_route()
-
-    if path:
-        # 生成方向列表
-        directions, road_class_list = route_graph.get_path_directions(path)
-        log.debug(f"最小权重: {min_weight}")
-        log.debug(f"路径方向: {directions}")
-        log.debug(f"行走路径: {road_class_list}")
-        return directions, road_class_list
-    else:
-        log.warning("未能检测到有效路径")
-
-    return [], []
-
-
-# battle 是常规遭遇战，boss_battle 是boss战，event 是事件，hard_battle 是集中遭遇战（非拉链），hard_battle_2 是精锐遭遇战（有拉链）
-# shop 是商店，small_boss_battle 是异想体遭遇战
-
-
 def identify_nodes(bus_x):
     import numpy as np
     import onnxruntime as ort
@@ -440,20 +412,26 @@ def identify_nodes(bus_x):
     original_image: np.ndarray = np.array(auto.screenshot)
     [height, width, _] = original_image.shape  # 获取原始图像的高、宽、通道数
 
-    # 创建正方形空白图像（边长为原始图像的最大边），用于保持图像比例并避免变形
-    length = max((height, width))  # 正方形边长取原始图像的高或宽的最大值
+    # Define ROI based on bus_x
+    scale_factor = cfg.set_win_size / 1440
+    x_min = max(0, int(bus_x - 50 * scale_factor))
+    x_max = int(width)
+    y_min = int(height * 0.1)
+    y_max = int(height * 0.9)
+
+    # Crop to ROI
+    cropped_image = original_image[y_min:y_max, x_min:x_max]
+    [c_height, c_width, _] = cropped_image.shape
+
+    # 创建正方形空白图像（边长为裁剪图像的最大边），用于保持图像比例并避免变形
+    length = max((c_height, c_width))  # 正方形边长取裁剪图像的高或宽的最大值
     image = np.zeros((length, length, 3), np.uint8)  # 初始化全黑正方形图像
-    image[0:height, 0:width] = original_image  # 将原始图像粘贴到正方形的左上角区域
+    image[0:c_height, 0:c_width] = cropped_image  # 将裁剪图像粘贴到正方形的左上角区域
 
     # 计算缩放比例（正方形边长 → 模型输入尺寸 640 的缩放因子）
     scale = length / 640
 
     # 将图像转换为模型所需的输入格式（blob）
-    # blobFromImage 参数说明：
-    # - image: 输入图像（正方形）
-    # - scalefactor=1/255: 像素值归一化（0-255 → 0-1）
-    # - size=(640, 640): 模型输入的尺寸（宽高均为 640）
-    # - swapRB=True: 交换 RGB 通道（OpenCV 读取的是 BGR，模型可能需要 RGB）
     blob = cv2.dnn.blobFromImage(
         image, scalefactor=1 / 255, size=(640, 640), swapRB=True
     )
@@ -463,48 +441,39 @@ def identify_nodes(bus_x):
         None, {session.get_inputs()[0].name: blob}
     )  # 输出为模型预测结果
 
-    outputs = outputs[0]  # 提取第一个输出（YOLO 通常输出一个包含所有检测结果的数组）
-    outputs = np.array([cv2.transpose(outputs[0])])  # 转置维度（适配后续处理逻辑）
-    rows = outputs.shape[1]  # 获取检测结果的数量（每行对应一个目标的预测信息）
+    outputs = outputs[0]  # 提取第一个输出
+    outputs = np.array([cv2.transpose(outputs[0])])  # 转置维度
+    rows = outputs.shape[1]  # 获取检测结果的数量
 
-    boxes = []  # 存储边界框坐标（格式：[x_center, y_center, width, height]）
+    boxes = []  # 存储边界框坐标
     scores = []  # 存储检测置信度
     class_ids = []  # 存储类别 ID
 
-    # 遍历所有检测结果（每行对应一个目标的预测信息）
+    # 遍历所有检测结果
     for i in range(rows):
-        # 提取类别置信度（前 4 列是边界框坐标，第 5 列及之后是各分类得分）
+        # 提取类别置信度
         classes_scores = outputs[0][i][4:]
-
-        # 找到当前目标的最大类别置信度及其对应的类别索引
         minScore, maxScore, minClassLoc, (x, maxClassIndex) = cv2.minMaxLoc(
             classes_scores
         )
 
         # 若最大置信度超过阈值（0.25），则保留该检测结果
         if maxScore >= 0.25:
-            # 计算边界框的左上角坐标和宽高（YOLO 输出为中心点坐标 + 宽高，需转换）
+            # 计算边界框
             box = [
-                outputs[0][i][0]
-                - (0.5 * outputs[0][i][2]),  # 左上角 x = 中心点 x - 半宽
-                outputs[0][i][1]
-                - (0.5 * outputs[0][i][3]),  # 左上角 y = 中心点 y - 半高
-                outputs[0][i][2],  # 宽度（中心点 x 到右边界点的距离）
-                outputs[0][i][3],  # 高度（中心点 y 到下边界点的距离）
+                outputs[0][i][0] - (0.5 * outputs[0][i][2]),
+                outputs[0][i][1] - (0.5 * outputs[0][i][3]),
+                outputs[0][i][2],
+                outputs[0][i][3],
             ]
-            boxes.append(box)  # 保存边界框
-            scores.append(maxScore)  # 保存置信度
-            class_ids.append(maxClassIndex)  # 保存类别 ID
+            boxes.append(box)
+            scores.append(maxScore)
+            class_ids.append(maxClassIndex)
 
-    # 使用 NMS 抑制重叠的边界框（保留置信度高的框）
-    # 参数说明：
-    # - boxes: 边界框列表（格式：[x1, y1, w, h]）
-    # - scores: 置信度列表
-    # - score_threshold=0: 置信度阈值（此处未过滤低分，因前面已过滤）
-    # - nms_threshold=0.4: 重叠框的交并比（IoU）阈值（>0.4 则抑制）
+    # 使用 NMS 抑制重叠的边界框
     result_boxes = cv2.dnn.NMSBoxes(boxes, scores, 0, 0.4, 0.5)
 
-    detections = []  # 存储最终的检测结果（字典列表）
+    detections = []  # 存储最终的检测结果
 
     if len(result_boxes) > 0:  # 若有有效检测结果
         for i in range(len(result_boxes)):
@@ -541,8 +510,8 @@ def identify_nodes(bus_x):
         y1 = box[1].item()  # 左上角y（转换为Python float）
         w = box[2].item()  # 宽度（转换为Python float）
         h = box[3].item()  # 高度（转换为Python float）
-        center_x = int((x1 + w / 2) * scale)
-        center_y = int((y1 + h / 2) * scale)
+        center_x = int((x1 + w / 2) * scale) + x_min
+        center_y = int((y1 + h / 2) * scale) + y_min
 
         if center_x < bus_x + 50:
             continue
@@ -580,7 +549,14 @@ def identify_road(bus_x, min_length=160, merge_distance=230):
 
     auto.take_screenshot()
     screenshot = np.array(auto.screenshot)
-    raw_lines = get_detected_lines(screenshot)  # 调用检测函数获取原始线段数据
+    scale_factor = cfg.set_win_size / 1440
+    x_min = max(0, int(bus_x - 50 * scale_factor))
+    x_max = int(screenshot.shape[1])
+    y_min = int(screenshot.shape[0] * 0.1)
+    y_max = int(screenshot.shape[0] * 0.9)
+
+    roi_img = screenshot[y_min:y_max, x_min:x_max]
+    raw_lines = get_detected_lines(roi_img)  # 调用检测函数获取原始线段数据
     if raw_lines is None or len(raw_lines) == 0:  # 检测结果为空
         log.warning("⚠️ 未检测到任何线段")  # 提示无结果
         return []  # 返回空列表
@@ -594,6 +570,10 @@ def identify_road(bus_x, min_length=160, merge_distance=230):
                 line_info[0] if hasattr(line_info, "__len__") else line_info
             )  # 处理数组或元组
             x1, y1, x2, y2 = map(float, coords[:4])  # 转换为浮点数（保留精度）
+            x1 += x_min
+            y1 += y_min
+            x2 += x_min
+            y2 += y_min
 
             # 计算线段基础参数
             length = math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)  # 线段长度（欧氏距离）

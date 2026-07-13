@@ -402,20 +402,9 @@ class Shop:
             break
 
     def fuse_useless_gifts_aggressive(self):
-        """合成无用饰品_激进版"""
+        """合成无用饰品_激进版 (合成：四级优先)"""
 
         scale = cfg.set_win_size / 1440
-
-        def processing_coordinates(my_gift_list, coordinates, threshold=50):
-            """将需要保护的坐标移除出列表"""
-            for position in my_gift_list:
-                if (
-                    abs(position[0] - coordinates[0]) <= threshold * scale
-                    and abs(position[1] - coordinates[1]) <= threshold * scale
-                ):
-                    my_gift_list.pop(my_gift_list.index(position))
-
-            return my_gift_list
 
         if auto.find_element(
             f"mirror/shop/level_IV_gifts/{self.system}_level_IV.png",
@@ -438,169 +427,177 @@ class Shop:
                 log.info("已有本体系、第二体系的四级饰品，切换到出售模式")
                 return
 
-        log.debug("开始执行激进合成模块")
+        log.debug("开始执行激进合成模块 (四级优先)")
+        selected_gifts = []
+        
+        for scroll_attempt in range(4):
+            auto.mouse_to_blank()
+            if auto.take_screenshot() is None:
+                continue
+
+            points = auto.find_element(
+                "mirror/shop/fuse_label.png",
+                find_type="image_with_multiple_targets",
+                threshold=0.85,
+            )
+
+            if not points or len(points) == 0:
+                log.warning("未找到合成界面锚点 fuse_label.png")
+                return
+
+            points.sort(key=lambda c: (c[1], c[0]))
+            gift = points[-1]
+            first_gift = [gift[0] + 95 * scale, gift[1] + 135 * scale]
+            if self.the_first_line_position is None:
+                self.the_first_line_position = first_gift[1] + 100 * scale
+
+            # Scan the 3x5 grid on the screen
+            found_on_screen = []
+            for row in range(3):
+                for col in range(5):
+                    cx = first_gift[0] + 190 * col * scale
+                    cy = first_gift[1] + 190 * row * scale
+                    
+                    gift_bbox = [
+                        int(cx - 90 * scale),
+                        int(cy - 90 * scale),
+                        int(cx + 90 * scale),
+                        int(cy + 90 * scale)
+                    ]
+
+                    # Detect Level III to guarantee Level IV outcome
+                    is_level_3 = auto.find_element(
+                        "mirror/road_to_mir/observe_ego_gift/Level_III.png",
+                        my_crop=gift_bbox,
+                        threshold=0.85
+                    )
+                    if not is_level_3:
+                        continue
+
+                    # Check protected list
+                    protect_list = [
+                        "mirror/shop/level_IV_gifts/lunar_memory.png",
+                        f"mirror/shop/level_IV_gifts/{self.system}_level_IV.png",
+                        "mirror/shop/must_be_abandoned/leave2_vestige2.png",
+                        "mirror/shop/must_be_abandoned/leave3_vestige.png",
+                    ]
+                    if self.second_system and self.second_system_select:
+                        protect_list.append(
+                            f"mirror/shop/level_IV_gifts/{self.second_system_select}_level_IV.png"
+                        )
+
+                    is_protected = False
+                    for protect_img in protect_list:
+                        if auto.find_element(protect_img, my_crop=gift_bbox, threshold=0.75):
+                            is_protected = True
+                            break
+                    if is_protected:
+                        continue
+
+                    # Check system status
+                    if auto.find_element(f"mirror/shop/enhance_gifts/{self.system}.png", my_crop=gift_bbox, threshold=0.75):
+                        continue
+                    if self.second_system and self.second_system_select:
+                        if auto.find_element(f"mirror/shop/enhance_gifts/{self.second_system_select}.png", my_crop=gift_bbox, threshold=0.75):
+                            continue
+
+                    # Avoid duplicate selection
+                    duplicate = False
+                    for selected in selected_gifts:
+                        if abs(selected[0] - cx) < 30 * scale and abs(selected[1] - cy) < 30 * scale:
+                            duplicate = True
+                            break
+                    if duplicate:
+                        continue
+
+                    found_on_screen.append((cx, cy))
+
+            # Select found gifts
+            for cx, cy in found_on_screen:
+                selected_gifts.append((cx, cy))
+                if len(selected_gifts) == 3:
+                    break
+
+            if len(selected_gifts) == 3:
+                break
+
+            # Try to scroll down to find more Level III gifts
+            list_block = auto.find_element("mirror/shop/gifts_list_block.png")
+            if list_block:
+                log.debug("未能找齐3个 Level III 饰品，向上拖拽滚动列表以查看更多")
+                auto.mouse_drag(list_block[0], list_block[1], drag_time=1, dy=-300 * scale)
+                sleep(1.0)
+            else:
+                break
+
+        if len(selected_gifts) < 3:
+            log.warning(f"未能凑够 3 个非本体系的 Level III 饰品，合成中止。当前仅找到 {len(selected_gifts)} 个。")
+            return
+
+        # Click the 3 selected Level III gifts
+        for cx, cy in selected_gifts:
+            auto.mouse_click(cx, cy)
+            sleep(0.5)
+
+        # Confirm the fusion and obtain the Level IV gift
+        fuse = False
+        loop_times = 15
+        fuse_use_starlight_chance = 5
         while True:
             auto.mouse_to_blank()
             if auto.take_screenshot() is None:
                 continue
 
-            fuse = False
-            gift_list = []
-
-            points = auto.find_element(
-                "mirror/shop/fuse_label.png",
-                find_type="image_with_multiple_targets",
-                threshold=0.9,
-            )
-
-            points.sort(key=lambda c: (c[1], c[0]))
-
-            if len(points) >= 1:
-                gift = points[-1]
-            else:
-                return
-            if gift:
-                first_gift = [gift[0] + 95 * scale, gift[1] + 135 * scale]
-                if self.the_first_line_position is None:
-                    self.the_first_line_position = first_gift[1] + 100 * scale
-                for i in range(10):
-                    gift_list.append(
-                        [
-                            first_gift[0] + 190 * (i % 5) * scale,
-                            first_gift[1] + 190 * (i // 5) * scale,
-                        ]
-                    )
-            else:
-                return
-
-            protect_list = [
-                "mirror/shop/level_IV_gifts/lunar_memory.png",
-                f"mirror/shop/level_IV_gifts/{self.system}_level_IV.png",
-                "mirror/shop/must_be_abandoned/leave2_vestige2.png",
-                "mirror/shop/must_be_abandoned/leave3_vestige.png",
-            ]
-            if self.second_system and self.second_system_action[0]:
-                protect_list.append(
-                    f"mirror/shop/level_IV_gifts/{self.second_system_select}_level_IV.png"
-                )
-
-            for protect_gift in protect_list:
-                if protect_coordinates := auto.find_element(
-                    protect_gift, threshold=0.7
-                ):
-                    gift_list = processing_coordinates(gift_list, protect_coordinates)
-
-            if self.aggressive_save_systems:
-                protect_coord = []
-                for coord in gift_list:
-                    system_bbox = [
-                        coord[0],
-                        coord[1],
-                        coord[0] + 100 * scale,
-                        coord[1] + 100 * scale,
-                    ]
-                    if auto.find_element(
-                        f"mirror/shop/enhance_gifts/{self.system}.png",
-                        my_crop=system_bbox,
-                    ):
-                        protect_coord.append(coord)
-                for coord in protect_coord:
-                    gift_list = processing_coordinates(gift_list, coord)
-
-            # 直到合成概率90%
-            clicked_count = 0
-            for coord in gift_list:
-                auto.mouse_click(coord[0], coord[1])
-                clicked_count += 1
-                from time import sleep
-
-                sleep(0.5)
-                if auto.find_element(
-                    "mirror/shop/fuse_90%_assets.png",
-                    threshold=0.95,
-                    take_screenshot=True,
-                ):
-                    break
-
-            # 如果无法合成四级，或可用饰品不足三个，则退出此次合成
-            from time import sleep
-
-            sleep(0.5)
-            if not auto.find_element(
-                "mirror/shop/fuse_90%_assets.png", threshold=0.95, take_screenshot=True
+            if ego_gift_get_confirm := auto.find_element(
+                "mirror/road_in_mir/ego_gift_get_confirm_assets.png"
             ):
-                log.debug("未能达到90%合成率，退出")
-                return
-            if not auto.find_element(
-                "mirror/shop/fusion_level_IV_gift_assets.png",
-                threshold=0.9,
-                take_screenshot=True,
-            ):
-                log.debug("未能合成四级饰品，退出")
-                return
-
-            loop_times = 15
-            fuse_use_starlight_chance = 5
-            while True:
-                auto.mouse_to_blank()
-                if auto.take_screenshot() is None:
-                    continue
-
-                if ego_gift_get_confirm := auto.find_element(
-                    "mirror/road_in_mir/ego_gift_get_confirm_assets.png"
+                if auto.find_language_text(
+                    ["残片", "罪孽"], ["fragment", "corrosion", "resources"]
                 ):
+                    fuse = True
+                else:
                     if auto.find_language_text(
-                        ["残片", "罪孽"], ["fragment", "corrosion", "resources"]
+                        system_cn_zh[self.system], self.system
                     ):
-                        fuse = True
-                    else:
-                        if auto.find_language_text(
-                            system_cn_zh[self.system], self.system
-                        ):
-                            self.after_fuse_IV()
-                            fuse = False
-                    auto.mouse_click(ego_gift_get_confirm[0], ego_gift_get_confirm[1])
-                    sleep(0.5)
-                    auto.click_element(
-                        "mirror/road_in_mir/ego_gift_get_confirm_assets.png",
-                        take_screenshot=True,
-                    )
-                    break
-
-                if fuse_use_starlight_chance > 0 and auto.click_element(
-                    "mirror/shop/fuse_use_starlight_assets.png"
-                ):
-                    fuse_use_starlight_chance -= 1
-                    auto.click_element(
-                        "mirror/shop/fuse_use_starlight_confirm_assets.png",
-                        model="normal",
-                        take_screenshot=True,
-                    )
-                    continue
-
-                if auto.click_element(
-                    "mirror/shop/enhance_and_fuse_and_sell_confirm_assets.png",
-                    model="normal",
-                ):
-                    sleep(2)
-                    if loop_times <= 0:
-                        break
-                    loop_times -= 1
-                    continue
-
-                if retry() is False:
-                    raise self.RestartGame()
-
-            if fuse:
-                from time import sleep
-
-                sleep(2)
+                        self.after_fuse_IV()
+                        fuse = False
+                auto.mouse_click(ego_gift_get_confirm[0], ego_gift_get_confirm[1])
+                sleep(0.5)
                 auto.click_element(
-                    "mirror/shop/fuse_ego_gift_assets.png", take_screenshot=True
+                    "mirror/road_in_mir/ego_gift_get_confirm_assets.png",
+                    take_screenshot=True,
                 )
                 break
 
-            break
+            if fuse_use_starlight_chance > 0 and auto.click_element(
+                "mirror/shop/fuse_use_starlight_assets.png"
+            ):
+                fuse_use_starlight_chance -= 1
+                auto.click_element(
+                    "mirror/shop/fuse_use_starlight_confirm_assets.png",
+                    model="normal",
+                    take_screenshot=True,
+                )
+                continue
+
+            if auto.click_element(
+                "mirror/shop/enhance_and_fuse_and_sell_confirm_assets.png",
+                model="normal",
+            ):
+                sleep(2)
+                if loop_times <= 0:
+                    break
+                loop_times -= 1
+                continue
+
+            if retry() is False:
+                raise self.RestartGame()
+
+        if fuse:
+            sleep(2)
+            auto.click_element(
+                "mirror/shop/fuse_ego_gift_assets.png", take_screenshot=True
+            )
 
         if retry() is False:
             raise self.RestartGame()
