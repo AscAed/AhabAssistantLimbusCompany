@@ -144,7 +144,9 @@ class SimulatorControl(AbstractInput):
         try:
             return func()
         except Exception as e:
-            if not self._is_recoverable_connection_error(e) or not self.reconnect(f"{action}: {e}"):
+            if not self._is_recoverable_connection_error(e) or not self.reconnect(
+                f"{action}: {e}"
+            ):
                 raise
             log.info(f"模拟器连接已重建，重试操作: {action}")
             return func()
@@ -159,9 +161,13 @@ class SimulatorControl(AbstractInput):
             self._call_with_reconnect("启动游戏", _start_game)
         except Exception as e:
             log.error(f"启动游戏失败，失败原因为{str(e)}")
-            log.error("启动游戏失败，请确认是否安装了Limbus Company，五秒后将重新尝试启动")
+            log.error(
+                "启动游戏失败，请确认是否安装了Limbus Company，五秒后将重新尝试启动"
+            )
             try:
-                packages = self._call_with_reconnect("获取应用列表", lambda: self.simulator_device.list_packages())
+                packages = self._call_with_reconnect(
+                    "获取应用列表", lambda: self.simulator_device.list_packages()
+                )
                 log.debug(f"获取到的应用列表列表：{packages}")
             except Exception as e:
                 log.error(f"获取应用列表失败，失败原因为{str(e)}")
@@ -183,7 +189,9 @@ class SimulatorControl(AbstractInput):
                 break
             # bad port number '598265' in '127.0.0.1:598265'
             elif "bad port" in msg:
-                log.error(f"连接失败，端口号{self.simulator_port}不正确，可能是拼写错误或不规范")
+                log.error(
+                    f"连接失败，端口号{self.simulator_port}不正确，可能是拼写错误或不规范"
+                )
 
     def adb_disconnect(self):
         try:
@@ -196,7 +204,9 @@ class SimulatorControl(AbstractInput):
                     break
                 # bad port number '598265' in '127.0.0.1:598265'
                 elif "bad port" in msg:
-                    log.error(f"断开连接失败，端口号{self.simulator_port}不正确，可能是拼写错误或不规范")
+                    log.error(
+                        f"断开连接失败，端口号{self.simulator_port}不正确，可能是拼写错误或不规范"
+                    )
         except Exception:
             pass
 
@@ -234,12 +244,16 @@ class SimulatorControl(AbstractInput):
 
                 SimulatorControl.connection_device = self
 
-                log.debug("连接成功，已将模拟器实例记录至 SimulatorControl.connection_device")
+                log.debug(
+                    "连接成功，已将模拟器实例记录至 SimulatorControl.connection_device"
+                )
 
                 return self.simulator_device
             except AdbError as e:
                 last_error = e
-                log.error(f"获取模拟器设备失败，ADB 错误: {e}，正在尝试重新连接 ({attempt + 1}/3)")
+                log.error(
+                    f"获取模拟器设备失败，ADB 错误: {e}，正在尝试重新连接 ({attempt + 1}/3)"
+                )
                 try:
                     self.adb_disconnect()
                 except Exception:
@@ -261,7 +275,9 @@ class SimulatorControl(AbstractInput):
         def _screenshot():
             if self.simulator_device is None:
                 self.get_simulator()
-            data = self.simulator_device.shell(["screencap", "-p"], stream=False, encoding=None)
+            data = self.simulator_device.shell(
+                ["screencap", "-p"], stream=False, encoding=None
+            )
             if len(data) < 500:
                 raise RuntimeError(f"意外截图: {data}")
             image = np.frombuffer(data, np.uint8)
@@ -313,6 +329,7 @@ class SimulatorControl(AbstractInput):
 
         msg = f"点击位置:({x},{y})"
         log.debug(msg)
+
         def _tap():
             for _ in range(times):
                 self.simulator_device.shell(f"input tap {x} {y}")
@@ -364,7 +381,9 @@ class SimulatorControl(AbstractInput):
         self.wait_pause()
         return True
 
-    def mouse_to_blank(self, coordinate=(1, 1), move_back=False) -> None:  # background未重载
+    def mouse_to_blank(
+        self, coordinate=(1, 1), move_back=False
+    ) -> None:  # background未重载
         """占位"""
         return
 
@@ -391,7 +410,10 @@ class SimulatorControl(AbstractInput):
         try:
             # Android 的 input text 需要把空格写成 %s
             send_text = text.replace(" ", "%s")
-            self._call_with_reconnect("输入文本", lambda: self.simulator_device.shell(["input", "text", send_text]))
+            self._call_with_reconnect(
+                "输入文本",
+                lambda: self.simulator_device.shell(["input", "text", send_text]),
+            )
         except Exception as e:
             log.error(f"输入文本失败：{e}")
 
@@ -447,7 +469,9 @@ class SimulatorControl(AbstractInput):
     def close_current_app(self):
         if self.simulator_device is None:
             self.get_simulator()
-        self._call_with_reconnect("关闭游戏", lambda: self.simulator_device.app_stop(self.game_package_name))
+        self._call_with_reconnect(
+            "关闭游戏", lambda: self.simulator_device.app_stop(self.game_package_name)
+        )
 
     def check_game_alive(self) -> bool:
         """检查游戏是否存活
@@ -456,7 +480,9 @@ class SimulatorControl(AbstractInput):
         """
         if self.simulator_device is None:
             self.get_simulator()
-        package = self._call_with_reconnect("检查游戏存活", lambda: self.simulator_device.app_current().package)
+        package = self._call_with_reconnect(
+            "检查游戏存活", lambda: self.simulator_device.app_current().package
+        )
         if package != self.game_package_name:
             return False
         return True
@@ -476,5 +502,7 @@ class SimulatorControl(AbstractInput):
 
         self._call_with_reconnect(
             "链式滑动",
-            lambda: self.simulator_control.swipe(position_conversion, duration=drag_time * 1000),
+            lambda: self.simulator_control.swipe(
+                position_conversion, duration=drag_time * 1000
+            ),
         )

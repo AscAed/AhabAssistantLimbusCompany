@@ -83,7 +83,9 @@ class ProductionWork(QThread):
                     self.msleep(1000)
                     continue
                 make_enkephalin_module(cancel=False, skip=False)
-                while not auto.find_element("enkephalin/lunacy_assets.png", take_screenshot=True):
+                while not auto.find_element(
+                    "enkephalin/lunacy_assets.png", take_screenshot=True
+                ):
                     auto.click_element("enkephalin/use_lunacy_assets.png")
                 current_enkephalin = get_current_enkephalin()
                 if current_enkephalin is None:
@@ -121,7 +123,9 @@ class ProductionWork(QThread):
 
             elapsed = monotonic() - start_time
             if elapsed < restart_timeout:
-                log.warning(f"自动换饼返回主界面未完成，已尝试{int(elapsed)}秒，继续尝试")
+                log.warning(
+                    f"自动换饼返回主界面未完成，已尝试{int(elapsed)}秒，继续尝试"
+                )
                 self._sleep_with_stop_check(1.5)
                 continue
 
@@ -129,7 +133,9 @@ class ProductionWork(QThread):
             since_last_restart = now - self._last_back_init_restart_time
             if since_last_restart < restart_cooldown:
                 wait_seconds = max(1, int(restart_cooldown - since_last_restart))
-                log.warning(f"自动换饼返回主界面超时，但仍在重启冷却期，等待{wait_seconds}秒后继续尝试")
+                log.warning(
+                    f"自动换饼返回主界面超时，但仍在重启冷却期，等待{wait_seconds}秒后继续尝试"
+                )
                 self._sleep_with_stop_check(min(wait_seconds, 5))
                 continue
 
@@ -167,7 +173,9 @@ class ProductionWork(QThread):
             except Exception:
                 pass
         msg = str(error)
-        return "SetWindowPos" in msg and ("拒绝访问" in msg or "Access is denied" in msg)
+        return "SetWindowPos" in msg and (
+            "拒绝访问" in msg or "Access is denied" in msg
+        )
 
     def _set_win(self):
         if cfg.simulator:
@@ -307,7 +315,10 @@ class ProductionModule(QWidget):
         import time
 
         current_time = int(time.time())
-        if not hasattr(self, "_last_log_time") or current_time - self._last_log_time > 10:
+        if (
+            not hasattr(self, "_last_log_time")
+            or current_time - self._last_log_time > 10
+        ):
             self.log_text.append("生产操作执行")
             self._last_log_time = current_time
 
@@ -325,8 +336,12 @@ class ProductionModule(QWidget):
         self.log_text.append(f"状态：等待 - 下一次体力回复时间: {next_time} s")
         self.log_text.append(f"等待: 下一次执行模块生产等待时间: {waiting_time} s")
         future_time = now_time + timedelta(seconds=waiting_time)
-        self.log_text.append(f"预计下一次操作时间: {future_time.strftime('%Y-%m-%d %H:%M:%S')}")
-        log.info(f"生产等待: 下一次体力回复时间: {next_time} s，下一次执行模块生产等待时间: {waiting_time} s")
+        self.log_text.append(
+            f"预计下一次操作时间: {future_time.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+        log.info(
+            f"生产等待: 下一次体力回复时间: {next_time} s，下一次执行模块生产等待时间: {waiting_time} s"
+        )
 
     def closeEvent(self, event):
         """窗口关闭时停止所有定时器和工作线程"""

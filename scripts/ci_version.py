@@ -26,15 +26,44 @@ class StableRelease:
 
 def parse_args() -> argparse.Namespace:
     # 同时支持 GitHub Actions 在线调用与本地注入 JSON 的离线验证模式。
-    parser = argparse.ArgumentParser(description="Generate a semver-compatible CI version.")
-    parser.add_argument("--releases-json", type=Path, help="Path to mocked GitHub releases JSON for local tests.")
-    parser.add_argument("--runs-json", type=Path, help="Path to mocked workflow runs JSON for local tests.")
+    parser = argparse.ArgumentParser(
+        description="Generate a semver-compatible CI version."
+    )
+    parser.add_argument(
+        "--releases-json",
+        type=Path,
+        help="Path to mocked GitHub releases JSON for local tests.",
+    )
+    parser.add_argument(
+        "--runs-json",
+        type=Path,
+        help="Path to mocked workflow runs JSON for local tests.",
+    )
     parser.add_argument("--repo", help="GitHub repository in owner/name format.")
-    parser.add_argument("--workflow-file", default="ci.yaml", help="Workflow file name used to count CI runs.")
-    parser.add_argument("--current-run-id", type=int, required=True, help="Current GitHub Actions run id.")
-    parser.add_argument("--current-run-number", type=int, help="Current GitHub Actions workflow run number.")
-    parser.add_argument("--fallback-version", help="Fallback version to use when CI semver generation fails.")
-    parser.add_argument("--github-api-url", default=os.environ.get("GITHUB_API_URL", "https://api.github.com"))
+    parser.add_argument(
+        "--workflow-file",
+        default="ci.yaml",
+        help="Workflow file name used to count CI runs.",
+    )
+    parser.add_argument(
+        "--current-run-id",
+        type=int,
+        required=True,
+        help="Current GitHub Actions run id.",
+    )
+    parser.add_argument(
+        "--current-run-number",
+        type=int,
+        help="Current GitHub Actions workflow run number.",
+    )
+    parser.add_argument(
+        "--fallback-version",
+        help="Fallback version to use when CI semver generation fails.",
+    )
+    parser.add_argument(
+        "--github-api-url",
+        default=os.environ.get("GITHUB_API_URL", "https://api.github.com"),
+    )
     parser.add_argument("--github-token", default=os.environ.get("GITHUB_TOKEN"))
     parser.add_argument("--github-output", default=os.environ.get("GITHUB_OUTPUT"))
     return parser.parse_args()
@@ -72,11 +101,19 @@ def parse_stable_release(item: dict[str, Any]) -> StableRelease | None:
 
 def find_latest_stable_release(releases: list[dict[str, Any]]) -> StableRelease:
     # 从所有 release 中挑出最新稳定版，作为下一次 alpha 预发布的基线。
-    stable_releases = [release for item in releases if (release := parse_stable_release(item)) is not None]
+    stable_releases = [
+        release
+        for item in releases
+        if (release := parse_stable_release(item)) is not None
+    ]
     if not stable_releases:
-        raise ValueError("No stable GitHub release matching vX.Y.Z or VX.Y.Z was found.")
+        raise ValueError(
+            "No stable GitHub release matching vX.Y.Z or VX.Y.Z was found."
+        )
 
-    return max(stable_releases, key=lambda release: (release.version, release.published_at))
+    return max(
+        stable_releases, key=lambda release: (release.version, release.published_at)
+    )
 
 
 def build_ci_version(
@@ -97,16 +134,30 @@ def build_ci_version(
     runs_after_release = [
         run
         for run in runs
-        if run.get("created_at") and parse_iso8601(run["created_at"]) > latest_release.published_at
+        if run.get("created_at")
+        and parse_iso8601(run["created_at"]) > latest_release.published_at
     ]
-    runs_after_release.sort(key=lambda run: (run.get("run_number", 0), run.get("id", 0)))
+    runs_after_release.sort(
+        key=lambda run: (run.get("run_number", 0), run.get("id", 0))
+    )
 
-    current_index = next((index for index, run in enumerate(runs_after_release) if run.get("id") == current_run_id), None)
+    current_index = next(
+        (
+            index
+            for index, run in enumerate(runs_after_release)
+            if run.get("id") == current_run_id
+        ),
+        None,
+    )
     if current_index is not None:
         build_number = current_index + 1
     elif current_run_number is not None:
         # GitHub API 偶尔会在运行初期查不到当前 run，回退到 run_number 仍能保持单调递增。
-        build_number = 1 + sum(1 for run in runs_after_release if (run.get("run_number") or 0) < current_run_number)
+        build_number = 1 + sum(
+            1
+            for run in runs_after_release
+            if (run.get("run_number") or 0) < current_run_number
+        )
     else:
         build_number = len(runs_after_release) + 1
 
@@ -128,7 +179,9 @@ def fetch_json(url: str, token: str | None) -> dict[str, Any] | list[Any]:
         return json.load(response)
 
 
-def fetch_paginated_collection(base_url: str, collection_key: str, token: str | None) -> list[dict[str, Any]]:
+def fetch_paginated_collection(
+    base_url: str, collection_key: str, token: str | None
+) -> list[dict[str, Any]]:
     page = 1
     items: list[dict[str, Any]] = []
 
@@ -148,7 +201,9 @@ def fetch_paginated_collection(base_url: str, collection_key: str, token: str | 
     return items
 
 
-def load_releases_and_runs(args: argparse.Namespace) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def load_releases_and_runs(
+    args: argparse.Namespace,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     if args.releases_json and args.runs_json:
         # 本地测试直接读固定 JSON，避免依赖在线 GitHub API。
         releases = load_json_file(args.releases_json)
@@ -156,7 +211,9 @@ def load_releases_and_runs(args: argparse.Namespace) -> tuple[list[dict[str, Any
         return releases, runs
 
     if not args.repo:
-        raise ValueError("--repo is required unless --releases-json and --runs-json are provided.")
+        raise ValueError(
+            "--repo is required unless --releases-json and --runs-json are provided."
+        )
 
     # 在线模式下分别拉取 release 列表和当前 workflow 的运行记录。
     releases_url = f"{args.github_api_url}/repos/{args.repo}/releases"
@@ -182,14 +239,19 @@ def main() -> int:
     args = parse_args()
     try:
         releases, runs = load_releases_and_runs(args)
-        version = build_ci_version(releases, runs, args.current_run_id, args.current_run_number)
+        version = build_ci_version(
+            releases, runs, args.current_run_id, args.current_run_number
+        )
     except Exception as exc:
         if not args.fallback_version:
             print(f"Failed to generate CI version: {exc}", file=sys.stderr)
             raise
 
         print(f"Failed to generate CI version: {exc}", file=sys.stderr)
-        print(f"Falling back to workflow SHA version: {args.fallback_version}", file=sys.stderr)
+        print(
+            f"Falling back to workflow SHA version: {args.fallback_version}",
+            file=sys.stderr,
+        )
         version = args.fallback_version
 
     write_github_output(args.github_output, version)

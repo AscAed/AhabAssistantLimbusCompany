@@ -25,7 +25,9 @@ def _resolve_7z_executable() -> str:
 
     # 第一步：打包版本优先查找 exe 旁边的内置 7za.exe。
     if getattr(sys, "frozen", False):
-        candidate_paths.append(Path(sys.executable).resolve().parent / SEVEN_ZIP_EXECUTABLE_RELATIVE_PATH)
+        candidate_paths.append(
+            Path(sys.executable).resolve().parent / SEVEN_ZIP_EXECUTABLE_RELATIVE_PATH
+        )
 
     # 第二步：源码运行时回退到仓库内的 assets/binary/7za.exe。
     candidate_paths.append(PROJECT_ROOT / SEVEN_ZIP_EXECUTABLE_RELATIVE_PATH)
@@ -49,7 +51,9 @@ def _resolve_7z_executable() -> str:
     )
 
 
-def _run_7z_command(arguments: list[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+def _run_7z_command(
+    arguments: list[str], *, cwd: Path | None = None
+) -> subprocess.CompletedProcess[str]:
     """执行 7z 命令，并在失败时抛出带上下文的中文错误。
 
     参数:
@@ -107,7 +111,9 @@ def create_7z_archive(source_dir: Path, output_archive_path: Path) -> Path:
         output_archive_path.unlink()
 
     # 第三步：使用当前目录下的 .\* 作为输入，保证包内路径从资源目录根开始计算。
-    _run_7z_command(["a", "-t7z", str(output_archive_path.resolve()), ".\\*"], cwd=source_dir)
+    _run_7z_command(
+        ["a", "-t7z", str(output_archive_path.resolve()), ".\\*"], cwd=source_dir
+    )
     return output_archive_path
 
 
@@ -163,5 +169,7 @@ def extract_7z_archive(archive_path: Path, extract_dir: Path) -> Path:
             raise ValueError(f"资源包包含非法路径: {member_path}")
 
     # 第三步：执行覆盖式解压，保证同步时始终拿到完整的新包内容。
-    _run_7z_command(["x", str(archive_path.resolve()), f"-o{extract_dir.resolve()}", "-aoa", "-y"])
+    _run_7z_command(
+        ["x", str(archive_path.resolve()), f"-o{extract_dir.resolve()}", "-aoa", "-y"]
+    )
     return extract_dir

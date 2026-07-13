@@ -84,7 +84,9 @@ class Automation(metaclass=SingletonMeta):
             from .input_handlers.input import BackgroundInput
 
             self.input_handler = BackgroundInput()
-        assert isinstance(self.input_handler, AbstractInput), "输入处理器必须是AbstractInput的实例"
+        assert isinstance(
+            self.input_handler, AbstractInput
+        ), "输入处理器必须是AbstractInput的实例"
         self.mouse_click = self.input_handler.mouse_click
         self.mouse_click_blank = self.input_handler.mouse_click_blank
         self.mouse_drag = self.input_handler.mouse_drag
@@ -174,8 +176,13 @@ class Automation(metaclass=SingletonMeta):
         x, y = coordinates
         screenshot = np.array(self.screenshot)
         if offset:
-            x = max(0, min(screenshot.shape[1], x + random.randint(-10, 10)))
-            y = max(0, min(screenshot.shape[0], y + random.randint(-10, 10)))
+            # 使用正态分布生成点击偏移，使其更聚集在中心区域，符合人类点击习惯
+            import numpy as np
+
+            offset_x = int(np.clip(np.random.normal(0, 4), -10, 10))
+            offset_y = int(np.clip(np.random.normal(0, 4), -10, 10))
+            x = max(0, min(screenshot.shape[1], x + offset_x))
+            y = max(0, min(screenshot.shape[0], y + offset_y))
         return x, y
 
     def mouse_action_with_pos(
@@ -217,11 +224,18 @@ class Automation(metaclass=SingletonMeta):
 
         if cfg.mouse_action_interval and interval == 0.5:
             interval = cfg.mouse_action_interval
+        # Ensure we don't arbitrarily wait too long for consecutive fast clicks unless specified
+        interval = min(interval, 0.25)
+
+        # 增加随机浮动，规避匀速点击检测
+        import numpy as np
+
+        actual_interval = max(0.05, np.random.normal(interval, interval * 0.2))
 
         if self.last_click_time == 0:
             self.last_click_time = time.time()
-        if time.time() - self.last_click_time < interval:
-            time.sleep(interval)
+        if time.time() - self.last_click_time < actual_interval:
+            time.sleep(actual_interval)
             self.last_click_time = time.time()
 
         # 计算传入的位置
@@ -260,13 +274,16 @@ class Automation(metaclass=SingletonMeta):
             Image: 截取当前屏幕的图像对象
         """
         start_time = time.time()
-        screenshot_interval_time = cfg.screenshot_interval if cfg.screenshot_interval else 0.85
+        screenshot_interval_time = (
+            cfg.screenshot_interval if cfg.screenshot_interval else 0.85
+        )
         is_game_die = False
         while True:
             try:
                 if time.time() - self.last_screenshot_time < screenshot_interval_time:
                     wait_time = max(
-                        screenshot_interval_time - (time.time() - self.last_screenshot_time),
+                        screenshot_interval_time
+                        - (time.time() - self.last_screenshot_time),
                         0,
                     )
                     time.sleep(wait_time)
@@ -353,15 +370,23 @@ class Automation(metaclass=SingletonMeta):
                     )
                 elif find_type == "text":
                     # 使用文本查找方法查找元素
-                    center = self.find_text_element(target, my_crop, additional_stack=additional_stack)
+                    center = self.find_text_element(
+                        target, my_crop, additional_stack=additional_stack
+                    )
                 if center:
                     return center
             elif find_type in ["feature"]:
-                return self.find_feature_element(target, my_crop, additional_stack=additional_stack)
+                return self.find_feature_element(
+                    target, my_crop, additional_stack=additional_stack
+                )
             elif find_type in ["image_with_multiple_targets"]:
                 # 使用多目标图像查找方法查找元素
                 return self.find_image_with_multiple_targets(
-                    target, threshold, my_crop=my_crop, min_dist=min_dist, additional_stack=additional_stack
+                    target,
+                    threshold,
+                    my_crop=my_crop,
+                    min_dist=min_dist,
+                    additional_stack=additional_stack,
                 )
             else:
                 raise ValueError("错误的类型")
@@ -370,7 +395,9 @@ class Automation(metaclass=SingletonMeta):
                 time.sleep(1)  # 在重试前等待一定时间
         return None
 
-    def find_image_with_multiple_targets(self, target: str, threshold, my_crop=None, min_dist=10, additional_stack=0) -> List:
+    def find_image_with_multiple_targets(
+        self, target: str, threshold, my_crop=None, min_dist=10, additional_stack=0
+    ) -> List:
         """
         在当前截图中查找多个目标图像的位置
         """
@@ -386,11 +413,15 @@ class Automation(metaclass=SingletonMeta):
             if my_crop:
                 crop_offset = (int(round(my_crop[0])), int(round(my_crop[1])))
                 screenshot = ImageUtils.crop(screenshot, my_crop)
-            matches = ImageUtils.match_template_with_multiple_targets(screenshot, template, threshold, min_dist=min_dist)
+            matches = ImageUtils.match_template_with_multiple_targets(
+                screenshot, template, threshold, min_dist=min_dist
+            )
             if crop_offset != (0, 0):
                 matches = [(x + crop_offset[0], y + crop_offset[1]) for x, y in matches]
             if len(matches) == 0:
-                log.debug(f"未找到任何目标图像{target}", stacklevel=additional_stack + 3)
+                log.debug(
+                    f"未找到任何目标图像{target}", stacklevel=additional_stack + 3
+                )
                 return []
             else:
                 log.debug(
@@ -436,7 +467,9 @@ class Automation(metaclass=SingletonMeta):
             y = (box[0][1] + box[2][1]) / 2
             ocr_position_list.append([x, y])
 
-        ocr_dict = {text: position for text, position in zip(ocr_text_list, ocr_position_list)}
+        ocr_dict = {
+            text: position for text, position in zip(ocr_text_list, ocr_position_list)
+        }
         log.debug(f"识别到文本及其坐标：{ocr_dict}", stacklevel=additional_stack + 3)
         return ocr_dict
 
@@ -458,7 +491,9 @@ class Automation(metaclass=SingletonMeta):
         elif isinstance(target, dict):
             for key, value in target.items():
                 if position := self.find_str_in_text(str(key), ocr_dict):
-                    return TextMatchResult(value=value, text=str(key), position=position)
+                    return TextMatchResult(
+                        value=value, text=str(key), position=position
+                    )
             return None
         return False
 
@@ -489,7 +524,9 @@ class Automation(metaclass=SingletonMeta):
         Returns:
             文本命中结果，返回格式同 find_text_element；未命中返回 False。
         """
-        ocr_dict = self._run_ocr_for_text(my_crop=my_crop, additional_stack=additional_stack)
+        ocr_dict = self._run_ocr_for_text(
+            my_crop=my_crop, additional_stack=additional_stack
+        )
         if ocr_dict == {}:
             return False
 
@@ -512,13 +549,17 @@ class Automation(metaclass=SingletonMeta):
 
         return False
 
-    def find_text_element(self, target, my_crop=None, all_text=False, only_text=False, additional_stack=0):
+    def find_text_element(
+        self, target, my_crop=None, all_text=False, only_text=False, additional_stack=0
+    ):
         """
         寻找文本元素所在的坐标位置。
 
         str/list 目标返回坐标；dict 目标返回 TextMatchResult。
         """
-        ocr_result = self._run_ocr_for_text(my_crop=my_crop, only_text=only_text, additional_stack=additional_stack)
+        ocr_result = self._run_ocr_for_text(
+            my_crop=my_crop, only_text=only_text, additional_stack=additional_stack
+        )
         if only_text:
             return ocr_result
         return self._find_target_in_ocr_dict(target, ocr_result, all_text=all_text)
@@ -540,7 +581,9 @@ class Automation(metaclass=SingletonMeta):
 
         return ocr_text_list
 
-    def find_feature_element(self, target, pic_crop=None, min_matches=8, additional_stack=0):
+    def find_feature_element(
+        self, target, pic_crop=None, min_matches=8, additional_stack=0
+    ):
         """
         寻找特征元素所在的坐标位置
         """
@@ -569,7 +612,9 @@ class Automation(metaclass=SingletonMeta):
                 elif cfg.set_win_size > 1440:
                     pic_crop = [int(i * cfg.set_win_size / 1440) for i in pic_crop]
                 screenshot = ImageUtils.crop(screenshot, pic_crop)
-            result, num_matches = ImageUtils.feature_matching(template, screenshot, min_matches)
+            result, num_matches = ImageUtils.feature_matching(
+                template, screenshot, min_matches
+            )
             log.debug(
                 f"匹配目标特征图片：{target.replace('./assets/images/', '')}结果{result}, 找到 {num_matches} 个匹配点",
                 stacklevel=additional_stack + 3,
@@ -617,12 +662,22 @@ class Automation(metaclass=SingletonMeta):
 
     MATCH_GAP = 0.15
 
-    def _update_path_state_from_match_results(self, results, additional_stack: int = 0) -> None:
-        dark_results = [result for result in results if path_manager.is_path_dark(result["path"])]
-        default_results = [result for result in results if path_manager.is_path_default(result["path"])]
-        zh_cn_results = [result for result in results if path_manager.is_path_zh_cn(result["path"])]
+    def _update_path_state_from_match_results(
+        self, results, additional_stack: int = 0
+    ) -> None:
+        dark_results = [
+            result for result in results if path_manager.is_path_dark(result["path"])
+        ]
+        default_results = [
+            result for result in results if path_manager.is_path_default(result["path"])
+        ]
+        zh_cn_results = [
+            result for result in results if path_manager.is_path_zh_cn(result["path"])
+        ]
         en_results = [result for result in results if result["path"].endswith("/en")]
-        share_results = [result for result in results if result["path"].endswith("/share")]
+        share_results = [
+            result for result in results if result["path"].endswith("/share")
+        ]
 
         dark_matched = any(result["matched"] for result in dark_results)
         default_matched = any(result["matched"] for result in default_results)
@@ -669,7 +724,10 @@ class Automation(metaclass=SingletonMeta):
 
     @staticmethod
     def _path_state_is_known() -> bool:
-        return path_manager.current_theme is not None and path_manager.current_language is not None
+        return (
+            path_manager.current_theme is not None
+            and path_manager.current_language is not None
+        )
 
     def find_image_element(
         self,
@@ -704,10 +762,14 @@ class Automation(metaclass=SingletonMeta):
 
             results = []
             for loaded_path in existing_paths:
-                template, bbox = self._load_template_for_path(target, loaded_path, cacheable)
+                template, bbox = self._load_template_for_path(
+                    target, loaded_path, cacheable
+                )
                 if template is None:
                     continue
-                center, matchVal = ImageUtils.match_template(screenshot, template, bbox, model)
+                center, matchVal = ImageUtils.match_template(
+                    screenshot, template, bbox, model
+                )
                 matched = self._is_valid_match(matchVal, threshold)
                 if 0.70 < matchVal < 0.90 and int(matchVal * 1000 + 1e-9) % 10 >= 5:
                     match_fmt = ".3f"
@@ -732,7 +794,9 @@ class Automation(metaclass=SingletonMeta):
                 log.debug(f"无法加载图片: {target}", stacklevel=additional_stack + 3)
                 return None
 
-            self._update_path_state_from_match_results(results, additional_stack=additional_stack)
+            self._update_path_state_from_match_results(
+                results, additional_stack=additional_stack
+            )
             for result in results:
                 if result["matched"]:
                     return result["center"]

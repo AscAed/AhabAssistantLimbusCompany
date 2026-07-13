@@ -23,7 +23,9 @@ TYPING_PATH: Path = REPO_ROOT / "module" / "config" / "config_typing.py"
 def _example_keys() -> Set[str]:
     """从 example.yaml 里加载 config 字段名集合"""
     data = YAML().load(EXAMPLE_PATH.read_text(encoding="utf-8"))
-    assert isinstance(data, dict), f"example.yaml 顶层应为 mapping，实际为 {type(data).__name__}"
+    assert isinstance(
+        data, dict
+    ), f"example.yaml 顶层应为 mapping，实际为 {type(data).__name__}"
     return set(data.keys())
 
 
@@ -62,6 +64,4 @@ def test_config_model_has_no_hardcoded_defaults() -> None:
     with_default: List[str] = [
         _field_name(s) for s in _config_model_fields() if s.value is not None
     ]
-    assert (
-        with_default == []
-    ), f"下列 ConfigModel field 带有 default：{with_default}"
+    assert with_default == [], f"下列 ConfigModel field 带有 default：{with_default}"

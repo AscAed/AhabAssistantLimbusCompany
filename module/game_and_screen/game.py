@@ -25,7 +25,9 @@ class Game(metaclass=SingletonMeta):
                 proc_name = proc.info["name"]
                 # 精确匹配进程名（区分大小写，取决于系统）
                 if self.process_name in proc_name:
-                    self.log.debug(f"游戏已启动：{self.process_name}，进程ID：{proc.pid}")
+                    self.log.debug(
+                        f"游戏已启动：{self.process_name}，进程ID：{proc.pid}"
+                    )
                     return True
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 # 忽略已终止、无权限或僵尸进程

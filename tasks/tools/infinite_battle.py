@@ -224,7 +224,10 @@ class InfiniteBattles(QWidget):
         import time
 
         current_time = int(time.time())
-        if not hasattr(self, "_last_log_time") or current_time - self._last_log_time > 10:
+        if (
+            not hasattr(self, "_last_log_time")
+            or current_time - self._last_log_time > 10
+        ):
             self.log_text.append(self.tr("战斗操作执行"))
             self._last_log_time = current_time
 

@@ -62,7 +62,9 @@ def export_team_settings(team_num: int, file_path: str) -> bool:
         return False
 
 
-def import_team_settings(file_path: str, team_num: int) -> tuple[Optional[TeamSetting], Optional[dict], list[str]]:
+def import_team_settings(
+    file_path: str, team_num: int
+) -> tuple[Optional[TeamSetting], Optional[dict], list[str]]:
     """从 YAML 文件导入队伍设置
 
     Args:
@@ -89,7 +91,9 @@ def import_team_settings(file_path: str, team_num: int) -> tuple[Optional[TeamSe
             team_setting = TeamSetting(**data)
             return team_setting, theme_pack_weight, []
         except ValidationError as e:
-            missing_fields = [err["loc"][0] for err in e.errors() if err["type"] == "missing"]
+            missing_fields = [
+                err["loc"][0] for err in e.errors() if err["type"] == "missing"
+            ]
             if missing_fields:
                 # 使用 model_construct 为缺失字段创建默认值
                 team_setting = TeamSetting.model_construct(**data)
@@ -102,7 +106,9 @@ def import_team_settings(file_path: str, team_num: int) -> tuple[Optional[TeamSe
         return None, None, [str(e)]
 
 
-def apply_team_settings(team_num: int, team_setting: TeamSetting, theme_pack_weight: Optional[dict]) -> None:
+def apply_team_settings(
+    team_num: int, team_setting: TeamSetting, theme_pack_weight: Optional[dict]
+) -> None:
     """应用导入的队伍设置到配置"""
     cfg.config.teams[str(team_num)] = team_setting
 

@@ -42,7 +42,12 @@ class ObserveGiftSelection:
 
     def is_blank(self) -> bool:
         """判断这一行是否还是完全空白。"""
-        return self.system is None and self.level is None and self.row is None and self.col is None
+        return (
+            self.system is None
+            and self.level is None
+            and self.row is None
+            and self.col is None
+        )
 
     def is_complete(self) -> bool:
         """判断这一行是否已经形成可保存的完整选择。"""

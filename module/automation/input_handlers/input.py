@@ -1,4 +1,5 @@
 import random
+import numpy as np
 from time import sleep, time
 from typing import overload
 
@@ -137,6 +138,12 @@ class WinAbstractInput(AbstractInput):
         return MESSAGE_KEY_WPARAMS.get(vk, vk)
 
 
+def human_delay(base_time=0.1, std_dev=0.03):
+    """生成正态分布的随机延迟，更符合人类操作习惯，下限保护为0.01"""
+    delay = np.random.normal(base_time, std_dev)
+    return max(0.01, delay)
+
+
 class Input(WinAbstractInput, metaclass=SingletonMeta):
     """基于 `pyautogui` 的输入类, 仅支持前台操作"""
 
@@ -198,10 +205,8 @@ class Input(WinAbstractInput, metaclass=SingletonMeta):
         pyautogui.moveTo(x, y)
         pyautogui.mouseDown()
         pyautogui.moveTo(x + dx, y + dy, duration=drag_time)
-        if drag_time * 0.3 > 0.5:
-            sleep(drag_time * 0.3)
-        else:
-            sleep(0.5)
+        # 注入随机拖拽延迟
+        sleep(human_delay(drag_time * 0.3 if drag_time * 0.3 > 0.2 else 0.2, 0.05))
         pyautogui.mouseUp()
 
         if move_back and current_mouse_position:
@@ -307,11 +312,17 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         if move_back:
             current_mouse_position = self.get_mouse_position()
             rect = screen.handle.rect(True)
-            if current_mouse_position[0] > rect[2] or current_mouse_position[1] > rect[3]:
+            if (
+                current_mouse_position[0] > rect[2]
+                or current_mouse_position[1] > rect[3]
+            ):
                 # 在窗口右下角外
                 log.debug("当前鼠标位置不在游戏窗口内，取消移动到空白", stacklevel=2)
                 return
-            elif current_mouse_position[0] < rect[0] or current_mouse_position[1] < rect[1]:
+            elif (
+                current_mouse_position[0] < rect[0]
+                or current_mouse_position[1] < rect[1]
+            ):
                 # 在窗口左上角外
                 log.debug("当前鼠标位置不在游戏窗口内，取消移动到空白", stacklevel=2)
                 return
@@ -341,7 +352,7 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
             self.set_mouse_pos(x, y)
             self.set_active()
             self.mouse_down(x, y)
-            sleep(0.03)
+            sleep(human_delay(0.05, 0.02))  # 模拟人类按下和松开的时间间隔
             self.mouse_up(x, y)
             # 多次点击执行很快所以暂停放到循环外
 
@@ -391,10 +402,8 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         self.set_active()
         self.mouse_down(x, y)
         self.set_mouse_pos(x + dx, y + dy, duration=drag_time)
-        if drag_time * 0.3 > 0.5:
-            sleep(drag_time * 0.3)
-        else:
-            sleep(0.5)
+        # 注入随机拖拽延迟
+        sleep(human_delay(drag_time * 0.3 if drag_time * 0.3 > 0.2 else 0.2, 0.05))
         self.mouse_up(x + dx, y + dy)
 
         if move_back and current_mouse_position:
@@ -432,7 +441,7 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
             self.set_mouse_pos(x, y)
             self.set_active()
             self.mouse_down(x, y)
-            sleep(0.03)
+            sleep(human_delay(0.05, 0.02))  # 模拟人类按下和松开的时间间隔
             self.mouse_up(x, y)
 
         if move_back and current_mouse_position:
@@ -656,10 +665,8 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
         self.set_active()
         self.mouse_down(x, y)
         self._window_move_to(x + dx, y + dy, duration=drag_time)
-        if drag_time * 0.3 > 0.5:
-            sleep(drag_time * 0.3)
-        else:
-            sleep(0.5)
+        # 注入随机拖拽延迟
+        sleep(human_delay(drag_time * 0.3 if drag_time * 0.3 > 0.2 else 0.2, 0.05))
         self.mouse_up(x + dx, y + dy)
         screen.handle.set_window_pos(*pos)
 
@@ -692,7 +699,9 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
         self.mouse_click(x, y, times=times)
         return True
 
-    def _window_move_to(self, x_or_pos: int | tuple[int, int], y: int = -32000, duration: float = 0) -> tuple[int, int]:
+    def _window_move_to(
+        self, x_or_pos: int | tuple[int, int], y: int = -32000, duration: float = 0
+    ) -> tuple[int, int]:
         if duration <= 0:
             return self._set_window_pos(x_or_pos, y)
         else:
@@ -702,7 +711,9 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
                 target_x = x_or_pos
                 target_y = y
         raw_pos = screen.handle.rect()[:2]
-        current_x, current_y = screen.handle.mouse_pos_to_client_mouse(*self.get_mouse_position())
+        current_x, current_y = screen.handle.mouse_pos_to_client_mouse(
+            *self.get_mouse_position()
+        )
         accur = 7000
         duration = int(max(duration, 0.01) * accur)
         dx = (target_x - current_x) / duration * 100

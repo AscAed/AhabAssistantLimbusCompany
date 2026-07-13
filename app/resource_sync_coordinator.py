@@ -81,11 +81,16 @@ class ResourceSyncCoordinator(QObject):
     def start_manual_resource_sync_check(self) -> None:
         """由设置页触发的手动资源同步检查入口。"""
         # 第一步：如果当前已有资源任务在跑，则直接提示用户稍后再试。
-        if self._resource_sync_worker is not None and self._resource_sync_worker.isRunning():
+        if (
+            self._resource_sync_worker is not None
+            and self._resource_sync_worker.isRunning()
+        ):
             self._show_resource_sync_infobar(
                 level="warning",
                 title=self._window.tr("图片资源任务进行中"),
-                content=self._window.tr("当前已有图片资源检查或同步任务正在运行，请稍后再试"),
+                content=self._window.tr(
+                    "当前已有图片资源检查或同步任务正在运行，请稍后再试"
+                ),
             )
             return
 
@@ -138,7 +143,11 @@ class ResourceSyncCoordinator(QObject):
             notify_user_when_blocked = True
         else:
             raise ValueError(f"不支持的资源同步门禁触发场景: {trigger}")
-        trigger_text = self._window.tr("启动阶段") if trigger == "startup" else self._window.tr("手动资源同步")
+        trigger_text = (
+            self._window.tr("启动阶段")
+            if trigger == "startup"
+            else self._window.tr("手动资源同步")
+        )
         log.debug(f"{trigger_text}将先检查软件版本更新状态，再决定是否继续图片资源同步")
 
         # 第二步：调用既有软件更新检查入口，并把资源同步回调附加进去。
@@ -180,18 +189,24 @@ class ResourceSyncCoordinator(QObject):
                 self._show_resource_sync_infobar(
                     level="warning",
                     title=self._window.tr("无法同步图片资源"),
-                    content=self._window.tr("软件版本检查失败，暂时无法确认当前版本是否为最新版本"),
+                    content=self._window.tr(
+                        "软件版本检查失败，暂时无法确认当前版本是否为最新版本"
+                    ),
                 )
             return False
 
         # 第二步：若本地软件版本尚未追平最新版本，则阻断资源同步并给出原因。
         if not getattr(update_thread, "is_current_version_latest", False):
-            log.info(f"当前软件版本 {cfg.version} 与最新版本 {latest_version} 不一致，已跳过图片资源同步")
+            log.info(
+                f"当前软件版本 {cfg.version} 与最新版本 {latest_version} 不一致，已跳过图片资源同步"
+            )
             if notify_user:
                 self._show_resource_sync_infobar(
                     level="warning",
                     title=self._window.tr("无法同步图片资源"),
-                    content=self._window.tr("当前软件版本与最新版本不一致，请先更新软件后再同步图片资源"),
+                    content=self._window.tr(
+                        "当前软件版本与最新版本不一致，请先更新软件后再同步图片资源"
+                    ),
                 )
             return False
 
@@ -276,7 +291,10 @@ class ResourceSyncCoordinator(QObject):
             若成功启动新线程则返回 True；若已有线程运行则返回 False。
         """
         # 第一步：避免重复启动资源同步线程，保护后台状态机的一致性。
-        if self._resource_sync_worker is not None and self._resource_sync_worker.isRunning():
+        if (
+            self._resource_sync_worker is not None
+            and self._resource_sync_worker.isRunning()
+        ):
             return False
 
         # 第二步：读取当前资源源偏好并构造工作线程对象。
@@ -330,7 +348,11 @@ class ResourceSyncCoordinator(QObject):
         """
         # 统一复用主窗口现有进度环组件
         # 检测远端清单与本地差异时不显示进度环，只在真正下载、解压和应用资源包时显示。
-        if self._resource_sync_worker_context in {"startup_auto", "startup_check_only", "manual"}:
+        if self._resource_sync_worker_context in {
+            "startup_auto",
+            "startup_check_only",
+            "manual",
+        }:
             self._window.progress_ring.hide()
             return
         self._set_progress(value)
@@ -395,7 +417,9 @@ class ResourceSyncCoordinator(QObject):
             raise ValueError("资源同步检查结果缺少同步计划，无法继续处理")
 
         if not sync_plan.has_changes:
-            log.debug("远端图片资源清单已更新，但本地无需下载或删除图片，正在刷新状态文件")
+            log.debug(
+                "远端图片资源清单已更新，但本地无需下载或删除图片，正在刷新状态文件"
+            )
             self._resource_sync_service.accept_remote_state(check_result)
             self._set_resource_sync_status("synced")
             if context == "manual":
@@ -425,7 +449,9 @@ class ResourceSyncCoordinator(QObject):
             )
             return
 
-        if not self._confirm_apply_resource_sync(sync_plan, startup_context=context == "startup_auto"):
+        if not self._confirm_apply_resource_sync(
+            sync_plan, startup_context=context == "startup_auto"
+        ):
             self._set_resource_sync_status("update_available")
             log.debug(f"用户跳过了本次图片资源同步：{summary_text}")
             if context == "startup_auto":
@@ -440,7 +466,9 @@ class ResourceSyncCoordinator(QObject):
             "sync_plan": sync_plan,
         }
 
-    def _on_resource_sync_apply_finished(self, apply_result: ResourceApplyResult) -> None:
+    def _on_resource_sync_apply_finished(
+        self, apply_result: ResourceApplyResult
+    ) -> None:
         """处理资源同步应用完成后的收尾逻辑。
 
         参数:
@@ -474,7 +502,9 @@ class ResourceSyncCoordinator(QObject):
         """
         # 第一步：先根据当前上下文刷新标题栏状态并记录异常日志。
         context = self._resource_sync_worker_context or ""
-        self._set_resource_sync_status("update_available" if context.endswith("apply") else "hidden")
+        self._set_resource_sync_status(
+            "update_available" if context.endswith("apply") else "hidden"
+        )
         log.error(f"图片资源同步流程异常结束：{message}")
 
         # 第二步：手动场景需要直接告知用户失败原因；启动场景则继续放行原启动链路。
@@ -505,7 +535,11 @@ class ResourceSyncCoordinator(QObject):
         if pending_request is not None:
             self._pending_resource_sync_apply_request = pending_request
             started, resumed_request = self._start_pending_resource_sync_apply()
-            if not started and resumed_request is not None and resumed_request["context"] == "startup_apply":
+            if (
+                not started
+                and resumed_request is not None
+                and resumed_request["context"] == "startup_apply"
+            ):
                 self._continue_startup_sequence_once()
             return
 
@@ -544,7 +578,9 @@ class ResourceSyncCoordinator(QObject):
             delete_count=len(sync_plan.files_to_delete),
         )
 
-    def _confirm_apply_resource_sync(self, sync_plan: ResourceSyncPlan, *, startup_context: bool) -> bool:
+    def _confirm_apply_resource_sync(
+        self, sync_plan: ResourceSyncPlan, *, startup_context: bool
+    ) -> bool:
         """提示用户是否立即应用检测到的图片资源更新。
 
         参数:
@@ -555,13 +591,15 @@ class ResourceSyncCoordinator(QObject):
             用户确认应用时返回 True，否则返回 False。
         """
         # 第一步：先拼接同步计划摘要，生成确认框正文。
-        content = self._window.tr(
-            "{summary}\n是否立即同步？"
-        ).format(summary=self._format_resource_sync_plan_summary(sync_plan))
+        content = self._window.tr("{summary}\n是否立即同步？").format(
+            summary=self._format_resource_sync_plan_summary(sync_plan)
+        )
 
         # 第二步：start 自动任务模式下追加超时提示，避免阻塞无人值守启动。
         if startup_context and self._is_auto_task_start(self._startup_argv):
-            content += self._window.tr("\n当前为 start 自动任务模式，5 分钟内未选择将默认跳过本次更新。")
+            content += self._window.tr(
+                "\n当前为 start 自动任务模式，5 分钟内未选择将默认跳过本次更新。"
+            )
 
         message_box = MessageBoxConfirm(
             self._window.tr("检测到图片资源更新"),
@@ -578,7 +616,9 @@ class ResourceSyncCoordinator(QObject):
             def _reject_on_timeout() -> None:
                 # 自动任务模式下不让确认框无限阻塞启动流程，超时后按“跳过同步”处理。
                 if message_box.isVisible():
-                    log.info("start 自动任务模式下等待图片资源更新确认超时 5 分钟，默认跳过本次同步")
+                    log.info(
+                        "start 自动任务模式下等待图片资源更新确认超时 5 分钟，默认跳过本次同步"
+                    )
                     message_box.reject()
 
             timeout_timer.timeout.connect(_reject_on_timeout)
@@ -590,7 +630,9 @@ class ResourceSyncCoordinator(QObject):
             timeout_timer.stop()
         return accepted
 
-    def _show_resource_sync_infobar(self, *, level: str, title: str, content: str) -> None:
+    def _show_resource_sync_infobar(
+        self, *, level: str, title: str, content: str
+    ) -> None:
         """统一弹出资源同步相关提示，保持提示风格一致。
 
         参数:
@@ -615,7 +657,9 @@ class ResourceSyncCoordinator(QObject):
             parent=self._window,
         )
 
-    def _resolve_resource_sync_status_presentation(self, is_dark: bool) -> tuple[str | None, str | None]:
+    def _resolve_resource_sync_status_presentation(
+        self, is_dark: bool
+    ) -> tuple[str | None, str | None]:
         """解析当前标题栏资源状态需要展示的文案与颜色。
 
         参数:
@@ -673,8 +717,7 @@ class ResourceSyncCoordinator(QObject):
             return
 
         # 第二步：统一更新标题栏状态标记的字号和前景色。
-        self._status_label.setStyleSheet(
-            f"""
+        self._status_label.setStyleSheet(f"""
             QLabel {{
                 background-color: transparent;
                 border: none;
@@ -683,5 +726,4 @@ class ResourceSyncCoordinator(QObject):
                 font-weight: 600;
                 padding: 0 2px;
             }}
-            """
-        )
+            """)

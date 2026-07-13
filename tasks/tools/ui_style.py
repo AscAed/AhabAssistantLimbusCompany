@@ -2,7 +2,6 @@ import os
 
 from qfluentwidgets import isDarkTheme
 
-
 _THEMES = {
     "dark": {
         "window_bg": "#1f1f1f",

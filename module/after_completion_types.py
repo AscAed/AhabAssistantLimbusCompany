@@ -60,7 +60,9 @@ _EXIT_ACTION_TO_FLAG: dict[ExitAction, ExitActionFlag] = {
 
 # 引入版本：v1772205660 (PR #593)
 # 旧数字配置的兼容映射集中维护在这里，避免业务层各自复制一份协议。
-LEGACY_AFTER_COMPLETION_TO_CONFIG: dict[int, tuple[tuple[ExitAction, ...], PowerAction]] = {
+LEGACY_AFTER_COMPLETION_TO_CONFIG: dict[
+    int, tuple[tuple[ExitAction, ...], PowerAction]
+] = {
     0: ((), POWER_ACTION_NONE),
     1: ((), POWER_ACTION_SLEEP),
     2: ((), POWER_ACTION_HIBERNATE),
@@ -103,10 +105,14 @@ def normalize_after_actions(
     actions: Iterable[str | ExitAction] | str | ExitAction | None,
 ) -> list[ExitAction]:
     flags = build_exit_action_flag(actions)
-    return [action for action in AFTER_ACTIONS_ORDER if flags & _EXIT_ACTION_TO_FLAG[action]]
+    return [
+        action for action in AFTER_ACTIONS_ORDER if flags & _EXIT_ACTION_TO_FLAG[action]
+    ]
 
 
-def serialize_after_actions(actions: Iterable[str | ExitAction] | str | ExitAction | None) -> list[str]:
+def serialize_after_actions(
+    actions: Iterable[str | ExitAction] | str | ExitAction | None,
+) -> list[str]:
     return [action.value for action in normalize_after_actions(actions)]
 
 

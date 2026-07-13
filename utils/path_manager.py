@@ -37,9 +37,13 @@ class PathManager(metaclass=SingletonMeta):
 
         self.active_paths = self.DEFAULT_ACTIVE_PATHS.copy()
         if self.is_dark_eliminated:
-            self.active_paths = [path for path in self.active_paths if not path.startswith("dark/")]
+            self.active_paths = [
+                path for path in self.active_paths if not path.startswith("dark/")
+            ]
         if self.is_zh_cn_eliminated:
-            self.active_paths = [path for path in self.active_paths if not path.endswith("/zh_cn")]
+            self.active_paths = [
+                path for path in self.active_paths if not path.endswith("/zh_cn")
+            ]
 
         log.debug(f"路径管理器初始化完成，路径: {self.active_paths}")
 
@@ -71,7 +75,9 @@ class PathManager(metaclass=SingletonMeta):
         if self.is_dark_eliminated:
             return False
 
-        new_active_paths = [path for path in self.active_paths if not path.startswith("dark/")]
+        new_active_paths = [
+            path for path in self.active_paths if not path.startswith("dark/")
+        ]
         if new_active_paths == self.active_paths:
             return False
 
@@ -85,7 +91,9 @@ class PathManager(metaclass=SingletonMeta):
         if self.is_zh_cn_eliminated:
             return False
 
-        new_active_paths = [path for path in self.active_paths if not path.endswith("/zh_cn")]
+        new_active_paths = [
+            path for path in self.active_paths if not path.endswith("/zh_cn")
+        ]
         if new_active_paths == self.active_paths:
             return False
 

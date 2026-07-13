@@ -18,7 +18,9 @@ def unload_logger_modules() -> None:
 
 
 def py_side_modules() -> set[str]:
-    return {module_name for module_name in sys.modules if module_name.startswith("PySide6")}
+    return {
+        module_name for module_name in sys.modules if module_name.startswith("PySide6")
+    }
 
 
 def test_importing_logger_package_does_not_import_qt_logger_module() -> None:

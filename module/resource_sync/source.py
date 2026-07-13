@@ -5,9 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 # GitHub 资源清单地址。
-RESOURCE_MANIFEST_URL_GITHUB = "https://raw.githubusercontent.com/KIYI671/AALCImageResources/main/manifest.json"
+RESOURCE_MANIFEST_URL_GITHUB = (
+    "https://raw.githubusercontent.com/KIYI671/AALCImageResources/main/manifest.json"
+)
 # Gitee 资源清单地址。
-RESOURCE_MANIFEST_URL_GITEE = "https://gitee.com/KIYI/AALCImageResources/raw/master/manifest.json"
+RESOURCE_MANIFEST_URL_GITEE = (
+    "https://gitee.com/KIYI/AALCImageResources/raw/master/manifest.json"
+)
 
 
 @dataclass(frozen=True, slots=True)

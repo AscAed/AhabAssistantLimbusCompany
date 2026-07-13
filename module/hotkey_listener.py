@@ -14,7 +14,11 @@ _MODIFIER_KEYS = {
 
 
 class _ExactHotKey:
-    def __init__(self, keys: list[keyboard.Key | keyboard.KeyCode], on_activate: Callable[[], None]):
+    def __init__(
+        self,
+        keys: list[keyboard.Key | keyboard.KeyCode],
+        on_activate: Callable[[], None],
+    ):
         self._keys = set(keys)
         self._state: set[keyboard.Key | keyboard.KeyCode] = set()
         self._required_modifiers = {key for key in self._keys if key in _MODIFIER_KEYS}
@@ -29,7 +33,9 @@ class _ExactHotKey:
         if key in self._keys:
             self._state.add(key)
 
-        should_activate = self._state == self._keys and pressed_modifiers == self._required_modifiers
+        should_activate = (
+            self._state == self._keys and pressed_modifiers == self._required_modifiers
+        )
         if should_activate and not self._is_active:
             self._is_active = True
             self._on_activate()
@@ -44,7 +50,10 @@ class _ExactHotKey:
 class ExactGlobalHotKeys(keyboard.Listener):
     def __init__(self, hotkeys: dict[str, Callable[[], None]], *args, **kwargs):
         self._pressed_keys: set[keyboard.Key | keyboard.KeyCode] = set()
-        self._hotkeys = [_ExactHotKey(keyboard.HotKey.parse(hotkey), callback) for hotkey, callback in hotkeys.items()]
+        self._hotkeys = [
+            _ExactHotKey(keyboard.HotKey.parse(hotkey), callback)
+            for hotkey, callback in hotkeys.items()
+        ]
         super().__init__(
             on_press=self._on_press,
             on_release=self._on_release,

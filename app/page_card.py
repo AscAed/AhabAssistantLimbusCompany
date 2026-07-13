@@ -90,7 +90,9 @@ class PageCard(QFrame):
         self.pivot.addItem("general", "常规设置")
         self.pivot.addItem("advanced", "高级设置")
         self.pivot.setCurrentItem("general")
-        self.pivot.currentItemChanged.connect(lambda k: self.all_page.setCurrentWidget(self.findChild(QWidget, k)))
+        self.pivot.currentItemChanged.connect(
+            lambda k: self.all_page.setCurrentWidget(self.findChild(QWidget, k))
+        )
 
     def __init_widget(self):
         self.card_layout.setAlignment(Qt.AlignTop)
@@ -98,8 +100,12 @@ class PageCard(QFrame):
         self.vbox_advanced.setAlignment(Qt.AlignTop)
 
     def retranslateUi(self):
-        self.pivot.setItemText("general", QCoreApplication.translate("PageCard", "常规设置"))
-        self.pivot.setItemText("advanced", QCoreApplication.translate("PageCard", "高级设置"))
+        self.pivot.setItemText(
+            "general", QCoreApplication.translate("PageCard", "常规设置")
+        )
+        self.pivot.setItemText(
+            "advanced", QCoreApplication.translate("PageCard", "高级设置")
+        )
 
     @classmethod
     def tr(cls, text):
@@ -145,14 +151,21 @@ class PageSetWindows(PageCard):
             "mouse_down_duration",
             double=True,
             tips=QT_TRANSLATE_NOOP(
-                "LabelWithSpinBox", "仅在使用异步方法进行鼠标输入时生效，单位为秒，每次鼠标按下都会增加对应的延迟"
+                "LabelWithSpinBox",
+                "仅在使用异步方法进行鼠标输入时生效，单位为秒，每次鼠标按下都会增加对应的延迟",
             ),
         )
         self.use_post_message = LabelWithComboBox(
             QT_TRANSLATE_NOOP("LabelWithComboBox", "使用异步方法进行键鼠输入"),
             "use_post_message",
-            {QT_TRANSLATE_NOOP("BaseComboBox", "否 (默认)"): False, QT_TRANSLATE_NOOP("BaseComboBox", "是"): True},
-            tips=QT_TRANSLATE_NOOP("LabelWithComboBox", "提高点击速度，但是对硬件与网络有一定需求，否则可能出现漏点"),
+            {
+                QT_TRANSLATE_NOOP("BaseComboBox", "否 (默认)"): False,
+                QT_TRANSLATE_NOOP("BaseComboBox", "是"): True,
+            },
+            tips=QT_TRANSLATE_NOOP(
+                "LabelWithComboBox",
+                "提高点击速度，但是对硬件与网络有一定需求，否则可能出现漏点",
+            ),
         )
 
     def __init_layout(self):
@@ -207,7 +220,9 @@ class PageDailyTask(PageCard):
             QT_TRANSLATE_NOOP("CheckBoxWithComboBox", "使用连续作战"),
             None,
             "use_continuous_combat_select",
-            tips=QT_TRANSLATE_NOOP("BaseCheckBox", "勾选后将使用连续作战模式，设置的值为最大连续作战场次"),
+            tips=QT_TRANSLATE_NOOP(
+                "BaseCheckBox", "勾选后将使用连续作战模式，设置的值为最大连续作战场次"
+            ),
         )
         self.coutinuous_combat.box.setFixedWidth(200)
         self.coutinuous_combat.combo_box.setFixedWidth(100)
@@ -234,7 +249,9 @@ class PageDailyTask(PageCard):
             "EXP_day_5_6",
             all_teams,
         )
-        self.EXP_day_7 = LabelWithComboBox(QT_TRANSLATE_NOOP("LabelWithComboBox", "周日"), "EXP_day_7", all_teams)
+        self.EXP_day_7 = LabelWithComboBox(
+            QT_TRANSLATE_NOOP("LabelWithComboBox", "周日"), "EXP_day_7", all_teams
+        )
         self.targeted_teaming_thread = BaseCheckBox(
             "targeted_teaming_thread",
             None,
@@ -367,7 +384,9 @@ class PageLunacyToEnkephalin(PageCard):
             "skip_enkephalin",
             None,
             QT_TRANSLATE_NOOP("BaseCheckBox", "不自动兑换脑啡肽 (?)"),
-            tips=QT_TRANSLATE_NOOP("BaseCheckBox", "勾选后除狂气换体以外不执行兑换脑啡肽的操作"),
+            tips=QT_TRANSLATE_NOOP(
+                "BaseCheckBox", "勾选后除狂气换体以外不执行兑换脑啡肽的操作"
+            ),
             center=False,
         )
 
@@ -408,7 +427,9 @@ class PageMirror(PageCard):
             "team1_setting",
         )
 
-        self.mirror_count = MirrorSpinBox(QT_TRANSLATE_NOOP("MirrorSpinBox", "坐牢次数"), "set_mirror_count")
+        self.mirror_count = MirrorSpinBox(
+            QT_TRANSLATE_NOOP("MirrorSpinBox", "坐牢次数"), "set_mirror_count"
+        )
 
         self.add_team = QHBoxLayout()
         self.add_team_button = TransparentToolButton(FIF.ADD, None)
@@ -453,7 +474,9 @@ class PageMirror(PageCard):
             "save_rewards",
             None,
             QT_TRANSLATE_NOOP("BaseCheckBox", "保存困牢奖励"),
-            tips=QT_TRANSLATE_NOOP("BaseCheckBox", "仅在进行困难镜牢时生效，普通难度不生效"),
+            tips=QT_TRANSLATE_NOOP(
+                "BaseCheckBox", "仅在进行困难镜牢时生效，普通难度不生效"
+            ),
             center=False,
         )
         self.hard_mirror_single_bonuses = BaseCheckBox(
@@ -600,7 +623,9 @@ class PageMirror(PageCard):
                 if cfg.config.teams.get(f"{i}", None) is not None:
                     self.vbox_general.insertWidget(
                         self.vbox_general.count() - 1,
-                        MirrorTeamCombination(i, f"the_team_{i}", f"编队{i}", None, f"team{i}_setting"),
+                        MirrorTeamCombination(
+                            i, f"the_team_{i}", f"编队{i}", None, f"team{i}_setting"
+                        ),
                     )
         finally:
             self.page_general.setUpdatesEnabled(True)
@@ -621,7 +646,9 @@ class PageMirror(PageCard):
                 )
 
                 newTeamComb.retranslateUi()
-                self.vbox_general.insertWidget(self.vbox_general.count() - 1, newTeamComb)
+                self.vbox_general.insertWidget(
+                    self.vbox_general.count() - 1, newTeamComb
+                )
             finally:
                 self.page_general.setUpdatesEnabled(True)
 
@@ -643,21 +670,31 @@ class PageMirror(PageCard):
         menu.addAction(create_from_file_action)
 
         # 在按钮位置显示菜单
-        menu.exec(self.add_team_button.mapToGlobal(self.add_team_button.rect().bottomLeft()))
+        menu.exec(
+            self.add_team_button.mapToGlobal(self.add_team_button.rect().bottomLeft())
+        )
 
     def create_team_from_file(self):
         """从导入的配置文件创建新队伍"""
         # 打开文件对话框选择 YAML 文件
-        file_path, _ = QFileDialog.getOpenFileName(self, self.tr("选择队伍配置文件"), "", "YAML Files (*.yaml *.yml)")
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, self.tr("选择队伍配置文件"), "", "YAML Files (*.yaml *.yml)"
+        )
 
         if not file_path:
             return
 
         # 从文件导入队伍设置
-        team_setting, theme_pack_weight, missing_fields = import_team_settings(file_path, 1)
+        team_setting, theme_pack_weight, missing_fields = import_team_settings(
+            file_path, 1
+        )
 
         if team_setting is None:
-            MessageBox(self.tr("导入失败"), self.tr("无法读取配置文件，请检查文件格式是否正确。"), self).exec()
+            MessageBox(
+                self.tr("导入失败"),
+                self.tr("无法读取配置文件，请检查文件格式是否正确。"),
+                self,
+            ).exec()
             return
 
         # 如果字段缺失则显示警告
@@ -665,7 +702,9 @@ class PageMirror(PageCard):
             missing_text = "\n- ".join(missing_fields)
             w = MessageBox(
                 self.tr("缺少字段"),
-                self.tr(f"配置文件中缺少以下字段：\n- {missing_text}\n\n将使用默认值填充这些字段。是否继续？"),
+                self.tr(
+                    f"配置文件中缺少以下字段：\n- {missing_text}\n\n将使用默认值填充这些字段。是否继续？"
+                ),
                 self,
             )
             w.yesButton.setText(self.tr("继续"))
@@ -684,7 +723,11 @@ class PageMirror(PageCard):
                 break
 
         if team_num is None:
-            MessageBox(self.tr("无可用队伍槽位"), self.tr("已达到最大队伍数量（20个），无法创建新队伍。"), self).exec()
+            MessageBox(
+                self.tr("无可用队伍槽位"),
+                self.tr("已达到最大队伍数量（20个），无法创建新队伍。"),
+                self,
+            ).exec()
             return
 
         # 应用导入的设置
@@ -711,7 +754,9 @@ class PageMirror(PageCard):
             )
         except Exception as e:
             log.error(f"Failed to create team from file: {e}")
-            MessageBox(self.tr("创建失败"), self.tr(f"创建队伍时出错：{str(e)}"), self).exec()
+            MessageBox(
+                self.tr("创建失败"), self.tr(f"创建队伍时出错：{str(e)}"), self
+            ).exec()
 
     def remove_team_card(self, target: str):
         try:
@@ -729,7 +774,9 @@ class PageMirror(PageCard):
         try:
             team = self.findChild(MirrorTeamCombination, target)
             if team is not None:
-                team_order_box = team.findChild(BaseCheckBox, f"the_team_{team.team_number}")
+                team_order_box = team.findChild(
+                    BaseCheckBox, f"the_team_{team.team_number}"
+                )
                 if team_order_box is not None:
                     team_order_box.set_check_false()
             number = int(target.split("_")[-1])
@@ -746,7 +793,9 @@ class PageMirror(PageCard):
     def refresh_team_setting_card(self):
         old_to_new = {}
         compact_teams = {}
-        for new_index, old_index in enumerate(sorted(cfg.config.teams, key=lambda k: int(k)), start=1):
+        for new_index, old_index in enumerate(
+            sorted(cfg.config.teams, key=lambda k: int(k)), start=1
+        ):
             old_number = int(old_index)
             old_to_new[old_number] = new_index
             team_setting = cfg.config.teams[old_index]
@@ -867,11 +916,15 @@ class MarkdownViewer(QWidget):
         LanguageManager().register_component(self)
 
         self.text_browser = ThemeAwareTextBrowser()
-        self.text_browser.scrollDelegate.verticalSmoothScroll.setSmoothMode(SmoothMode.LINEAR)
+        self.text_browser.scrollDelegate.verticalSmoothScroll.setSmoothMode(
+            SmoothMode.LINEAR
+        )
         self.text_browser.scrollDelegate.verticalSmoothScroll.duration = 100
         self.text_browser.setOpenExternalLinks(False)
         self.text_browser.anchorClicked.connect(self.handle_link_clicked)
-        self.text_browser.setContextMenuPolicy(Qt.ContextMenuPolicy.NoContextMenu)  # 禁用右键菜单
+        self.text_browser.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.NoContextMenu
+        )  # 禁用右键菜单
 
         self.md = (
             MarkdownIt("commonmark", {"html": True})
@@ -910,7 +963,9 @@ class MarkdownViewer(QWidget):
             self.load_markdown(self.help_path)
             self.text_browser.setHtml(self.html)
         else:
-            self.text_browser.setPlainText(f"错误: 无法加载文件 {self.help_path}，请检查文件路径是否正确。")
+            self.text_browser.setPlainText(
+                f"错误: 无法加载文件 {self.help_path}，请检查文件路径是否正确。"
+            )
 
     def handle_link_clicked(self, url: QUrl):
         """

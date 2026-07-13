@@ -59,7 +59,9 @@ class CustomSegmentedWidget(SegmentedWidget):
 
         c = themeColor()
         painter.setPen(QPen(c, 1.5))
-        painter.setBrush(QColor(30, 30, 30, 255) if is_dark else QColor(255, 255, 255, 255))
+        painter.setBrush(
+            QColor(30, 30, 30, 255) if is_dark else QColor(255, 255, 255, 255)
+        )
 
         item = self.currentItem()
         slidex = int(self.slideAni.value())
@@ -75,7 +77,12 @@ class CustomSegmentedWidget(SegmentedWidget):
         if is_left_edge and is_right_edge:
             path.addRoundedRect(rect_active, radius, radius)
         else:
-            x, y, w, h = rect_active.x(), rect_active.y(), rect_active.width(), rect_active.height()
+            x, y, w, h = (
+                rect_active.x(),
+                rect_active.y(),
+                rect_active.width(),
+                rect_active.height(),
+            )
             # 手动构建路径：左边缘圆角，右边缘直角（或反之）
             path.moveTo(x + (radius if is_left_edge else 0), y)
 
@@ -83,7 +90,14 @@ class CustomSegmentedWidget(SegmentedWidget):
                 path.lineTo(x + w - radius, y)
                 path.arcTo(x + w - 2 * radius, y, 2 * radius, 2 * radius, 90, -90)
                 path.lineTo(x + w, y + h - radius)
-                path.arcTo(x + w - 2 * radius, y + h - 2 * radius, 2 * radius, 2 * radius, 0, -90)
+                path.arcTo(
+                    x + w - 2 * radius,
+                    y + h - 2 * radius,
+                    2 * radius,
+                    2 * radius,
+                    0,
+                    -90,
+                )
             else:
                 path.lineTo(x + w, y)
                 path.lineTo(x + w, y + h)

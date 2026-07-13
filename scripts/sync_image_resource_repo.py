@@ -44,13 +44,21 @@ def sync_resource_repo(
         同步后的目标 manifest 路径和目标资源包路径。
     """
     if not artifact_manifest_path.is_file():
-        raise FileNotFoundError(f"Manifest file does not exist in build artifacts: {artifact_manifest_path}")
+        raise FileNotFoundError(
+            f"Manifest file does not exist in build artifacts: {artifact_manifest_path}"
+        )
     if not artifact_package_path.is_file():
-        raise FileNotFoundError(f"Resource package does not exist in build artifacts: {artifact_package_path}")
+        raise FileNotFoundError(
+            f"Resource package does not exist in build artifacts: {artifact_package_path}"
+        )
     if not repo_root.exists():
-        raise FileNotFoundError(f"Target resource repository directory does not exist: {repo_root}")
+        raise FileNotFoundError(
+            f"Target resource repository directory does not exist: {repo_root}"
+        )
     if not repo_root.is_dir():
-        raise NotADirectoryError(f"Target resource repository path is not a directory: {repo_root}")
+        raise NotADirectoryError(
+            f"Target resource repository path is not a directory: {repo_root}"
+        )
 
     target_manifest_path = repo_root / repo_manifest_relative_path
     target_packages_dir = repo_root / repo_packages_relative_dir
