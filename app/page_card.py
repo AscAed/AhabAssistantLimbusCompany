@@ -916,7 +916,7 @@ class MarkdownViewer(QWidget):
         """
         处理 QTextBrowser 中点击链接的逻辑
         """
-        if url.scheme() in ["http", "https"]:
+        if url.scheme() in {"http", "https"}:
             # 用系统默认浏览器打开外部链接
             QDesktopServices.openUrl(url)
         elif url.scheme() != "":
