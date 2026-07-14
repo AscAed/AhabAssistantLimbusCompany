@@ -66,12 +66,6 @@ class ImageUtils:
             img_path = os.path.join(f"./assets/images/{path}/{image_path}")
             if os.path.exists(img_path):
                 paths.append(path)
-        if path_manager.current_theme == "dark":
-            dark_paths = [path for path in paths if path_manager.is_path_dark(path)]
-            if dark_paths:
-                paths = dark_paths
-        elif path_manager.current_theme == "default":
-            paths = [path for path in paths if path_manager.is_path_default(path)]
 
         if path_manager.current_language == "zh_cn":
             zh_cn_paths = [path for path in paths if path_manager.is_path_zh_cn(path)]
