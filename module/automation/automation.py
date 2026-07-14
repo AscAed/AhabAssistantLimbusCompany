@@ -178,8 +178,6 @@ class Automation(metaclass=SingletonMeta):
         screenshot = np.array(self.screenshot)
         if offset:
             # 使用正态分布生成点击偏移，使其更聚集在中心区域，符合人类点击习惯
-            import numpy as np
-
             offset_x = int(np.clip(np.random.normal(0, 4), -10, 10))
             offset_y = int(np.clip(np.random.normal(0, 4), -10, 10))
             x = max(0, min(screenshot.shape[1], x + offset_x))
@@ -229,8 +227,6 @@ class Automation(metaclass=SingletonMeta):
         interval = min(interval, 0.25)
 
         # 增加随机浮动，规避匀速点击检测
-        import numpy as np
-
         actual_interval = max(0.05, np.random.normal(interval, interval * 0.2))
 
         if self.last_click_time == 0:
