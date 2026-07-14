@@ -452,21 +452,6 @@ class Automation(metaclass=SingletonMeta):
             else:
                 if is_cacheable:
                     self.location_cache.pop(target, None)
-                if target == "mirror/road_in_mir/legend_assets.png":
-                    fallback_center = self.find_element(
-                        "mirror/road_in_mir/to_window_assets.png",
-                        find_type,
-                        threshold,
-                        max_retries=1,
-                        take_screenshot=False,
-                        model=model,
-                        my_crop=my_crop,
-                        min_dist=min_dist,
-                        additional_stack=additional_stack + 1,
-                        roi=roi,
-                    )
-                    if fallback_center:
-                        return fallback_center
 
             if i < max_retries - 1:
                 time.sleep(1)
@@ -1040,7 +1025,8 @@ class PageStateDispatcher:
         if self.auto.find_element("mirror/shop/shop_coins_assets.png"):
             return GameState.SHOP
 
-        if self.auto.find_element("mirror/road_in_mir/legend_assets.png"):
+        if (self.auto.find_element("mirror/road_in_mir/legend_assets.png") or
+                self.auto.find_element("mirror/road_in_mir/to_window_assets.png")):
             return GameState.ROAD_MAP
 
         if self.auto.find_element("mirror/theme_pack/feature_theme_pack_assets.png"):
