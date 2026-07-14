@@ -1183,6 +1183,17 @@ class SystemIconButton(QLabel):
             )
         else:
             self.setText(tooltip)
+
+        # ADD TOOLTIP
+        self.setToolTip(tooltip)
+        self.installEventFilter(
+            ToolTipFilter(
+                self,
+                showDelay=300,
+                position=ToolTipPosition.TOP,
+            )
+        )
+
         self.setFixedSize(54, 54)
         self.setAlignment(Qt.AlignCenter)
         self.setCursor(Qt.PointingHandCursor)
@@ -1293,6 +1304,13 @@ class ObserveEgoGiftModule(QFrame):
             lbl = PreviewGiftLabel()
             lbl.setStyleSheet(
                 "border: 1px solid rgba(128,128,128,0.4); border-radius: 4px; background-color: rgba(0,0,0,0.1);"
+            )
+            lbl.installEventFilter(
+                ToolTipFilter(
+                    lbl,
+                    showDelay=300,
+                    position=ToolTipPosition.TOP,
+                )
             )
             self._preview_labels.append(lbl)
             self.selected_preview_layout.addWidget(lbl)
@@ -1535,6 +1553,7 @@ class ObserveEgoGiftModule(QFrame):
 
     def _refresh_preview(self):
         completed_rows = self._completed_rows()
+        observe_systems_dict = dict(self.observe_systems)
         for index, label in enumerate(self._preview_labels):
             if index < len(completed_rows):
                 row_index, selection = completed_rows[index]
@@ -1549,10 +1568,12 @@ class ObserveEgoGiftModule(QFrame):
                     label.setStyleSheet(
                         "border: 1px solid rgba(128,128,128,0.4); border-radius: 4px; background-color: rgba(0,0,0,0.1);"
                     )
+                    label.setToolTip(observe_systems_dict.get(selection.system, ""))
                     continue
 
             label.row_index = None
             label.clear()
+            label.setToolTip("")
             label.setStyleSheet(
                 "border: 1px solid rgba(128,128,128,0.4); border-radius: 4px; background-color: rgba(0,0,0,0.1);"
             )
