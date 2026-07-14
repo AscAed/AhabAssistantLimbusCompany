@@ -1127,9 +1127,7 @@ class Mirror:
             time.sleep(1)
             if retry() is False:
                 return False
-        # TODO耗时
-        msg = f"满 身 疮 痍 ！ 重 开 ！此次战败耗时{time.time() - self.start_time}"
-        log.info(msg)
+        to_log_with_time("满 身 疮 痍 ！ 重 开 ！此次战败", time.time() - self.start_time)
         self.first_battle = True
         self.start_time = time.time()
 
