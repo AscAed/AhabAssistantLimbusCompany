@@ -46,6 +46,7 @@ class Automation(metaclass=SingletonMeta):
         self.location_cache = {}
         self.last_screenshot_time = 0
         self.last_click_time = 0
+        self.last_memory_check_time = 0
         self.model = "clam"
 
     def init_input(self):
@@ -698,6 +699,8 @@ class Automation(metaclass=SingletonMeta):
 
     def clear_img_cache(self) -> None:
         """清除图片缓存"""
+        if not self.img_cache and not getattr(self, "location_cache", None):
+            return
         self.img_cache.clear()
         if hasattr(self, "location_cache"):
             self.location_cache.clear()
@@ -813,11 +816,16 @@ class Automation(metaclass=SingletonMeta):
         """
         try:
             if self.memory_protection:
-                memory = psutil.virtual_memory()
-                current_percent = memory.percent
-                if current_percent > 90:
-                    log.debug(f"当前系统内存总占用率: {current_percent}%，释放图片缓存")
-                    self.clear_img_cache()
+                now = time.time()
+                if now - self.last_memory_check_time > 10:
+                    self.last_memory_check_time = now
+                    memory = psutil.virtual_memory()
+                    current_percent = memory.percent
+                    if current_percent > 90:
+                        has_cache = bool(self.img_cache) or bool(getattr(self, "location_cache", None))
+                        if has_cache:
+                            log.debug(f"当前系统内存总占用率: {current_percent}%，释放图片缓存")
+                            self.clear_img_cache()
 
             existing_paths = ImageUtils.existing_image_paths(target)
             if not existing_paths:
