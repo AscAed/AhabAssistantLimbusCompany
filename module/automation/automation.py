@@ -411,7 +411,18 @@ class Automation(metaclass=SingletonMeta):
                 h = cfg.set_win_size
                 w = int(h * 16 / 9)
                 x, y = cached_pos
-                padding = 50
+                
+                # Dynamically set padding to prevent template mismatch size errors
+                padding = 100
+                if find_type == "image":
+                    existing_paths = ImageUtils.existing_image_paths(target)
+                    if existing_paths:
+                        cache_key = (target, existing_paths[0])
+                        if cache_key in self.img_cache:
+                            template = self.img_cache[cache_key]["template"]
+                            if template is not None:
+                                padding = max(template.shape[1] // 2 + 30, template.shape[0] // 2 + 30, 50)
+                
                 x1 = max(0, int(x - padding))
                 y1 = max(0, int(y - padding))
                 x2 = min(w, int(x + padding))
@@ -460,6 +471,8 @@ class Automation(metaclass=SingletonMeta):
             if my_crop:
                 crop_offset = (int(round(my_crop[0])), int(round(my_crop[1])))
                 screenshot = ImageUtils.crop(screenshot, my_crop)
+            if screenshot.shape[0] < template.shape[0] or screenshot.shape[1] < template.shape[1]:
+                return []
             matches = ImageUtils.match_template_with_multiple_targets(
                 screenshot, template, threshold, min_dist=min_dist
             )

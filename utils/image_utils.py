@@ -213,6 +213,8 @@ class ImageUtils:
     @staticmethod
     def match_template(screenshot, template, bbox, model="clam"):
         try:
+            if screenshot.shape[0] < template.shape[0] or screenshot.shape[1] < template.shape[1]:
+                return None, 0.0
             shape = screenshot.shape
             if len(shape) == 2:
                 height, width = shape
