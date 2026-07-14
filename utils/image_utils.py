@@ -238,6 +238,8 @@ class ImageUtils:
                     )
             if bbox is not None and model != "aggressive":
                 screenshot_crop = screenshot[bbox[1] : bbox[3], bbox[0] : bbox[2]]
+                if screenshot_crop.shape[0] < template.shape[0] or screenshot_crop.shape[1] < template.shape[1]:
+                    return None, 0.0
                 result = cv2.matchTemplate(
                     screenshot_crop, template, cv2.TM_CCOEFF_NORMED
                 )
