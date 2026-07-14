@@ -245,16 +245,16 @@ def run_as_user(command: list[str], timeout: int = 30):
         else 0x08000000
     )
 
-    def run_cmd(cmd: str, ignore_error: bool = False):
+    def run_cmd(cmd: list[str], ignore_error: bool = False):
         try:
             res = subprocess.run(
-                cmd, shell=True, capture_output=True, text=True, timeout=10
+                cmd, capture_output=True, text=True, timeout=10
             )
             if res.returncode != 0 and not ignore_error:
-                log.debug(f"命令执行失败: {cmd}\n错误: {res.stderr.strip()}")
+                log.debug(f"命令执行失败: {' '.join(cmd)}\n错误: {res.stderr.strip()}")
             return res
         except subprocess.TimeoutExpired:
-            log.debug(f"命令执行超时: {cmd}")
+            log.debug(f"命令执行超时: {' '.join(cmd)}")
             return None
 
     def _fallback_launch():
@@ -264,7 +264,7 @@ def run_as_user(command: list[str], timeout: int = 30):
 
     try:
         # 1. 预清理：强制删除旧任务 (/f)
-        run_cmd(f'schtasks /delete /tn "{task_name}" /f', ignore_error=True)
+        run_cmd(["schtasks", "/delete", "/tn", task_name, "/f"], ignore_error=True)
 
         # 2. 创建临时批处理文件
         with tempfile.NamedTemporaryFile(
@@ -274,8 +274,8 @@ def run_as_user(command: list[str], timeout: int = 30):
             bat_path = bat.name
 
         # 3. 创建任务
-        username = os.environ.get("USERNAME")
-        create_cmd = f'schtasks /create /f /tn "{task_name}" /sc once /st 23:59 /ru "{username}" /tr "cmd.exe /c \'{bat_path}\'"'
+        username = os.environ.get("USERNAME", "")
+        create_cmd = ["schtasks", "/create", "/f", "/tn", task_name, "/sc", "once", "/st", "23:59", "/ru", username, "/tr", f"cmd.exe /c '{bat_path}'"]
         create_result = run_cmd(create_cmd)
         if create_result is None or create_result.returncode != 0:
             _fallback_launch()
@@ -283,7 +283,7 @@ def run_as_user(command: list[str], timeout: int = 30):
 
         # 4. 立即执行任务
         log.debug(f"启动任务: {command}")
-        run_result = run_cmd(f'schtasks /run /tn "{task_name}"')
+        run_result = run_cmd(["schtasks", "/run", "/tn", task_name])
         if run_result is None or run_result.returncode != 0:
             _fallback_launch()
             return
@@ -302,7 +302,7 @@ def run_as_user(command: list[str], timeout: int = 30):
             log.error(f"run_as_user Popen 降级也失败了: {e2}")
     finally:
         # 6. 最终清理
-        run_cmd(f'schtasks /delete /tn "{task_name}" /f', ignore_error=True)
+        run_cmd(["schtasks", "/delete", "/tn", task_name, "/f"], ignore_error=True)
         if isinstance(bat_path, (str, bytes, os.PathLike)) and os.path.exists(bat_path):
             try:
                 os.unlink(bat_path)
