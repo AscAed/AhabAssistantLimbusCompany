@@ -269,12 +269,16 @@ class ImageUtils:
         sorted_points = sorted(points, key=lambda x: res[x[1], x[0]], reverse=True)
         # 遍历排序后的匹配位置
         if sorted_points:
+            min_dist_sq = min_dist ** 2
             for pt in sorted_points:
                 # 检查当前匹配点是否与已保留的匹配点太近
-                if all(
-                    np.linalg.norm(np.array(pt) - np.array(kept_pt)) > min_dist
-                    for kept_pt in center_points
-                ):
+                # 使用简单的标量算术（平方欧氏距离）和 early break 来代替 np.linalg.norm 的 O(n^2) 内存分配，提升性能。
+                keep = True
+                for kept_pt in center_points:
+                    if (pt[0] - kept_pt[0])**2 + (pt[1] - kept_pt[1])**2 <= min_dist_sq:
+                        keep = False
+                        break
+                if keep:
                     # 如果没有太近的匹配点，保留当前匹配点
                     center_points.append(pt)
             # 计算每个匹配点的中心坐标
