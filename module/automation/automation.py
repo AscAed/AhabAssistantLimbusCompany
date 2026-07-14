@@ -452,6 +452,21 @@ class Automation(metaclass=SingletonMeta):
             else:
                 if is_cacheable:
                     self.location_cache.pop(target, None)
+                if target == "mirror/road_in_mir/legend_assets.png":
+                    fallback_center = self.find_element(
+                        "mirror/road_in_mir/to_window_assets.png",
+                        find_type,
+                        threshold,
+                        max_retries=1,
+                        take_screenshot=False,
+                        model=model,
+                        my_crop=my_crop,
+                        min_dist=min_dist,
+                        additional_stack=additional_stack + 1,
+                        roi=roi,
+                    )
+                    if fallback_center:
+                        return fallback_center
 
             if i < max_retries - 1:
                 time.sleep(1)
@@ -703,6 +718,48 @@ class Automation(metaclass=SingletonMeta):
 
             threshold = 0.70
             matched = best_match_val >= threshold
+            
+            if not matched:
+                try:
+                    template_edges = cv2.Canny(template, 50, 200)
+                    screenshot_gray_edges = cv2.Canny(screenshot_gray, 50, 200)
+                    
+                    best_edge_match_val = -1
+                    best_edge_center = None
+                    
+                    for scale in scales:
+                        if scale == 1.0:
+                            scaled_edge_template = template_edges
+                        else:
+                            h_t, w_t = template_edges.shape[:2]
+                            new_h, new_w = int(h_t * scale), int(w_t * scale)
+                            if new_h <= 0 or new_w <= 0 or new_h > screenshot_gray_edges.shape[0] or new_w > screenshot_gray_edges.shape[1]:
+                                continue
+                            scaled_edge_template = cv2.resize(template_edges, (new_w, new_h), interpolation=cv2.INTER_AREA if scale < 1.0 else cv2.INTER_LINEAR)
+                        
+                        if scaled_edge_template.shape[0] > screenshot_gray_edges.shape[0] or scaled_edge_template.shape[1] > screenshot_gray_edges.shape[1]:
+                            continue
+                            
+                        res = cv2.matchTemplate(screenshot_gray_edges, scaled_edge_template, cv2.TM_CCOEFF_NORMED)
+                        _, max_val, _, max_loc = cv2.minMaxLoc(res)
+                        
+                        if max_val > best_edge_match_val:
+                            best_edge_match_val = max_val
+                            h_st, w_st = scaled_edge_template.shape[:2]
+                            best_edge_center = (
+                                int(max_loc[0]) + w_st // 2 + crop_offset[0],
+                                int(max_loc[1]) + h_st // 2 + crop_offset[1]
+                            )
+                    
+                    if best_edge_match_val >= 0.30:
+                        log.debug(
+                            f"通过 Canny 边缘匹配成功定位特征 {target.replace('./assets/images/', '')}，边缘相似度: {best_edge_match_val:.3f}",
+                            stacklevel=additional_stack + 3,
+                        )
+                        return best_edge_center
+                except Exception as ex:
+                    log.error(f"Canny 边缘匹配异常: {ex}")
+
             log.debug(
                 f"优化特征匹配：{target.replace('./assets/images/', '')}，最佳相似度：{best_match_val:.3f}，结果：{matched}",
                 stacklevel=additional_stack + 3,
