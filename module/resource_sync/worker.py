@@ -118,7 +118,9 @@ class ResourceSyncWorker(QThread):
         # 第一步：读取本地状态并完成远端清单检查。
         local_state = self.service.load_state()
         self._emit_progress(5)
-        check_result = self.service.check_for_updates(self.preferred_source, state=local_state)
+        check_result = self.service.check_for_updates(
+            self.preferred_source, state=local_state
+        )
         if emit_mid_progress:
             self._emit_progress(15)
 
@@ -134,7 +136,9 @@ class ResourceSyncWorker(QThread):
             )
         )
 
-    def _build_sync_plan_from_check_result(self, check_result: ResourceCheckResult) -> ResourceSyncPlan | None:
+    def _build_sync_plan_from_check_result(
+        self, check_result: ResourceCheckResult
+    ) -> ResourceSyncPlan | None:
         """根据检查结果决定是否继续生成本地同步计划。
 
         参数:
@@ -151,7 +155,10 @@ class ResourceSyncWorker(QThread):
         sync_plan = self.service.build_sync_plan(check_result.remote_manifest)
 
         # 第三步：若远端清单未变化但本地文件已漂移，则提升为“可更新”状态。
-        if check_result.status is ResourceCheckStatus.UP_TO_DATE and sync_plan.has_changes:
+        if (
+            check_result.status is ResourceCheckStatus.UP_TO_DATE
+            and sync_plan.has_changes
+        ):
             check_result.status = ResourceCheckStatus.UPDATE_AVAILABLE
             check_result.message = "本地图片资源与远端清单不一致"
         return sync_plan
@@ -166,7 +173,9 @@ class ResourceSyncWorker(QThread):
         apply_result = self.service.apply_sync_plan(
             check_result=self.check_result,
             sync_plan=self.sync_plan,
-            progress_callback=lambda current, total: self._emit_progress(self._map_apply_progress(current, total)),
+            progress_callback=lambda current, total: self._emit_progress(
+                self._map_apply_progress(current, total)
+            ),
         )
         # 第二步：应用成功后发出 100% 进度和最终结果。
         self._emit_progress(100)

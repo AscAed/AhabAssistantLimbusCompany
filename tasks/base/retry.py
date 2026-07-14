@@ -15,6 +15,35 @@ from utils.utils import check_game_running
 _last_title_screen_tap_time = 0.0
 _last_simulator_alive_check_time = 0.0
 
+# How long a single loading screen is allowed to run before we consider it stuck.
+LOADING_SCREEN_TIMEOUT = 300  # 5 minutes
+_loading_started_at: float | None = None
+
+
+def is_game_loading() -> bool:
+    """
+    Returns True when the game is in a known transient state that should NOT
+    be interpreted as a freeze:
+      - A loading progress bar is visible in the bottom-right corner
+        (base/waiting_assets.png or base/waiting_2_assets.png)
+      - A network-lag overlay is visible (base/connecting_assets.png,
+        or any screen containing the text string used for "continuing")
+
+    The caller is responsible for resetting the freeze-detection timer while
+    this returns True.
+    """
+    if auto.take_screenshot() is None:
+        return False
+    # Progress bar indicators (bottom-right loading bar)
+    if auto.find_element("base/waiting_assets.png"):
+        return True
+    if auto.find_element("base/waiting_2_assets.png"):
+        return True
+    # Network connection / lag overlay
+    if auto.find_element("base/connecting_assets.png"):
+        return True
+    return False
+
 
 def ensure_simulator_game_started() -> bool:
     """模拟器模式下确认游戏仍在前台，不在时尝试拉起游戏。"""
@@ -117,18 +146,49 @@ def kill_game():
 
 
 def check_times(start_time, timeout=90, logs=True):
-    """检查是否卡死超时，若是则尝试关闭重启游戏"""
+    """检查是否卡死超时，若是则尝试关闭重启游戏。
+
+    Loading screens and network-lag overlays are explicitly excluded: while
+    the game is in a transient loading state, the elapsed time is not counted
+    towards the freeze timeout so that normal load times never trigger a
+    spurious restart.
+    """
+    global _loading_started_at
+
     now_time = time.time()
-    if logs and int(now_time - start_time) > 9 and int(now_time - start_time) % 10 == 0:
-        log.info(f"初始时间为{time.strftime('%H:%M:%S', time.localtime(start_time))}，此刻时间为{time.strftime('%H:%M:%S', time.localtime(now_time))}，已卡死{int(now_time - start_time)}秒")
+
+    if is_game_loading():
+        _loading_started_at = _loading_started_at or now_time
+        loading_elapsed = now_time - _loading_started_at
+        if loading_elapsed < LOADING_SCREEN_TIMEOUT:
+            # Still within the allowed loading window – not a freeze.
+            return False
+        else:
+            log.warning(
+                f"加载界面已持续 {int(loading_elapsed)} 秒（超过 {LOADING_SCREEN_TIMEOUT} 秒上限），判定为卡死，尝试重启游戏"
+            )
+            _loading_started_at = None
+            kill_game()
+            restart_game()
+            return True
+    else:
+        # Not in a loading screen – reset the loading timer.
+        _loading_started_at = None
+
+    elapsed = now_time - start_time
+    if logs and int(elapsed) > 9 and int(elapsed) % 10 == 0:
+        log.info(
+            f"初始时间为{time.strftime('%H:%M:%S', time.localtime(start_time))}，"
+            f"此刻时间为{time.strftime('%H:%M:%S', time.localtime(now_time))}，"
+            f"已卡死{int(elapsed)}秒"
+        )
         sleep(1)
-    if now_time - start_time > timeout:
+    if elapsed > timeout:
         log.info(f"已卡死超过{timeout}秒，尝试关闭重启游戏")
         kill_game()
         restart_game()
         return True
-    else:
-        return False
+    return False
 
 
 def retry():
@@ -153,6 +213,11 @@ def retry():
         if check_times(start_time):
             return False
         if auto.take_screenshot() is None:
+            continue
+        # Loading progress bar or network-lag overlay – wait it out.
+        if auto.find_element("base/waiting_assets.png"):
+            continue
+        if auto.find_element("base/waiting_2_assets.png"):
             continue
         if auto.find_element("base/connecting_assets.png"):
             continue

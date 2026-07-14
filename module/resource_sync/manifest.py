@@ -147,15 +147,24 @@ class ResourceManifest:
             重建后的资源清单对象。
         """
         # 第一步：先校验顶层字段，确保清单结构严格符合当前协议。
-        _reject_unknown_keys(payload, {"schema_version", "generated_at", "manifest_id", "package", "files"})
+        _reject_unknown_keys(
+            payload,
+            {"schema_version", "generated_at", "manifest_id", "package", "files"},
+        )
         package_payload = payload.get("package")
         # 第二步：再依次重建顶层字段与嵌套对象，保证整份清单都经过同一套校验。
         return cls(
             schema_version=int(payload["schema_version"]),
             generated_at=str(payload["generated_at"]),
             manifest_id=str(payload["manifest_id"]),
-            package=ResourcePackageEntry.from_dict(package_payload) if package_payload is not None else None,
-            files=[ResourceFileEntry.from_dict(item) for item in payload.get("files", [])],
+            package=(
+                ResourcePackageEntry.from_dict(package_payload)
+                if package_payload is not None
+                else None
+            ),
+            files=[
+                ResourceFileEntry.from_dict(item) for item in payload.get("files", [])
+            ],
         )
 
     def to_json(self) -> str:

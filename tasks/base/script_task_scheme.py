@@ -127,8 +127,15 @@ def init_game():
             if cfg.simulator_port == 0 and cfg.mumu_instance_number == -1:
                 log.info("未设置模拟器端口或实例编号，使用默认mumu模拟器")
             elif cfg.simulator_port != 0:
-                if cfg.simulator_port == 16384 or (cfg.simulator_port - 16384) % 32 == 0:
-                    mumu_instance_number = 0 if cfg.simulator_port == 16384 else (cfg.simulator_port - 16384) // 32
+                if (
+                    cfg.simulator_port == 16384
+                    or (cfg.simulator_port - 16384) % 32 == 0
+                ):
+                    mumu_instance_number = (
+                        0
+                        if cfg.simulator_port == 16384
+                        else (cfg.simulator_port - 16384) // 32
+                    )
                     log.debug(f"使用mumu模拟器实例号为 {mumu_instance_number}")
                 else:
                     log.info("设置的模拟器端口非常用默认端口，使用默认mumu模拟器")
@@ -198,7 +205,9 @@ def _get_game_rendering_scale() -> int | None:
         game_config = json.loads(json_str)
         return game_config.get("_renderingScale")
     except FileNotFoundError:
-        log.debug(r"游戏设置注册表路径不存在: HKEY_CURRENT_USER\Software\ProjectMoon\LimbusCompany")
+        log.debug(
+            r"游戏设置注册表路径不存在: HKEY_CURRENT_USER\Software\ProjectMoon\LimbusCompany"
+        )
     except PermissionError:
         log.debug("读取游戏设置注册表时权限不足")
     except Exception as e:
@@ -315,7 +324,9 @@ def Mirror_task():
             mediator.mirror_signal.emit(finish_times, mir_times)
             msg = f"已完成 {finish_times} 次镜牢"
             log.info(msg)
-            if finish_times == 1 and cfg.re_claim_rewards:  # 完成第一次镜牢后重新领取奖励
+            if (
+                finish_times == 1 and cfg.re_claim_rewards
+            ):  # 完成第一次镜牢后重新领取奖励
                 to_get_reward()
 
     mediator.mirror_bar_kill_signal.emit()
@@ -329,12 +340,16 @@ def script_task() -> None | int:
     init_game()
 
     if cfg.skip_enkephalin:
-        log.info("设置了跳过合成脑啡肽，将不会自动合成\nSet to skip make enkephalin, it will not to do")
+        log.info(
+            "设置了跳过合成脑啡肽，将不会自动合成\nSet to skip make enkephalin, it will not to do"
+        )
     if not cfg.simulator:
         if _get_game_rendering_scale() == 2:
             log.warning("当前游戏渲染比例为低, 可能会导致识别错误, 建议设置为中或更高")
         if cfg.set_win_size == 720:
-            log.warning("当前游戏分辨率为1280*720, 可能会导致识别错误或卡死, 建议设置为更高分辨率")
+            log.warning(
+                "当前游戏分辨率为1280*720, 可能会导致识别错误或卡死, 建议设置为更高分辨率"
+            )
 
     path_manager.initialize_paths()
     auto.clear_img_cache()
@@ -448,7 +463,9 @@ class my_script_task(QThread):
         self.finished_signal.emit()"""
 
     def _run(self):
-        keep_awake_enabled = bool(cfg.get_value("experimental_keep_screen_awake", False))
+        keep_awake_enabled = bool(
+            cfg.get_value("experimental_keep_screen_awake", False)
+        )
         try:
             if keep_awake_enabled:
                 apply_power_keep_awake(True)
@@ -459,6 +476,8 @@ class my_script_task(QThread):
             if keep_awake_enabled:
                 # 先切回 AALC 再释放线程级防息屏，避免游戏仍持有前台时继续阻止息屏。
                 mediator.request_focus.emit()
-                self.msleep(800)  # 覆盖 WinRT toast 异步归还焦点（延迟约 600ms），再释放防息屏
+                self.msleep(
+                    800
+                )  # 覆盖 WinRT toast 异步归还焦点（延迟约 600ms），再释放防息屏
                 apply_power_keep_awake(False)
             auto.clear_img_cache()

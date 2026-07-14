@@ -14,7 +14,6 @@ import time
 from ctypes import c_void_p, windll
 from pathlib import Path
 
-
 # =============================================================================
 # 初始化区域：DPI、项目路径、依赖导入、参数、Steam 游戏窗口、截图
 # =============================================================================
@@ -110,7 +109,9 @@ for image_file in image_files:
     relative_path = image_file.relative_to(image_root).as_posix()
 
     for model in models:
-        center, score = ImageUtils.match_template(screenshot_gray, template, bbox, model=model)
+        center, score = ImageUtils.match_template(
+            screenshot_gray, template, bbox, model=model
+        )
         results.append(
             (
                 float(score),
@@ -126,8 +127,12 @@ results.sort(reverse=True, key=lambda item: item[0])
 print()
 print("匹配结果:")
 for score, model, relative_path, center, bbox in results:
-    print(f"{relative_path}, {model}: score={score:.6f}, center={center}, bbox={bbox}, matched={score >= threshold}")
+    print(
+        f"{relative_path}, {model}: score={score:.6f}, center={center}, bbox={bbox}, matched={score >= threshold}"
+    )
 
 best = results[0]
 print()
-print(f"最高匹配: image={best[2]}, model={best[1]}, score={best[0]:.6f}, center={best[3]}, matched={best[0] >= threshold}")
+print(
+    f"最高匹配: image={best[2]}, model={best[1]}, score={best[0]:.6f}, center={best[3]}, matched={best[0] >= threshold}"
+)

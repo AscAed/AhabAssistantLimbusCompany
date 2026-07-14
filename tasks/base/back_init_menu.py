@@ -4,10 +4,15 @@ from module.automation import auto
 from module.decorator.decorator import begin_and_finish_time_log
 from module.logger import log
 from tasks.base import update_model_for_retry
-from tasks.base.retry import click_title_screen_safely, ensure_simulator_game_started, retry
+from tasks.base.retry import (
+    click_title_screen_safely,
+    ensure_simulator_game_started,
+    retry,
+)
 from tasks.mirror.reward_card import get_reward_card
 
-LOOP_COUNT=30
+LOOP_COUNT = 30
+
 
 @begin_and_finish_time_log(task_name="返回主界面")
 def back_init_menu(*, allow_restart: bool = True):
@@ -34,7 +39,9 @@ def back_init_menu(*, allow_restart: bool = True):
         if retry() is False:
             return False
 
-        if auto.click_element("home/window_assets.png") and auto.find_element("home/mail_assets.png", model="normal"):
+        if auto.click_element("home/window_assets.png") and auto.find_element(
+            "home/mail_assets.png", model="normal"
+        ):
             return True
 
         if auto.find_element("base/notification_close_assets.png"):
@@ -48,8 +55,12 @@ def back_init_menu(*, allow_restart: bool = True):
             if get_day_of_week() == 4:
                 seoul_tz = ZoneInfo("Asia/Seoul")
                 now_time = datetime.now(seoul_tz)
-                today_10am = now_time.replace(hour=10, minute=0, second=0, microsecond=0)
-                today_12pm = now_time.replace(hour=12, minute=0, second=0, microsecond=0)
+                today_10am = now_time.replace(
+                    hour=10, minute=0, second=0, microsecond=0
+                )
+                today_12pm = now_time.replace(
+                    hour=12, minute=0, second=0, microsecond=0
+                )
 
                 if today_10am <= now_time <= today_12pm:
                     time_remaining = today_12pm - now_time
@@ -65,13 +76,17 @@ def back_init_menu(*, allow_restart: bool = True):
 
         if auto.click_element("mirror/road_in_mir/towindow&forfeit_confirm_assets.png"):
             continue
-        if auto.click_element("mirror/road_in_mir/to_window_assets.png", threshold=0.75):
+        if auto.click_element(
+            "mirror/road_in_mir/to_window_assets.png", threshold=0.75
+        ):
             continue
         if auto.find_element("mirror/road_in_mir/legend_assets.png"):
             auto.click_element("mirror/road_in_mir/setting_assets.png")
             continue
 
-        if auto.find_element("mirror/road_in_mir/select_encounter_reward_card_assets.png"):
+        if auto.find_element(
+            "mirror/road_in_mir/select_encounter_reward_card_assets.png"
+        ):
             get_reward_card()
 
         # 在剧情中

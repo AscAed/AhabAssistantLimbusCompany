@@ -387,7 +387,11 @@ def _is_starlight_english(language: str | None) -> bool:
 
 
 def get_starlight_bonus_name(index: int, language: str | None = None) -> str:
-    names = STARLIGHT_BONUS_NAMES_EN if _is_starlight_english(language) else STARLIGHT_BONUS_NAMES
+    names = (
+        STARLIGHT_BONUS_NAMES_EN
+        if _is_starlight_english(language)
+        else STARLIGHT_BONUS_NAMES
+    )
     return names[index]
 
 
@@ -398,9 +402,12 @@ def get_starlight_action_label(text: str, language: str | None = None) -> str:
 
 
 def get_starlight_bonus_tips(index: int, language: str | None = None) -> dict[str, str]:
-    tips = STARLIGHT_BONUS_TIPS_EN if _is_starlight_english(language) else STARLIGHT_BONUS_TIPS
+    tips = (
+        STARLIGHT_BONUS_TIPS_EN
+        if _is_starlight_english(language)
+        else STARLIGHT_BONUS_TIPS
+    )
     return tips[index]
-
 
 
 STARLIGHT_TOTAL_COST_STYLES = {
@@ -558,7 +565,9 @@ def get_starlight_selector_qss() -> tuple[str, str]:
 
 
 def get_starlight_paint_colors(is_dark: bool) -> dict[str, QColor]:
-    style = STARLIGHT_PAINT_COLORS["dark"] if is_dark else STARLIGHT_PAINT_COLORS["light"]
+    style = (
+        STARLIGHT_PAINT_COLORS["dark"] if is_dark else STARLIGHT_PAINT_COLORS["light"]
+    )
     default_line_color = QColor(120, 120, 120, 105)
     return {
         "border": default_line_color,
@@ -798,7 +807,9 @@ def get_setting_interface_qss() -> tuple[str, str]:
     return SETTING_INTERFACE_STYLES["light"], SETTING_INTERFACE_STYLES["dark"]
 
 
-def set_border_style(qframe: QFrame, is_dark: bool | None = None, border_radius: int = 5):
+def set_border_style(
+    qframe: QFrame, is_dark: bool | None = None, border_radius: int = 5
+):
     """为 QFrame 及子类设置边框样式"""
     if is_dark is None:
         is_dark = isDarkTheme()

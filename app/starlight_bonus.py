@@ -3,8 +3,20 @@ from html import escape
 
 from PySide6.QtCore import QEvent, QObject, QPoint, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QCursor, QGuiApplication, QPainter, QPainterPath, QPen
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QVBoxLayout
-from qfluentwidgets import StyleSheetBase, isDarkTheme, setCustomStyleSheet, setStyleSheet
+from PySide6.QtWidgets import (
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+)
+from qfluentwidgets import (
+    StyleSheetBase,
+    isDarkTheme,
+    setCustomStyleSheet,
+    setStyleSheet,
+)
 
 from app import mediator
 from app.common.ui_config import (
@@ -41,21 +53,25 @@ def _format_starlight_tip(title: str, tip_text: str) -> str:
     for match in re.finditer(r"\\yellow\{([^{}]*)\}", tip_text):
         escaped_parts.append(escape(tip_text[last_end : match.start()]))
         highlighted = escape(match.group(1))
-        escaped_parts.append(f'<span style="color:#d8a300;font-weight:700;">{highlighted}</span>')
+        escaped_parts.append(
+            f'<span style="color:#d8a300;font-weight:700;">{highlighted}</span>'
+        )
         last_end = match.end()
     escaped_parts.append(escape(tip_text[last_end:]))
     html = "".join(escaped_parts)
     html = html.replace("\n", "<br>")
     return (
         '<div style="white-space:nowrap; font-size:12px; line-height:1.45;">'
-        f'<b>{escape(title)}</b><br>{html}'
+        f"<b>{escape(title)}</b><br>{html}"
         "</div>"
     )
 
 
 class StarlightToolTipPopup(QFrame):
     def __init__(self):
-        super().__init__(None, Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint)
+        super().__init__(
+            None, Qt.WindowType.ToolTip | Qt.WindowType.FramelessWindowHint
+        )
         self.setObjectName("starlightToolTipPopup")
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
 
@@ -128,7 +144,11 @@ class DelayedRichToolTipFilter(QObject):
             self.__restart_timer(obj)
         elif event_type in (QEvent.Type.MouseMove, QEvent.Type.HoverMove):
             self.global_pos = QCursor.pos()
-            if self.widget is obj and not self.timer.isActive() and not _get_starlight_tooltip_popup().isVisible():
+            if (
+                self.widget is obj
+                and not self.timer.isActive()
+                and not _get_starlight_tooltip_popup().isVisible()
+            ):
                 self.timer.start()
         elif event_type == QEvent.Type.MouseButtonRelease:
             if obj.rect().contains(obj.mapFromGlobal(QCursor.pos())):
@@ -165,7 +185,9 @@ class StarlightNameButton(QPushButton):
     def __init__(self, text: str, cost: int, parent=None):
         super().__init__(text, parent)
         self.cost_label = QLabel(self)
-        self.cost_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
+        self.cost_label.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop
+        )
         self.cost_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         self._apply_theme_style()
         self.set_cost(cost)
@@ -184,7 +206,10 @@ class StarlightNameButton(QPushButton):
         self.__place_cost_label()
 
     def __place_cost_label(self):
-        width = max(28, self.cost_label.fontMetrics().horizontalAdvance(self.cost_label.text()) + 6)
+        width = max(
+            28,
+            self.cost_label.fontMetrics().horizontalAdvance(self.cost_label.text()) + 6,
+        )
         self.cost_label.setGeometry(max(0, self.width() - width - 4), 2, width, 14)
 
 
@@ -206,8 +231,16 @@ class StarlightLevelSelector(QFrame):
         super().__init__(parent)
         self.setObjectName(config_name)
         self.config_name = config_name
-        self.starlight_index = starlight_index if starlight_index is not None else int(config_name.split("_")[-1])
-        self.base_cost = base_cost if base_cost is not None else STARLIGHT_BONUS_COSTS[self.starlight_index - 1]
+        self.starlight_index = (
+            starlight_index
+            if starlight_index is not None
+            else int(config_name.split("_")[-1])
+        )
+        self.base_cost = (
+            base_cost
+            if base_cost is not None
+            else STARLIGHT_BONUS_COSTS[self.starlight_index - 1]
+        )
         self.emit_team_setting = emit_team_setting
         self.bonus_value = 0
 
@@ -223,9 +256,15 @@ class StarlightLevelSelector(QFrame):
         self.segment_layout.addWidget(self.level_one_button, 4)
         self.segment_layout.addWidget(self.level_two_button, 4)
 
-        self.default_button.clicked.connect(lambda _checked=False: self.__on_segment_clicked(0))
-        self.level_one_button.clicked.connect(lambda _checked=False: self.__on_segment_clicked(1))
-        self.level_two_button.clicked.connect(lambda _checked=False: self.__on_segment_clicked(2))
+        self.default_button.clicked.connect(
+            lambda _checked=False: self.__on_segment_clicked(0)
+        )
+        self.level_one_button.clicked.connect(
+            lambda _checked=False: self.__on_segment_clicked(1)
+        )
+        self.level_two_button.clicked.connect(
+            lambda _checked=False: self.__on_segment_clicked(2)
+        )
         self._apply_theme_style()
         if 1 <= self.starlight_index <= len(STARLIGHT_BONUS_TIPS):
             self.__refresh_tooltips(label_text)
@@ -247,7 +286,11 @@ class StarlightLevelSelector(QFrame):
 
     def _apply_theme_style(self):
         light_style, dark_style = get_starlight_level_button_qss()
-        for button in (self.default_button, self.level_one_button, self.level_two_button):
+        for button in (
+            self.default_button,
+            self.level_one_button,
+            self.level_two_button,
+        ):
             _register_custom_style_widget(button)
             setCustomStyleSheet(button, light_style, dark_style)
 
@@ -269,7 +312,12 @@ class StarlightLevelSelector(QFrame):
 
         painter.save()
         painter.setClipPath(path)
-        self.__fill_segment(painter, 0, self.default_button.geometry().right() + 1, self.__segment_color(0, colors))
+        self.__fill_segment(
+            painter,
+            0,
+            self.default_button.geometry().right() + 1,
+            self.__segment_color(0, colors),
+        )
         self.__fill_segment(
             painter,
             self.level_one_button.geometry().x(),
@@ -286,7 +334,10 @@ class StarlightLevelSelector(QFrame):
 
         painter.setPen(QPen(colors["border"], 1))
         painter.drawPath(path)
-        for x in (self.level_one_button.geometry().x(), self.level_two_button.geometry().x()):
+        for x in (
+            self.level_one_button.geometry().x(),
+            self.level_two_button.geometry().x(),
+        ):
             painter.fillRect(QRectF(x, 1, 1, self.height() - 2), colors["divider"])
 
     def __fill_segment(self, painter: QPainter, left: int, right: int, color: QColor):
@@ -303,8 +354,13 @@ class StarlightLevelSelector(QFrame):
         return get_starlight_paint_colors(isDarkTheme())
 
     def __refresh_tooltips(self, title: str):
-        tips = get_starlight_bonus_tips(self.starlight_index - 1, cfg.language_in_program)
-        self.__set_button_tooltip(self.default_button, lambda title=title: _format_starlight_tip(title, tips["buff"]))
+        tips = get_starlight_bonus_tips(
+            self.starlight_index - 1, cfg.language_in_program
+        )
+        self.__set_button_tooltip(
+            self.default_button,
+            lambda title=title: _format_starlight_tip(title, tips["buff"]),
+        )
         self.__set_button_tooltip(
             self.level_one_button,
             lambda title=title: _format_starlight_tip(f"{title}+", tips["buff+"]),
@@ -332,7 +388,9 @@ class StarlightLevelSelector(QFrame):
 
         self.stateChangedByClick.emit(bonus_value)
         if self.emit_team_setting:
-            mediator.team_setting.emit({f"starlight_state_{self.starlight_index}": bonus_value})
+            mediator.team_setting.emit(
+                {f"starlight_state_{self.starlight_index}": bonus_value}
+            )
 
     def set_state(self, bonus_value: int):
         self.bonus_value = max(0, min(int(bonus_value), 3))

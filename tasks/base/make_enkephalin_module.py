@@ -7,7 +7,9 @@ from module.logger import log
 
 
 def get_the_timing(return_time=False):
-    if module_position := auto.find_element("enkephalin/lunacy_assets.png", take_screenshot=True):
+    if module_position := auto.find_element(
+        "enkephalin/lunacy_assets.png", take_screenshot=True
+    ):
         my_scale = cfg.set_win_size / 1440
         bbox = (
             module_position[0] - 200 * my_scale,
@@ -28,7 +30,9 @@ def get_the_timing(return_time=False):
                     if return_time:
                         return minute * 60 + seconds
                     if minute >= 5 and seconds >= 20:
-                        log.debug(f"生成下一点体力的时间为{minute}分{seconds}秒，符合葛朗台模式操作")
+                        log.debug(
+                            f"生成下一点体力的时间为{minute}分{seconds}秒，符合葛朗台模式操作"
+                        )
                         return True
             except:
                 return False
@@ -42,7 +46,9 @@ def get_current_enkephalin():
     from module.ocr import ocr
     from utils.image_utils import ImageUtils
 
-    enkephalin_bbox = ImageUtils.get_bbox(ImageUtils.load_image("enkephalin/enkephalin_now_bbox.png"))
+    enkephalin_bbox = ImageUtils.get_bbox(
+        ImageUtils.load_image("enkephalin/enkephalin_now_bbox.png")
+    )
     for _ in range(5):
         try:
             while auto.take_screenshot() is None:
@@ -104,29 +110,35 @@ def make_enkephalin_module(cancel=True, skip=True, *, task_name: str = "体力�
         if now_time - start_time > 60:
             from app import mediator
 
-            if first_popup_warning and (last_log_time is None or now_time - last_log_time > 5):
+            if first_popup_warning and (
+                last_log_time is None or now_time - last_log_time > 5
+            ):
                 # only do it once
                 first_popup_warning = False
-                log.warning(f"已尝试{task_name}超过1分钟，脚本将停止运行，请先检查语言配置，或检查电脑配置是否支持")
+                log.warning(
+                    f"已尝试{task_name}超过1分钟，脚本将停止运行，请先检查语言配置，或检查电脑配置是否支持"
+                )
                 mediator.link_start.emit()
-                message = f"脚本卡死在{task_name}，请检查语言配置，或检查电脑配置是否支持"
+                message = (
+                    f"脚本卡死在{task_name}，请检查语言配置，或检查电脑配置是否支持"
+                )
                 mediator.warning.emit(message)
         # 自动截图
         if auto.take_screenshot() is None:
             continue
         auto.mouse_to_blank()
-        if auto.find_element("base/update_close_assets.png", model="clam") and auto.find_element(
-            "home/drive_assets.png", model="normal"
-        ):
+        if auto.find_element(
+            "base/update_close_assets.png", model="clam"
+        ) and auto.find_element("home/drive_assets.png", model="normal"):
             auto.click_element("base/update_close_assets.png")
             from tasks.base.back_init_menu import back_init_menu
 
             back_init_menu()
             start_time = time.time()
             continue
-        if auto.find_element("base/renew_confirm_assets.png", model="clam") and auto.find_element(
-            "home/drive_assets.png", model="normal"
-        ):
+        if auto.find_element(
+            "base/renew_confirm_assets.png", model="clam"
+        ) and auto.find_element("home/drive_assets.png", model="normal"):
             auto.click_element("base/renew_confirm_assets.png")
             from tasks.base.back_init_menu import back_init_menu
 
@@ -134,15 +146,25 @@ def make_enkephalin_module(cancel=True, skip=True, *, task_name: str = "体力�
             start_time = time.time()
             continue
         panel_visible = bool(
-            auto.find_element("enkephalin/use_lunacy_assets.png", threshold=use_lunacy_threshold)
-            or auto.find_element("enkephalin/enkephalin_cancel_assets.png", threshold=popup_marker_threshold)
-            or auto.find_element("enkephalin/all_in_assets.png", threshold=all_in_threshold)
+            auto.find_element(
+                "enkephalin/use_lunacy_assets.png", threshold=use_lunacy_threshold
+            )
+            or auto.find_element(
+                "enkephalin/enkephalin_cancel_assets.png",
+                threshold=popup_marker_threshold,
+            )
+            or auto.find_element(
+                "enkephalin/all_in_assets.png", threshold=all_in_threshold
+            )
         )
         if not panel_visible:
-            if now_time - last_open_panel_click_time >= open_panel_click_cooldown and auto.click_element(
-                "home/enkephalin_box_assets.png",
-                threshold=0.75,
-                offset=False,
+            if (
+                now_time - last_open_panel_click_time >= open_panel_click_cooldown
+                and auto.click_element(
+                    "home/enkephalin_box_assets.png",
+                    threshold=0.75,
+                    offset=False,
+                )
             ):
                 last_open_panel_click_time = now_time
                 sleep(0.5)

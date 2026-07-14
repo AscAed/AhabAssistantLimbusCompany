@@ -81,7 +81,11 @@ class ScheduleHelper_Win32:
         task_def.RegistrationInfo.Author = getpass.getuser()
 
         trigger = task_def.Triggers.Create(2)  # 每日触发器
-        trigger.StartBoundary = datetime.datetime.now().replace(hour=h, minute=m, second=0, microsecond=0).isoformat()
+        trigger.StartBoundary = (
+            datetime.datetime.now()
+            .replace(hour=h, minute=m, second=0, microsecond=0)
+            .isoformat()
+        )
         trigger.DaysInterval = 1
         trigger.Enabled = True
 
@@ -101,9 +105,7 @@ class ScheduleHelper_Win32:
 
         try:
             self.root.RegisterTaskDefinition(task_name, task_def, 6, None, None, 3)
-            log.info(
-                f"创建每日任务成功，执行时间为每日{h:02d}:{m:02d}"
-            )
+            log.info(f"创建每日任务成功，执行时间为每日{h:02d}:{m:02d}")
         except com_error as e:
             log.error(f"创建任务 {task_name} 失败")
             raise e
@@ -143,7 +145,9 @@ class ScheduleHelper_Win32:
             """
             key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
             try:
-                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE)
+                key = winreg.OpenKey(
+                    winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE
+                )
                 winreg.DeleteValue(key, task_name)
                 winreg.CloseKey(key)
                 log.debug(f"已移除启动项: {task_name}")

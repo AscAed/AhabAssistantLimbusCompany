@@ -68,21 +68,47 @@ class AfterCompletionActionEditor(FlyoutViewBase):
         super().__init__(parent)
         self._on_apply = on_apply
         self._action_text = {
-            ACTION_EXIT_GAME: QT_TRANSLATE_NOOP("AfterCompletionActionEditor", "退出游戏"),
-            ACTION_EXIT_EMULATOR: QT_TRANSLATE_NOOP("AfterCompletionActionEditor", "退出模拟器"),
-            ACTION_EXIT_AALC: QT_TRANSLATE_NOOP("AfterCompletionActionEditor", "退出AALC"),
+            ACTION_EXIT_GAME: QT_TRANSLATE_NOOP(
+                "AfterCompletionActionEditor", "退出游戏"
+            ),
+            ACTION_EXIT_EMULATOR: QT_TRANSLATE_NOOP(
+                "AfterCompletionActionEditor", "退出模拟器"
+            ),
+            ACTION_EXIT_AALC: QT_TRANSLATE_NOOP(
+                "AfterCompletionActionEditor", "退出AALC"
+            ),
         }
         self._power_items = [
             (QT_TRANSLATE_NOOP("AfterCompletionActionEditor", "无"), POWER_ACTION_NONE),
-            (QT_TRANSLATE_NOOP("AfterCompletionActionEditor", "睡眠"), POWER_ACTION_SLEEP),
-            (QT_TRANSLATE_NOOP("AfterCompletionActionEditor", "休眠"), POWER_ACTION_HIBERNATE),
-            (QT_TRANSLATE_NOOP("AfterCompletionActionEditor", "锁屏"), POWER_ACTION_LOCK),
-            (QT_TRANSLATE_NOOP("AfterCompletionActionEditor", "关机"), POWER_ACTION_SHUTDOWN),
+            (
+                QT_TRANSLATE_NOOP("AfterCompletionActionEditor", "睡眠"),
+                POWER_ACTION_SLEEP,
+            ),
+            (
+                QT_TRANSLATE_NOOP("AfterCompletionActionEditor", "休眠"),
+                POWER_ACTION_HIBERNATE,
+            ),
+            (
+                QT_TRANSLATE_NOOP("AfterCompletionActionEditor", "锁屏"),
+                POWER_ACTION_LOCK,
+            ),
+            (
+                QT_TRANSLATE_NOOP("AfterCompletionActionEditor", "关机"),
+                POWER_ACTION_SHUTDOWN,
+            ),
         ]
-        self._title_actions = QT_TRANSLATE_NOOP("AfterCompletionActionEditor", "前置动作（可多选）")
-        self._title_power = QT_TRANSLATE_NOOP("AfterCompletionActionEditor", "最终动作（单选）")
-        self._button_apply_once = QT_TRANSLATE_NOOP("AfterCompletionActionEditor", "仅本次生效")
-        self._button_save_default = QT_TRANSLATE_NOOP("AfterCompletionActionEditor", "保存为默认")
+        self._title_actions = QT_TRANSLATE_NOOP(
+            "AfterCompletionActionEditor", "前置动作（可多选）"
+        )
+        self._title_power = QT_TRANSLATE_NOOP(
+            "AfterCompletionActionEditor", "最终动作（单选）"
+        )
+        self._button_apply_once = QT_TRANSLATE_NOOP(
+            "AfterCompletionActionEditor", "仅本次生效"
+        )
+        self._button_save_default = QT_TRANSLATE_NOOP(
+            "AfterCompletionActionEditor", "保存为默认"
+        )
 
         self.vbox = QVBoxLayout(self)
         self.vbox.setSpacing(10)
@@ -166,13 +192,17 @@ class AfterCompletionSelector(QFrame):
         self._none_text = QT_TRANSLATE_NOOP("AfterCompletionSelector", "无")
         self._action_text = {
             ACTION_EXIT_GAME: QT_TRANSLATE_NOOP("AfterCompletionSelector", "退出游戏"),
-            ACTION_EXIT_EMULATOR: QT_TRANSLATE_NOOP("AfterCompletionSelector", "退出模拟器"),
+            ACTION_EXIT_EMULATOR: QT_TRANSLATE_NOOP(
+                "AfterCompletionSelector", "退出模拟器"
+            ),
             ACTION_EXIT_AALC: QT_TRANSLATE_NOOP("AfterCompletionSelector", "退出AALC"),
         }
         self._power_text = {
             POWER_ACTION_NONE: QT_TRANSLATE_NOOP("AfterCompletionSelector", "无"),
             POWER_ACTION_SLEEP: QT_TRANSLATE_NOOP("AfterCompletionSelector", "睡眠"),
-            POWER_ACTION_HIBERNATE: QT_TRANSLATE_NOOP("AfterCompletionSelector", "休眠"),
+            POWER_ACTION_HIBERNATE: QT_TRANSLATE_NOOP(
+                "AfterCompletionSelector", "休眠"
+            ),
             POWER_ACTION_LOCK: QT_TRANSLATE_NOOP("AfterCompletionSelector", "锁屏"),
             POWER_ACTION_SHUTDOWN: QT_TRANSLATE_NOOP("AfterCompletionSelector", "关机"),
         }
@@ -181,11 +211,16 @@ class AfterCompletionSelector(QFrame):
         self._once_text = QT_TRANSLATE_NOOP("AfterCompletionSelector", "本次")
         self._exit_prefix_text = QT_TRANSLATE_NOOP("AfterCompletionSelector", "退出")
         self._joiner_text = QT_TRANSLATE_NOOP("AfterCompletionSelector", "与")
-        self._after_power_text = QT_TRANSLATE_NOOP("AfterCompletionSelector", "后，再{0}")
+        self._after_power_text = QT_TRANSLATE_NOOP(
+            "AfterCompletionSelector", "后，再{0}"
+        )
         self._power_only_text = QT_TRANSLATE_NOOP("AfterCompletionSelector", "执行{0}")
-        self._do_nothing_text = QT_TRANSLATE_NOOP("AfterCompletionSelector", "什么也不干")
+        self._do_nothing_text = QT_TRANSLATE_NOOP(
+            "AfterCompletionSelector", "什么也不干"
+        )
         self._tool_tip_text = QT_TRANSLATE_NOOP(
-            "AfterCompletionSelector", "支持组合动作：退出目标后再执行电源动作，可选择仅本次或保存默认"
+            "AfterCompletionSelector",
+            "支持组合动作：退出目标后再执行电源动作，可选择仅本次或保存默认",
         )
 
         self.hbox = QHBoxLayout(self)
@@ -206,7 +241,9 @@ class AfterCompletionSelector(QFrame):
             self._set_after_completion_config([], POWER_ACTION_NONE, persist=False)
 
         self.edit_button.installEventFilter(ToolTipFilter(self))
-        self.summary.installEventFilter(ToolTipFilter(self.summary, position=ToolTipPosition.BOTTOM))
+        self.summary.installEventFilter(
+            ToolTipFilter(self.summary, position=ToolTipPosition.BOTTOM)
+        )
 
         self.edit_button.clicked.connect(self._show_editor)
         self.apply_style()
@@ -218,9 +255,17 @@ class AfterCompletionSelector(QFrame):
         set_border_style(self)
 
     def _summary_text(self, actions: list[str], power_action: str) -> tuple[str, str]:
-        exit_names = [self.tr(self._action_text[action]) for action in actions if action in self._action_text]
+        exit_names = [
+            self.tr(self._action_text[action])
+            for action in actions
+            if action in self._action_text
+        ]
         exit_targets = [
-            name[len(self.tr(self._exit_prefix_text)) :] if name.startswith(self.tr(self._exit_prefix_text)) else name
+            (
+                name[len(self.tr(self._exit_prefix_text)) :]
+                if name.startswith(self.tr(self._exit_prefix_text))
+                else name
+            )
             for name in exit_names
         ]
         power_text = self.tr(self._power_text.get(power_action, self._none_text))
@@ -229,7 +274,9 @@ class AfterCompletionSelector(QFrame):
             exit_text = self.tr(self._joiner_text).join(exit_targets)
             exit_clause = f"{self.tr(self._exit_prefix_text)}{exit_text}"
             if power_action != POWER_ACTION_NONE:
-                display_text = f"{exit_clause}{self.tr(self._after_power_text).format(power_text)}"
+                display_text = (
+                    f"{exit_clause}{self.tr(self._after_power_text).format(power_text)}"
+                )
             else:
                 display_text = exit_clause
         else:
@@ -238,15 +285,17 @@ class AfterCompletionSelector(QFrame):
             else:
                 display_text = self.tr(self._do_nothing_text)
 
-        mode = self.tr(self._saved_text if cfg.get_value("keep_after_completion", False) else self._once_text)
+        mode = self.tr(
+            self._saved_text
+            if cfg.get_value("keep_after_completion", False)
+            else self._once_text
+        )
         full_text = f"{display_text}（{mode}）"
 
         # 动作较多时用换行压缩宽度，完整内容通过悬浮提示查看
         if len(exit_targets) >= 3 and power_action != POWER_ACTION_NONE:
             exit_text = self.tr(self._joiner_text).join(exit_targets)
-            display_text = (
-                f"{self.tr(self._exit_prefix_text)}{exit_text}\n{self.tr(self._after_power_text).format(power_text)}"
-            )
+            display_text = f"{self.tr(self._exit_prefix_text)}{exit_text}\n{self.tr(self._after_power_text).format(power_text)}"
 
         return display_text, full_text
 
@@ -282,9 +331,13 @@ class AfterCompletionSelector(QFrame):
         self._editor_dialog = dialog
         dialog.show()
 
-    def _set_after_completion_config(self, actions: list[str], power_action: str, persist: bool):
+    def _set_after_completion_config(
+        self, actions: list[str], power_action: str, persist: bool
+    ):
         # UI 层统一先规范化一次，避免一次性设置把脏值写入配置。
-        normalized_actions, normalized_power = normalize_after_completion_config(actions, power_action)
+        normalized_actions, normalized_power = normalize_after_completion_config(
+            actions, power_action
+        )
         if persist:
             set_after_completion_config(normalized_actions, normalized_power)
         else:
@@ -304,7 +357,9 @@ class AfterCompletionSelector(QFrame):
         self.refresh_from_config()
         self._close_dialog()
 
-    def _apply_from_dialog(self, actions: list[str], power_action: str, permanent: bool, dialog: QDialog):
+    def _apply_from_dialog(
+        self, actions: list[str], power_action: str, permanent: bool, dialog: QDialog
+    ):
         self.apply_selection(actions, power_action, permanent)
         try:
             dialog.close()
@@ -466,10 +521,14 @@ class FarmingInterfaceLeft(QWidget):
 
         self.resonate_with_Ahab.button.setEnabled(False)
 
-        self.select_all = NormalTextButton(QT_TRANSLATE_NOOP("NormalTextButton", "全选"), "select_all")
+        self.select_all = NormalTextButton(
+            QT_TRANSLATE_NOOP("NormalTextButton", "全选"), "select_all"
+        )
         self.select_all.clicked.connect(self.select_all_function)
 
-        self.clear_all = NormalTextButton(QT_TRANSLATE_NOOP("NormalTextButton", "清空"), "clear_all")
+        self.clear_all = NormalTextButton(
+            QT_TRANSLATE_NOOP("NormalTextButton", "清空"), "clear_all"
+        )
         self.clear_all.clicked.connect(self.clear_all_function)
 
         self.then = BaseLabel(QT_TRANSLATE_NOOP("BaseLabel", "之后"))
@@ -478,11 +537,15 @@ class FarmingInterfaceLeft(QWidget):
         self.link_start_button = NormalTextButton("Link Start!", "link_start", 0)
         self.link_start_button.clicked.connect(self.start_and_stop_tasks)
         self.link_start_button.button.setMinimumSize(130, 70)
-        self.pause_resume_button = NormalTextButton(QT_TRANSLATE_NOOP("NormalTextButton", "暂停"), "pause_resume", 0)
+        self.pause_resume_button = NormalTextButton(
+            QT_TRANSLATE_NOOP("NormalTextButton", "暂停"), "pause_resume", 0
+        )
         self.pause_resume_button.clicked.connect(self.pause_or_resume_tasks)
         self.pause_resume_button.button.setMinimumSize(90, 70)
         self.pause_resume_button.setVisible(False)
-        scale_factor = QApplication.primaryScreen().logicalDotsPerInch() / 96  # Windows 标准 DPI 是 96
+        scale_factor = (
+            QApplication.primaryScreen().logicalDotsPerInch() / 96
+        )  # Windows 标准 DPI 是 96
         font_size = min(14, int(14 / scale_factor))
         # 创建字体对象并设置大小
         font = self.link_start_button.button.font()  # 获取当前字体
@@ -600,7 +663,12 @@ class FarmingInterfaceLeft(QWidget):
                 mediator.warning.emit(message)
                 return False
 
-        if cfg.daily_task is False and cfg.get_reward is False and cfg.buy_enkephalin is False and cfg.mirror is False:
+        if (
+            cfg.daily_task is False
+            and cfg.get_reward is False
+            and cfg.buy_enkephalin is False
+            and cfg.mirror is False
+        ):
             mediator.tasks_warning.emit()
             return False
 
@@ -647,7 +715,9 @@ class FarmingInterfaceLeft(QWidget):
             self.reset_pause_resume_button()
             mediator.refresh_teams_order.emit()
             # 检查线程是否仍在运行，如果仍在运行则执行清理，否则跳过（因为脚本已自行清理）
-            thread_was_running = self.my_script is not None and self.my_script.isRunning()
+            thread_was_running = (
+                self.my_script is not None and self.my_script.isRunning()
+            )
             self.stop_script()
             if thread_was_running:
                 auto.clear_img_cache()
@@ -825,13 +895,17 @@ class FarmingInterfaceCenter(QWidget):
 
     def __init_setting(self):
         self.setting_page.setCurrentIndex(cfg.get_value("default_page"))
-        list(toggle_button_group.items())[cfg.get_value("default_page")][1].setChecked(True)
+        list(toggle_button_group.items())[cfg.get_value("default_page")][1].setChecked(
+            True
+        )
 
     def switch_to_page(self, target: str):
         try:
             """切换页面（带越界保护）"""
             page_index = page_name_and_index[target]
-            self.setting_page.setCurrentIndex(page_index)  # 当调用 setCurrentIndex 时，StackedWidget 会自动播放过渡动画
+            self.setting_page.setCurrentIndex(
+                page_index
+            )  # 当调用 setCurrentIndex 时，StackedWidget 会自动播放过渡动画
             cfg.set_value("default_page", page_index)
         except Exception as e:
             log.error(f"【异常】switch_to_page 出错：{type(e).__name__}:{e}")

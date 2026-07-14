@@ -11,7 +11,9 @@ from utils.path_manager import path_manager
 
 @begin_and_finish_time_log(task_name="选择镜牢主题包")
 # 选择镜牢主题包
-def select_theme_pack(hard_switch=False, floor=None, team_num=None, use_custom_theme_pack_weight=False):
+def select_theme_pack(
+    hard_switch=False, floor=None, team_num=None, use_custom_theme_pack_weight=False
+):
     loop_count = 30
     auto.model = "clam"
     scale = cfg.set_win_size / 1080
@@ -49,17 +51,25 @@ def select_theme_pack(hard_switch=False, floor=None, team_num=None, use_custom_t
             if loop_count < 0:
                 break
             if loop_count < 5:
-                normal_bbox = ImageUtils.get_bbox(ImageUtils.load_image("mirror/theme_pack/normal_assets.png"))
-                hard_bbox = ImageUtils.get_bbox(ImageUtils.load_image("mirror/theme_pack/hard_assets.png"))
+                normal_bbox = ImageUtils.get_bbox(
+                    ImageUtils.load_image("mirror/theme_pack/normal_assets.png")
+                )
+                hard_bbox = ImageUtils.get_bbox(
+                    ImageUtils.load_image("mirror/theme_pack/hard_assets.png")
+                )
                 difficulty_bbox = [
                     min(normal_bbox[0], hard_bbox[0]),
                     min(normal_bbox[1], hard_bbox[1]),
                     max(normal_bbox[2], hard_bbox[2]),
                     max(normal_bbox[3], hard_bbox[3]),
                 ]
-                ocr_result = auto.find_text_element(None, my_crop=difficulty_bbox, only_text=True)
+                ocr_result = auto.find_text_element(
+                    None, my_crop=difficulty_bbox, only_text=True
+                )
                 if not isinstance(ocr_result, str):
-                    if auto.find_element("mirror/road_in_mir/legend_assets.png", take_screenshot=True):
+                    if auto.find_element(
+                        "mirror/road_in_mir/legend_assets.png", take_screenshot=True
+                    ):
                         return
                     continue
                 if "normal" in ocr_result:
@@ -75,7 +85,9 @@ def select_theme_pack(hard_switch=False, floor=None, team_num=None, use_custom_t
             if auto.click_element("mirror/theme_pack/normal_assets.png"):
                 continue
             elif difficulty == "normal":
-                normal_bbox = ImageUtils.get_bbox(ImageUtils.load_image("mirror/theme_pack/normal_assets.png"))
+                normal_bbox = ImageUtils.get_bbox(
+                    ImageUtils.load_image("mirror/theme_pack/normal_assets.png")
+                )
                 auto.mouse_click(
                     (normal_bbox[0] + normal_bbox[2]) // 2,
                     (normal_bbox[1] + normal_bbox[3]) // 2,
@@ -84,7 +96,9 @@ def select_theme_pack(hard_switch=False, floor=None, team_num=None, use_custom_t
             if auto.click_element("mirror/theme_pack/hard_assets.png"):
                 continue
             elif difficulty == "hard":
-                hard_bbox = ImageUtils.get_bbox(ImageUtils.load_image("mirror/theme_pack/hard_assets.png"))
+                hard_bbox = ImageUtils.get_bbox(
+                    ImageUtils.load_image("mirror/theme_pack/hard_assets.png")
+                )
                 auto.mouse_click(
                     (hard_bbox[0] + hard_bbox[2]) // 2,
                     (hard_bbox[1] + hard_bbox[3]) // 2,
@@ -123,7 +137,9 @@ def select_theme_pack(hard_switch=False, floor=None, team_num=None, use_custom_t
                         min(pack[1] + 390 * scale, cfg.set_win_size),
                     )
                     crop = (top_left[0], top_left[1], bottom_right[0], bottom_right[1])
-                    result = auto.find_language_text(theme_pack_list_zh, theme_pack_list_en, crop)
+                    result = auto.find_language_text(
+                        theme_pack_list_zh, theme_pack_list_en, crop
+                    )
                     if isinstance(result, TextMatchResult):
                         theme_pack_weight = result.value
                         theme_pack_name = result.text
@@ -131,7 +147,9 @@ def select_theme_pack(hard_switch=False, floor=None, team_num=None, use_custom_t
                         theme_pack_weight = -5
                         theme_pack_name = "unknown"
 
-                    weight_list.append(theme_pack_weight)  # 采用最大值的形式，权重越大，优先级越高
+                    weight_list.append(
+                        theme_pack_weight
+                    )  # 采用最大值的形式，权重越大，优先级越高
                     pack_name.append(theme_pack_name)
 
                 # 选择权重最大的主题包
@@ -152,7 +170,9 @@ def select_theme_pack(hard_switch=False, floor=None, team_num=None, use_custom_t
             log.error(f"识别主题包出错:{e}")
             continue
 
-        if refresh_times >= 0 and auto.click_element("mirror/theme_pack/refresh_assets.png"):
+        if refresh_times >= 0 and auto.click_element(
+            "mirror/theme_pack/refresh_assets.png"
+        ):
             refresh_times -= 1
             auto.mouse_to_blank()
             sleep(1)

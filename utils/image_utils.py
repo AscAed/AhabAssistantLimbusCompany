@@ -66,12 +66,6 @@ class ImageUtils:
             img_path = os.path.join(f"./assets/images/{path}/{image_path}")
             if os.path.exists(img_path):
                 paths.append(path)
-        if path_manager.current_theme == "dark":
-            dark_paths = [path for path in paths if path_manager.is_path_dark(path)]
-            if dark_paths:
-                paths = dark_paths
-        elif path_manager.current_theme == "default":
-            paths = [path for path in paths if path_manager.is_path_default(path)]
 
         if path_manager.current_language == "zh_cn":
             zh_cn_paths = [path for path in paths if path_manager.is_path_zh_cn(path)]
@@ -184,7 +178,9 @@ class ImageUtils:
         image = image[y1:y2, x1:x2]
         # 如果裁剪区域超出了图像边界，对裁剪后的图像进行边框填充。
         if sum(border) > 0:
-            image = cv2.copyMakeBorder(image, *border, borderType=cv2.BORDER_CONSTANT, value=(0, 0, 0))
+            image = cv2.copyMakeBorder(
+                image, *border, borderType=cv2.BORDER_CONSTANT, value=(0, 0, 0)
+            )
         # 如果需要，返回图像的一个副本。
         if copy:
             image = image.copy()
@@ -211,6 +207,8 @@ class ImageUtils:
     @staticmethod
     def match_template(screenshot, template, bbox, model="clam"):
         try:
+            if screenshot.shape[0] < template.shape[0] or screenshot.shape[1] < template.shape[1]:
+                return None, 0.0
             shape = screenshot.shape
             if len(shape) == 2:
                 height, width = shape
@@ -234,7 +232,11 @@ class ImageUtils:
                     )
             if bbox is not None and model != "aggressive":
                 screenshot_crop = screenshot[bbox[1] : bbox[3], bbox[0] : bbox[2]]
-                result = cv2.matchTemplate(screenshot_crop, template, cv2.TM_CCOEFF_NORMED)
+                if screenshot_crop.shape[0] < template.shape[0] or screenshot_crop.shape[1] < template.shape[1]:
+                    return None, 0.0
+                result = cv2.matchTemplate(
+                    screenshot_crop, template, cv2.TM_CCOEFF_NORMED
+                )
                 min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
                 h, w = template.shape[:2]
                 center = (bbox[0] + max_loc[0] + w // 2, bbox[1] + max_loc[1] + h // 2)
@@ -249,7 +251,9 @@ class ImageUtils:
             log.error(f"图片识别出现错误：{e}")
 
     @staticmethod
-    def match_template_with_multiple_targets(screenshot, template, threshold, min_dist=10):
+    def match_template_with_multiple_targets(
+        screenshot, template, threshold, min_dist=10
+    ):
         # 获取模板的宽度和高度
         w, h = ImageUtils.get_image_info(template)
         # 存储所有匹配位置的中心点
@@ -263,13 +267,22 @@ class ImageUtils:
         sorted_points = sorted(points, key=lambda x: res[x[1], x[0]], reverse=True)
         # 遍历排序后的匹配位置
         if sorted_points:
+            min_dist_sq = min_dist ** 2
             for pt in sorted_points:
                 # 检查当前匹配点是否与已保留的匹配点太近
-                if all(np.linalg.norm(np.array(pt) - np.array(kept_pt)) > min_dist for kept_pt in center_points):
+                # 使用简单的标量算术（平方欧氏距离）和 early break 来代替 np.linalg.norm 的 O(n^2) 内存分配，提升性能。
+                keep = True
+                for kept_pt in center_points:
+                    if (pt[0] - kept_pt[0])**2 + (pt[1] - kept_pt[1])**2 <= min_dist_sq:
+                        keep = False
+                        break
+                if keep:
                     # 如果没有太近的匹配点，保留当前匹配点
                     center_points.append(pt)
             # 计算每个匹配点的中心坐标
-            center_points = [(int(pt[0] + w / 2), int(pt[1] + h / 2)) for pt in center_points]
+            center_points = [
+                (int(pt[0] + w / 2), int(pt[1] + h / 2)) for pt in center_points
+            ]
             return center_points
         log.debug(f"未找到匹配项，最高匹配度为：{np.max(res)}")
         return []
@@ -287,8 +300,12 @@ class ImageUtils:
     def feature_matching(template_img, target_img, min_matches=8):
         # 读取图像并进行预处理
 
-        template = cv2.resize(template_img, None, fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
-        target = cv2.resize(target_img, None, fx=2, fy=2, interpolation=cv2.INTER_LINEAR)
+        template = cv2.resize(
+            template_img, None, fx=2, fy=2, interpolation=cv2.INTER_LINEAR
+        )
+        target = cv2.resize(
+            target_img, None, fx=2, fy=2, interpolation=cv2.INTER_LINEAR
+        )
 
         # 使用ORB特征检测器
         orb = cv2.ORB_create(nfeatures=1000, scaleFactor=1.2, edgeThreshold=10)
@@ -299,7 +316,9 @@ class ImageUtils:
 
         # 使用FLANN匹配器
         FLANN_INDEX_LSH = 6
-        index_params = dict(algorithm=FLANN_INDEX_LSH, table_number=6, key_size=12, multi_probe_level=1)
+        index_params = dict(
+            algorithm=FLANN_INDEX_LSH, table_number=6, key_size=12, multi_probe_level=1
+        )
         search_params = dict(checks=50)
         flann = cv2.FlannBasedMatcher(index_params, search_params)
 

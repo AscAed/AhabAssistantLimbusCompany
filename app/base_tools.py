@@ -66,16 +66,14 @@ class BaseSettingLayout(QFrame):
 
     def _apply_theme_style(self):
         style = get_setting_layout_style(isDarkTheme())
-        self.setStyleSheet(
-            f"""
+        self.setStyleSheet(f"""
             BaseSettingLayout {{
                 border: {style["border"]}; /* 边框 */
                 border-radius: 5px; /* 圆角 */
                 padding: 10px;   /* 内边距 */
                 background-color: transparent; /* 背景透明 */
             }}
-        """
-        )
+        """)
 
     def add(self, tool):
         if isinstance(tool, QWidget):
@@ -131,7 +129,9 @@ class BaseCheckBox(BaseLayout):
         self.tips = tips
         self.check_box = RightClickCheckBox(title, self)
         self.check_box.installEventFilter(
-            ToolTipFilter(self.check_box, showDelay=0, position=ToolTipPosition.BOTTOM_LEFT)
+            ToolTipFilter(
+                self.check_box, showDelay=0, position=ToolTipPosition.BOTTOM_LEFT
+            )
         )
 
         self.hBoxLayout.addWidget(self.check_box, 0, Qt.AlignLeft)
@@ -401,7 +401,11 @@ class BaseComboBox(BaseLayout):
         self.combo_box = RightClickComboBox(self)
         self.hBoxLayout.addWidget(self.combo_box, stretch=1)
         self.setFixedHeight(30)
-        self.installEventFilter(ToolTipFilter(self, showDelay=tool_tip_delay, position=ToolTipPosition.BOTTOM_LEFT))
+        self.installEventFilter(
+            ToolTipFilter(
+                self, showDelay=tool_tip_delay, position=ToolTipPosition.BOTTOM_LEFT
+            )
+        )
         if combo_box_width and isinstance(combo_box_width, int):
             self.combo_box.setFixedWidth(combo_box_width)
 

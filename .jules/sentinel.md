@@ -1,0 +1,4 @@
+## 2025-02-20 - [Command Injection Mitigation in Subprocess Calls]
+**Vulnerability:** Subprocess command execution using string interpolation with `shell=True` exposed arbitrary command injection if properties like `self.exe_path` contained malicious payloads.
+**Learning:** Python's `subprocess.run` executed with `shell=True` should be avoided when input comes from variables that might be untrusted or derived from environment artifacts. Constructing an array of arguments bypassing the shell entirely guarantees safety. In `mumu_control.py`, `enable_app_keptlive`, `disable_app_keptlive`, and `get_app_keptlive` were affected. Refactoring one subset is an anti-pattern.
+**Prevention:** Always use list-based parameters for subprocess calls unless shell functionality is expressly required, and systematically audit every method implementing similar structures in a class to avoid partial patches.

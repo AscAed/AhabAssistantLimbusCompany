@@ -64,7 +64,9 @@ class LanguageManager(metaclass=SingletonMeta):
             if c is component:
                 self.translatable_components.pop(i)
                 return
-        log.warning(f"组件 {self._component_name(component)} 未注册，无法注销", stacklevel=2)
+        log.warning(
+            f"组件 {self._component_name(component)} 未注册，无法注销", stacklevel=2
+        )
 
     def init_language(self):
         """初始化语言设置"""
@@ -140,12 +142,16 @@ class LanguageManager(metaclass=SingletonMeta):
             try:
                 if needs_arg:
                     if lang_code is None:
-                        raise ValueError(f"component {self._component_name(component)}.{retranslateUi} 需要参数但为空")
+                        raise ValueError(
+                            f"component {self._component_name(component)}.{retranslateUi} 需要参数但为空"
+                        )
                     component.retranslateUi(lang_code)
                 else:
                     component.retranslateUi()
             except Exception as e:
-                log.error(f"翻译错误 {self._component_name(component)}: {type(e).__name__} {str(e)}")
+                log.error(
+                    f"翻译错误 {self._component_name(component)}: {type(e).__name__} {str(e)}"
+                )
 
         log.debug("所有组件翻译更新完成")
 
@@ -154,9 +160,11 @@ class LanguageManager(metaclass=SingletonMeta):
         """检查方法是否需要参数"""
         sig = inspect.signature(method)
         required_params = [
-            p for p in sig.parameters.values()
+            p
+            for p in sig.parameters.values()
             if p.default is inspect.Parameter.empty
-            and p.kind not in (
+            and p.kind
+            not in (
                 inspect.Parameter.VAR_POSITIONAL,
                 inspect.Parameter.VAR_KEYWORD,
             )  # 排除可变参数
