@@ -228,7 +228,7 @@ class Battle:
                             confirm_button[0] + 200 * my_scale,
                             confirm_button[1] - 350 * my_scale,
                         )
-                    except:
+                    except Exception:
                         continue
 
                 auto.click_element("battle/dead_all_confirm_assets.png")
@@ -278,7 +278,7 @@ class Battle:
                         self.cur_turn = -1
                     if self.cur_turn == 1:
                         first_turn = True
-                except:
+                except Exception:
                     self.cur_turn = -1  # 表示识别失败
 
             if fail_count >= 10 or self.identify_keyword_turn is False:
@@ -290,7 +290,7 @@ class Battle:
                     result = ocr.run(sc)
                     ocr_result = [result.txts[i] for i in range(len(result.txts))]
                     ocr_result = "".join(ocr_result).lower()
-                except:
+                except Exception:
                     ocr_result = ""
                 if "turn" in ocr_result:
                     self._battle_operation(first_turn, defense_first_round, avoid_skill_3)
@@ -326,7 +326,7 @@ class Battle:
                     result = ocr.run(sc)
                     ocr_result = [result.txts[i] for i in range(len(result.txts))]
                     ocr_result = "".join(ocr_result).lower()
-                except:
+                except Exception:
                     ocr_result = ""
                 if (
                     "turn" in ocr_result
