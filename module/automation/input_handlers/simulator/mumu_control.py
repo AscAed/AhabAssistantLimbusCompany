@@ -581,7 +581,14 @@ class MumuControl(AbstractInput):
             if self.exe_path is None:
                 log.warning("get_app_keptlive: exe_path 为 None, 将触发异常 fallback")
                 raise ValueError("exe_path is None")
-            command = f""" "{self.exe_path}" setting -v {self.multi_instance_number} -k app_keptlive"""
+            command = [
+                self.exe_path,
+                "setting",
+                "-v",
+                str(self.multi_instance_number),
+                "-k",
+                "app_keptlive"
+            ]
             no_window_flag = (
                 subprocess.CREATE_NO_WINDOW
                 if hasattr(subprocess, "CREATE_NO_WINDOW")
@@ -589,7 +596,6 @@ class MumuControl(AbstractInput):
             )
             proc = subprocess.run(
                 command,
-                shell=True,
                 universal_newlines=True,
                 capture_output=True,
                 check=True,  # 新增：如果命令返回非零状态码则抛出异常
@@ -631,8 +637,16 @@ class MumuControl(AbstractInput):
     def disable_app_keptlive(self):
         # 关闭后台保活
         try:
-            command = f""" "{self.exe_path}" setting -v {self.multi_instance_number} -k app_keptlive -val false"""
-            # 新增：使用shell=True执行命令
+            command = [
+                self.exe_path,
+                "setting",
+                "-v",
+                str(self.multi_instance_number),
+                "-k",
+                "app_keptlive",
+                "-val",
+                "false"
+            ]
             no_window_flag = (
                 subprocess.CREATE_NO_WINDOW
                 if hasattr(subprocess, "CREATE_NO_WINDOW")
@@ -640,7 +654,6 @@ class MumuControl(AbstractInput):
             )
             subprocess.run(
                 command,
-                shell=True,
                 universal_newlines=True,
                 capture_output=True,
                 creationflags=no_window_flag,
@@ -652,7 +665,16 @@ class MumuControl(AbstractInput):
     def enable_app_keptlive(self):
         # 开启保活
         try:
-            command = f""" "{self.exe_path}" setting -v {self.multi_instance_number} -k app_keptlive -val true"""
+            command = [
+                self.exe_path,
+                "setting",
+                "-v",
+                str(self.multi_instance_number),
+                "-k",
+                "app_keptlive",
+                "-val",
+                "true"
+            ]
             no_window_flag = (
                 subprocess.CREATE_NO_WINDOW
                 if hasattr(subprocess, "CREATE_NO_WINDOW")
