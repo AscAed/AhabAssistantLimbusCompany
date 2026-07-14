@@ -385,34 +385,10 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         self.last_y = target_y
 
     def mouse_to_blank(self, coordinate=(1, 1), move_back=True) -> None:
-        """鼠标移动到空白位置，避免遮挡（然而为了避免影响用户操作，这个暂时没用）
-        Args:
-            coordinate (tuple): 坐标元组 (x, y)
-            move_back (bool): 是否在移动后将鼠标移动回原位置
-        """
-        # FIXME：既不能影响用户操作，也要避免遮挡，似乎没有好办法
-        # FIXME：目前是不在游戏窗口内不移动鼠标, 但是我觉得应该把这个功能集成在截图里 - 233 25.10.4
-        if move_back:
-            current_mouse_position = self.get_mouse_position()
-            rect = screen.handle.rect(True)
-            if (
-                current_mouse_position[0] > rect[2]
-                or current_mouse_position[1] > rect[3]
-            ):
-                # 在窗口右下角外
-                log.debug("当前鼠标位置不在游戏窗口内，取消移动到空白", stacklevel=2)
-                return
-            elif (
-                current_mouse_position[0] < rect[0]
-                or current_mouse_position[1] < rect[1]
-            ):
-                # 在窗口左上角外
-                log.debug("当前鼠标位置不在游戏窗口内，取消移动到空白", stacklevel=2)
-                return
-        self._mouse_move_to(coordinate[0], coordinate[1])
-
+        """鼠标移动到空白位置，避免遮挡"""
+        # 后台模式下，只向窗口发送后台鼠标移动消息，不移动物理鼠标，避免干扰用户并导致Unity点击坐标漂移
+        self._post_bezier_move(coordinate[0], coordinate[1])
         log.debug("鼠标移动到空白，避免遮挡", stacklevel=2)
-
         self.wait_pause()
 
     def mouse_click(self, x, y, times=1, move_back=True) -> bool:
@@ -761,7 +737,8 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         Args:
             coordinate (tuple): 坐标元组 (x, y)
         """
-        self._mouse_move_to(coordinate[0], coordinate[1])
+        # 后台模式下，只移动虚拟光标，不移动物理光标
+        self._post_bezier_move(coordinate[0], coordinate[1])
         self.wait_pause()
 
     def _mouse_move_to(self, x, y, duration: float = 0):
