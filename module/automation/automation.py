@@ -404,7 +404,11 @@ class Automation(metaclass=SingletonMeta):
                     continue
 
             # Check location matching cache for hashable single-target types
-            is_cacheable = find_type in ["image", "text"] and isinstance(target, (str, int, float))
+            is_cacheable = (
+                find_type in ["image", "text"]
+                and isinstance(target, (str, int, float))
+                and not (isinstance(target, str) and target.endswith("assets.png"))
+            )
 
             if is_cacheable and target in self.location_cache:
                 cached_pos = self.location_cache[target]
