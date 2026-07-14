@@ -70,7 +70,7 @@ class MirrorMap:
             ):
                 return True
         if auto.click_element(
-            "mirror/mybus_default_distance.png", take_screenshot=True
+            "mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=True
         ):
             sleep(1.25)
             if auto.click_element(
@@ -94,7 +94,7 @@ class MirrorMap:
             position = 2
         for _ in range(3):
             if bus_position := auto.find_element(
-                "mirror/mybus_default_distance.png", take_screenshot=True
+                "mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=True
             ):
                 return [
                     bus_position[0] + three_roads[position][0],
@@ -157,7 +157,7 @@ def search_road_default_distance():
     # 判断中、下两个节点是否有权重3的节点，有的话直接选择进入
     node_weight = {}
     if bus_position := auto.find_element(
-        "mirror/mybus_default_distance.png", take_screenshot=False
+        "mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=False
     ):
         for road in three_roads[:2]:
             node_x = bus_position[0] + road[0]
@@ -200,7 +200,7 @@ def search_road_default_distance():
             auto.mouse_to_blank()
 
             bus_position = auto.find_element(
-                "mirror/mybus_default_distance.png", take_screenshot=True
+                "mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=True
             )
             if bus_position is None:
                 break
@@ -250,7 +250,7 @@ def search_road_farthest_distance():
         [250 * scale, 0],
         [250 * scale, 225 * scale],
     ]
-    if bus_position := auto.find_element("mirror/mybus_maximum_distance.png"):
+    if bus_position := auto.find_element("mirror/mybus_maximum_distance.png", threshold=0.7):
         for road in three_roads:
             road[0] += bus_position[0]
             road[1] += bus_position[1]
@@ -278,7 +278,7 @@ def search_road_from_road_map(hard_mode=False):
     road = []
     bus = None
 
-    if auto.click_element("mirror/mybus_default_distance.png", take_screenshot=True):
+    if auto.click_element("mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=True):
         sleep(0.75)
         if auto.click_element(
             "mirror/road_in_mir/enter_assets.png", take_screenshot=True
@@ -286,7 +286,7 @@ def search_road_from_road_map(hard_mode=False):
             return True, True
 
     if bus_position := auto.find_element(
-        "mirror/mybus_default_distance.png", take_screenshot=True
+        "mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=True
     ):
         from tasks.base.retry import check_times
 
@@ -314,7 +314,7 @@ def search_road_from_road_map(hard_mode=False):
             auto.mouse_to_blank()
 
             bus_position = auto.find_element(
-                "mirror/mybus_default_distance.png", take_screenshot=True
+                "mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=True
             )
             if bus_position is None:
                 break
@@ -323,7 +323,12 @@ def search_road_from_road_map(hard_mode=False):
                 bus = bus_position
                 break
 
-    bus_pos = auto.find_element("mirror/mybus_default_distance.png")
+    if bus is None:
+        log.warning("无法定位当前玩家（巴士）位置，寻路失败")
+        return False, []
+    bus_pos = auto.find_element("mirror/mybus_default_distance.png", threshold=0.7)
+    if bus_pos is None:
+        bus_pos = bus
     all_nodes = identify_nodes(bus[0])
     y_area = divide_the_area_by_y(all_nodes)
     reset_position = False
@@ -350,7 +355,7 @@ def search_road_from_road_map(hard_mode=False):
         else:
             set_y_position = 250 * scale
         if bus_position := auto.find_element(
-            "mirror/mybus_default_distance.png", take_screenshot=True
+            "mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=True
         ):
             from tasks.base.retry import check_times
 
@@ -379,7 +384,7 @@ def search_road_from_road_map(hard_mode=False):
                 auto.mouse_to_blank()
 
                 bus_position = auto.find_element(
-                    "mirror/mybus_default_distance.png", take_screenshot=True
+                    "mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=True
                 )
                 if bus_position is None:
                     break
