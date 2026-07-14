@@ -408,8 +408,8 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         msg = f"点击位置:({x},{y})"
         log.debug(msg, stacklevel=2)
         for i in range(times):
+            self.set_mouse_pos(x, y)
             self.set_active()
-            self._post_bezier_move(x, y)
             self.mouse_down(x, y)
             sleep(humanised_delay(0.05, "gaussian"))  # 模拟人类按下和松开的时间间隔
             self.mouse_up(x, y)
@@ -532,8 +532,8 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         x = coordinate[0] + random.randint(0, 10)
         y = coordinate[1] + random.randint(0, 10)
         for i in range(times):
+            self.set_mouse_pos(x, y)
             self.set_active()
-            self._post_bezier_move(x, y)
             self.mouse_down(x, y)
             sleep(humanised_delay(0.05, "gaussian"))  # 模拟人类按下 and 松开时间间隔
             self.mouse_up(x, y)
@@ -737,8 +737,7 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         Args:
             coordinate (tuple): 坐标元组 (x, y)
         """
-        # 后台模式下，只移动虚拟光标，不移动物理光标
-        self._post_bezier_move(coordinate[0], coordinate[1])
+        self._mouse_move_to(coordinate[0], coordinate[1])
         self.wait_pause()
 
     def _mouse_move_to(self, x, y, duration: float = 0):
