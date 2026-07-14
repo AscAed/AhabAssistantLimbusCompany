@@ -358,7 +358,7 @@ class Mirror:
 
                 while auto.take_screenshot() is None:
                     continue
-                if auto.find_element("mirror/road_in_mir/legend_assets.png"):
+                if auto.find_element("mirror/road_in_mir/legend_assets.png") or auto.find_element("mirror/road_in_mir/to_window_assets.png"):
                     _, elapsed = self._time_call(self.search_road)
                     self.find_road_total_time += elapsed
                 continue
