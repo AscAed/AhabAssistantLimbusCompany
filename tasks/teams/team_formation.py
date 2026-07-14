@@ -15,8 +15,11 @@ def clean_team():
             continue
         if auto.click_element("teams/clear_selection_confirm_assets.png"):
             break
-        if (identify_position := auto.find_element("teams/identify_assets.png")) and auto.mouse_action_with_pos(
-            [identify_position[0], identify_position[1] + 600 * scale]):
+        if (
+            identify_position := auto.find_element("teams/identify_assets.png")
+        ) and auto.mouse_action_with_pos(
+            [identify_position[0], identify_position[1] + 600 * scale]
+        ):
             sleep(0.5)
             auto.take_screenshot()
             if auto.find_element("teams/clear_selection_confirm_assets.png") is None:
@@ -61,19 +64,26 @@ def select_battle_team(num):
     find = False
     while auto.take_screenshot() is None:
         continue
-    if auto.find_element("home/first_prompt_assets.png", model="clam") and auto.find_element(
-        "home/back_assets.png", model="normal"
-    ):
+    if auto.find_element(
+        "home/first_prompt_assets.png", model="clam"
+    ) and auto.find_element("home/back_assets.png", model="normal"):
         auto.click_element("home/back_assets.png")
-    if identify_position := auto.find_element("teams/identify_assets.png", take_screenshot=True):
-        position = [identify_position[0] - 2150 * scale, identify_position[1] + 215 * scale]
+    if identify_position := auto.find_element(
+        "teams/identify_assets.png", take_screenshot=True
+    ):
+        position = [
+            identify_position[0] - 2150 * scale,
+            identify_position[1] + 215 * scale,
+        ]
         auto.mouse_click(1, 1)
         my_position[0] += position[0]
         my_position[1] += position[1]
         auto.mouse_click(my_position[0], my_position[1])
         sleep(0.5)
         for _ in range(3):
-            auto.mouse_drag(my_position[0], my_position[1], dy=1333 * scale, drag_time=0.3)
+            auto.mouse_drag(
+                my_position[0], my_position[1], dy=1333 * scale, drag_time=0.3
+            )
         sleep(0.75)
         first_position = [position[0], position[1] + 70 * scale]
         if cfg.select_team_by_order:
@@ -88,7 +98,9 @@ def select_battle_team(num):
                 )
                 sleep(1)
             if num <= 15:
-                auto.mouse_click(first_position[0], first_position[1] + 75 * team_order * scale)
+                auto.mouse_click(
+                    first_position[0], first_position[1] + 75 * team_order * scale
+                )
             else:
                 auto.mouse_click(
                     first_position[0],
@@ -104,7 +116,9 @@ def select_battle_team(num):
             for i in range(10):
                 while auto.take_screenshot() is None:
                     continue
-                if team_position := auto.find_language_text(team_name_zh, team_name_en, my_crop=position_bbox):
+                if team_position := auto.find_language_text(
+                    team_name_zh, team_name_en, my_crop=position_bbox
+                ):
                     auto.mouse_action_with_pos(team_position, offset=False)
                     find = True
                     break
@@ -136,7 +150,9 @@ def deal_with_spills():
     from utils.image_utils import ImageUtils
 
     scale = cfg.set_win_size / 1440
-    sinner_nums_bbox = ImageUtils.get_bbox(ImageUtils.load_image("battle/normal_to_battle_assets.png"))
+    sinner_nums_bbox = ImageUtils.get_bbox(
+        ImageUtils.load_image("battle/normal_to_battle_assets.png")
+    )
     sinner_nums_bbox = (
         sinner_nums_bbox[0],
         sinner_nums_bbox[1] - 115 * scale,
@@ -165,7 +181,9 @@ def deal_with_spills():
             now = int(re.sub(r"\D", "", result[-2]))
             max = int(re.sub(r"\D", "", result[-1]))
             if now > max:
-                all_selected = auto.find_element("teams/selected.png", find_type="image_with_multiple_targets")
+                all_selected = auto.find_element(
+                    "teams/selected.png", find_type="image_with_multiple_targets"
+                )
                 kernel = np.ones((3, 3), np.uint8)
                 for selected in all_selected:
                     try:
@@ -192,7 +210,9 @@ def deal_with_spills():
                             # 再膨胀 2 次
                             background2 = cv2.dilate(background2, kernel, iterations=2)
                             result = ocr.run(background2)
-                            ocr_result = [result.txts[i] for i in range(len(result.txts))]
+                            ocr_result = [
+                                result.txts[i] for i in range(len(result.txts))
+                            ]
                             ocr_result = "".join(ocr_result)
                         if int(ocr_result) > max:
                             auto.mouse_click(selected[0], selected[1])
@@ -239,11 +259,15 @@ def load_team_code_in_game(team_code: str) -> bool:
         sleep(1)
 
         # 查找并点击加载编队码按钮
-        auto.click_element("teams/load_team_code_button_assets.png", take_screenshot=True)
+        auto.click_element(
+            "teams/load_team_code_button_assets.png", take_screenshot=True
+        )
         sleep(1)
 
         # 查找根据取消按钮判断输入框是否出现
-        if not auto.find_element("teams/team_code_cancel_button_assets.png", take_screenshot=True):
+        if not auto.find_element(
+            "teams/team_code_cancel_button_assets.png", take_screenshot=True
+        ):
             # 尝试点击取消按钮返回
             auto.mouse_click_blank()
             sleep(1)
@@ -255,7 +279,9 @@ def load_team_code_in_game(team_code: str) -> bool:
 
         # 点击确认按钮，最多重试 3 次
         for _ in range(3):
-            if auto.click_element("teams/team_code_confirm_button_assets.png", take_screenshot=True):
+            if auto.click_element(
+                "teams/team_code_confirm_button_assets.png", take_screenshot=True
+            ):
                 sleep(1)
             else:
                 break

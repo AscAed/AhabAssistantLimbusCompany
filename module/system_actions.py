@@ -55,7 +55,11 @@ def _run_command_result(command: list[str]) -> subprocess.CompletedProcess[str]:
 def _run_command(command: list[str]) -> int:
     result = _run_command_result(command)
     if result.returncode != 0:
-        detail = result.stderr.strip() or result.stdout.strip() or f"exit={result.returncode}"
+        detail = (
+            result.stderr.strip()
+            or result.stdout.strip()
+            or f"exit={result.returncode}"
+        )
         log.warning(f"命令执行失败 {' '.join(command)}: {detail}")
     return result.returncode
 
@@ -68,13 +72,19 @@ def get_after_completion_config() -> tuple[list[str], str]:
     )
 
 
-def set_after_completion_config(actions: Iterable[str] | None, power_action: str | None) -> None:
-    normalized_actions, normalized_power = normalize_after_completion_config(actions, power_action)
+def set_after_completion_config(
+    actions: Iterable[str] | None, power_action: str | None
+) -> None:
+    normalized_actions, normalized_power = normalize_after_completion_config(
+        actions, power_action
+    )
     cfg.set_value("after_completion_actions", normalized_actions)
     cfg.set_value("after_completion_power_action", normalized_power)
 
 
-def autodaily_exit_to_after_completion_config(exit_setting: list[bool] | tuple[bool, ...]) -> tuple[list[str], str]:
+def autodaily_exit_to_after_completion_config(
+    exit_setting: list[bool] | tuple[bool, ...],
+) -> tuple[list[str], str]:
     """
     将 autodaily_task_exit([exit_game, exit_aalc, sleep, hibernate, shutdown, lock, exit_emulator]) 转换为统一动作配置。
     """
@@ -210,7 +220,10 @@ def _action_power(power_action: str) -> None:
             log.info("已执行：睡眠")
         return
     if power_action == POWER_ACTION_HIBERNATE:
-        if _run_command(["rundll32.exe", "powrprof.dll,SetSuspendState", "Hibernate"]) == 0:
+        if (
+            _run_command(["rundll32.exe", "powrprof.dll,SetSuspendState", "Hibernate"])
+            == 0
+        ):
             log.info("已执行：休眠")
         return
     if power_action == POWER_ACTION_SHUTDOWN:

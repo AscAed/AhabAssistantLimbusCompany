@@ -23,7 +23,13 @@ from .config_typing import ConfigModel, TeamSetting
 
 
 class Config(metaclass=SingletonMeta):
-    def __init__(self, version_path, example_path, config_path, backup_path: str = "config_backup"):
+    def __init__(
+        self,
+        version_path,
+        example_path,
+        config_path,
+        backup_path: str = "config_backup",
+    ):
         self.yaml = YAML()
         # 并发与延迟写控制
         self._lock = threading.RLock()
@@ -32,7 +38,9 @@ class Config(metaclass=SingletonMeta):
         self._pending_save = False
         # 后台写盘线程
         self._writer_event = threading.Event()
-        self._writer_thread = threading.Thread(target=self._writer_loop, name="ConfigWriter", daemon=True)
+        self._writer_thread = threading.Thread(
+            target=self._writer_loop, name="ConfigWriter", daemon=True
+        )
         self._writer_thread.start()
 
         # 加载版本信息
@@ -49,7 +57,9 @@ class Config(metaclass=SingletonMeta):
 
         # 加载实际配置，此方法会根据实际配置覆盖默认配置
         self._load_config()
-        log.debug(f"配置文件已加载，版本号：{self.version}, 配置版本: {self.get_value('config_version', '未知')}")
+        log.debug(
+            f"配置文件已加载，版本号：{self.version}, 配置版本: {self.get_value('config_version', '未知')}"
+        )
         # 进程退出前确保落盘
         atexit.register(self.flush)
 
@@ -64,7 +74,9 @@ class Config(metaclass=SingletonMeta):
         if saved_version < 1768403022:
             team_num = len(self.get_value("teams_be_select", []))
 
-            def _calculate_time_history(time_list: list[float], count: int) -> list[float]:
+            def _calculate_time_history(
+                time_list: list[float], count: int
+            ) -> list[float]:
                 """从每局都记录转换为只记录三种平均值"""
                 if count == 0:
                     return [0.0, 0.0, 0.0]
@@ -125,31 +137,41 @@ class Config(metaclass=SingletonMeta):
             # 迁移旧版结束后动作配置，按字段独立迁移，避免覆盖用户已设置的新字段
             # 映射表统一由 module.after_completion_types 维护；config 层只负责迁移与落盘。
             legacy_value = int(self.get_value("after_completion", 0) or 0)
-            legacy_actions, legacy_power = LEGACY_AFTER_COMPLETION_TO_CONFIG.get(legacy_value, ((), POWER_ACTION_NONE))
+            legacy_actions, legacy_power = LEGACY_AFTER_COMPLETION_TO_CONFIG.get(
+                legacy_value, ((), POWER_ACTION_NONE)
+            )
             migrated = False
 
             # 仅在 actions 字段缺失或类型错误时补写
             current_actions = self.get_value("after_completion_actions")
             if not isinstance(current_actions, list):
                 # 配置文件保持字符串协议，不直接持久化内部 Enum。
-                loaded_config["after_completion_actions"] = serialize_after_actions(legacy_actions)
+                loaded_config["after_completion_actions"] = serialize_after_actions(
+                    legacy_actions
+                )
                 migrated = True
 
             # 仅在 power_action 字段缺失或类型错误时补写（与 actions 独立判断）
             current_power = self.get_value("after_completion_power_action")
             if not isinstance(current_power, str):
-                loaded_config["after_completion_power_action"] = serialize_power_action(legacy_power)
+                loaded_config["after_completion_power_action"] = serialize_power_action(
+                    legacy_power
+                )
                 migrated = True
 
             if migrated:
-                log.info(f"已将旧版结束后操作配置迁移为组合动作（legacy={legacy_value}）")
+                log.info(
+                    f"已将旧版结束后操作配置迁移为组合动作（legacy={legacy_value}）"
+                )
         if saved_version < 1775826004:
             teams: dict[str, dict] = {}
             for i in range(1, 21):
                 settings: dict | None = loaded_config.get(f"team{i}_setting", None)
                 if settings is None:
                     continue
-                remark_name: str | None = loaded_config.get(f"team{i}_remark_name", None)
+                remark_name: str | None = loaded_config.get(
+                    f"team{i}_remark_name", None
+                )
                 history: dict = loaded_config.get(f"team{i}_history", {}) or {}
 
                 settings.update(history)
@@ -201,9 +223,15 @@ class Config(metaclass=SingletonMeta):
         try:
             if not path.exists():
                 if self.backup_path.exists():
-                    backup_files = [f for f in self.backup_path.iterdir() if f.is_file() and f.suffix == ".yaml"]
+                    backup_files = [
+                        f
+                        for f in self.backup_path.iterdir()
+                        if f.is_file() and f.suffix == ".yaml"
+                    ]
                     if backup_files:
-                        backup_files.sort(key=lambda f: f.stat().st_birthtime, reverse=True)
+                        backup_files.sort(
+                            key=lambda f: f.stat().st_birthtime, reverse=True
+                        )
                         log.info("配置文件不存在，存在备份配置，尝试从备份文件恢复配置")
                         self._load_config(backup_files[0])
                         return
@@ -214,15 +242,25 @@ class Config(metaclass=SingletonMeta):
                 if loaded_config is None:
                     log.error("读取到的设置文件为空, 请确认是否因为罕见情况丢失了数据")
                     if self.backup_path.exists():
-                        backup_files = [f for f in self.backup_path.iterdir() if f.is_file() and f.suffix == ".yaml"]
+                        backup_files = [
+                            f
+                            for f in self.backup_path.iterdir()
+                            if f.is_file() and f.suffix == ".yaml"
+                        ]
                     else:
                         backup_files = []
                     if backup_files:
-                        backup_files.sort(key=lambda f: f.stat().st_birthtime, reverse=True)
-                        with open(backup_files[0], "r", encoding="utf-8") as backup_file:
+                        backup_files.sort(
+                            key=lambda f: f.stat().st_birthtime, reverse=True
+                        )
+                        with open(
+                            backup_files[0], "r", encoding="utf-8"
+                        ) as backup_file:
                             loaded_config = self.yaml.load(backup_file) or {}
                         if loaded_config:
-                            log.info(f"已从最新的备份文件 {backup_files[0].name} 恢复配置")
+                            log.info(
+                                f"已从最新的备份文件 {backup_files[0].name} 恢复配置"
+                            )
                         else:
                             log.error(
                                 f"最新的备份文件 {backup_files[0].name} 无法读取到有效配置，请自行通过 {self.backup_path.name} 文件夹下其他文件恢复数据"
@@ -240,16 +278,24 @@ class Config(metaclass=SingletonMeta):
                 self.config = ConfigModel(**{**self._defaults, **loaded_config})
                 queue_in_loaded_config = loaded_config.get("teams_active_queue")
                 if queue_in_loaded_config is None:
-                    normalized_queue = self._normalize_team_queue(self.migrate_legacy_team_queue())
+                    normalized_queue = self._normalize_team_queue(
+                        self.migrate_legacy_team_queue()
+                    )
                 else:
-                    normalized_queue = self._normalize_team_queue(queue_in_loaded_config)
+                    normalized_queue = self._normalize_team_queue(
+                        queue_in_loaded_config
+                    )
                 self._sync_legacy_team_state(normalized_queue)
                 # 成功加载后保存当前文件为备份
                 self.backup_config()
                 self._save_config()
         except FileNotFoundError:
             if self.backup_path.exists():
-                backup_files = [f for f in self.backup_path.iterdir() if f.is_file() and f.suffix == ".yaml"]
+                backup_files = [
+                    f
+                    for f in self.backup_path.iterdir()
+                    if f.is_file() and f.suffix == ".yaml"
+                ]
                 if backup_files:
                     backup_files.sort(key=lambda f: f.stat().st_birthtime, reverse=True)
                     log.info("配置文件不存在，尝试从备份文件恢复配置")
@@ -260,7 +306,11 @@ class Config(metaclass=SingletonMeta):
             if path == self.config_path:
                 log.error("配置文件数据非法，尝试使用备份文件恢复配置")
                 if self.backup_path.exists():
-                    backup_files = [f for f in self.backup_path.iterdir() if f.is_file() and f.suffix == ".yaml"]
+                    backup_files = [
+                        f
+                        for f in self.backup_path.iterdir()
+                        if f.is_file() and f.suffix == ".yaml"
+                    ]
                     if not backup_files:
                         log.error("备份目录下没有可用的备份文件，无法恢复配置")
                         raise
@@ -269,11 +319,15 @@ class Config(metaclass=SingletonMeta):
                         try:
                             self._load_config(backup_file)
                             if i > 0:
-                                log.info(f"已从较早的备份文件 {backup_file.name} 恢复配置")
+                                log.info(
+                                    f"已从较早的备份文件 {backup_file.name} 恢复配置"
+                                )
                             break
                         except (ValidationError, ValueError, TypeError):
                             if i < len(backup_files) - 1:
-                                log.info(f"备份文件 {backup_file.name} 恢复失败，尝试下一个备份文件")
+                                log.info(
+                                    f"备份文件 {backup_file.name} 恢复失败，尝试下一个备份文件"
+                                )
                             else:
                                 log.error("所有备份文件均无法恢复配置")
                                 raise
@@ -288,7 +342,11 @@ class Config(metaclass=SingletonMeta):
             if path == self.config_path:
                 log.error("配置文件解析错误，尝试使用备份文件恢复配置")
                 if self.backup_path.exists():
-                    backup_files = [f for f in self.backup_path.iterdir() if f.is_file() and f.suffix == ".yaml"]
+                    backup_files = [
+                        f
+                        for f in self.backup_path.iterdir()
+                        if f.is_file() and f.suffix == ".yaml"
+                    ]
                     if not backup_files:
                         log.error("备份目录下没有可用的备份文件，无法恢复配置")
                         raise
@@ -297,11 +355,15 @@ class Config(metaclass=SingletonMeta):
                         try:
                             self._load_config(backup_file)
                             if i > 0:
-                                log.info(f"已从较早的备份文件 {backup_file.name} 恢复配置")
+                                log.info(
+                                    f"已从较早的备份文件 {backup_file.name} 恢复配置"
+                                )
                             break
                         except YAMLError:
                             if i < len(backup_files) - 1:
-                                log.info(f"备份文件 {backup_file.name} 恢复失败，尝试下一个备份文件")
+                                log.info(
+                                    f"备份文件 {backup_file.name} 恢复失败，尝试下一个备份文件"
+                                )
                             else:
                                 log.error("所有备份文件均无法恢复配置")
                                 raise
@@ -326,7 +388,9 @@ class Config(metaclass=SingletonMeta):
         with open(self.config_path, "w", encoding="utf-8") as file:
             self.yaml.dump(example_yaml, file)
 
-    def get_value(self, key: str, default: Any = None, *, config_obj: Optional[BaseModel] = None) -> Any:
+    def get_value(
+        self, key: str, default: Any = None, *, config_obj: Optional[BaseModel] = None
+    ) -> Any:
         """获取配置项的值, 如果是可变对象，则返回其指针"""
         if config_obj is not None:
             value = getattr(config_obj, key, default)
@@ -390,7 +454,10 @@ class Config(metaclass=SingletonMeta):
             select_index = team_num - 1
             if select_index >= len(teams_be_select):
                 continue
-            if teams_be_select[select_index] is not True or team_num in queued_team_numbers:
+            if (
+                teams_be_select[select_index] is not True
+                or team_num in queued_team_numbers
+            ):
                 continue
             migrated_queue.append(team_num)
         return migrated_queue
@@ -442,7 +509,11 @@ class Config(metaclass=SingletonMeta):
 
     def remove_team_from_queue(self, team_num: int) -> None:
         """从队列中移除指定队伍"""
-        queue = [value for value in self.get_value("teams_active_queue", []) or [] if value != team_num]
+        queue = [
+            value
+            for value in self.get_value("teams_active_queue", []) or []
+            if value != team_num
+        ]
         self._sync_legacy_team_state(self._normalize_team_queue(queue))
         self.save()
 
@@ -457,7 +528,9 @@ class Config(metaclass=SingletonMeta):
         self._sync_legacy_team_state(self._normalize_team_queue(queue))
         self.save()
 
-    def set_value(self, key: str, value: Any, *, config_obj: Optional[BaseModel | dict] = None) -> None:
+    def set_value(
+        self, key: str, value: Any, *, config_obj: Optional[BaseModel | dict] = None
+    ) -> None:
         """设置配置项的值并延迟保存"""
         with self._lock:
             self.unsaved_set_value(key, value, config_obj=config_obj, stacklevel=3)
@@ -535,9 +608,13 @@ class Config(metaclass=SingletonMeta):
                 self.config = ConfigModel(**{**self._defaults, **loaded_config})
                 queue_in_loaded_config = loaded_config.get("teams_active_queue")
                 if queue_in_loaded_config is None:
-                    normalized_queue = self._normalize_team_queue(self.migrate_legacy_team_queue())
+                    normalized_queue = self._normalize_team_queue(
+                        self.migrate_legacy_team_queue()
+                    )
                 else:
-                    normalized_queue = self._normalize_team_queue(queue_in_loaded_config)
+                    normalized_queue = self._normalize_team_queue(
+                        queue_in_loaded_config
+                    )
                 self._sync_legacy_team_state(normalized_queue)
         except FileNotFoundError:
             self._schedule_save()
@@ -545,7 +622,12 @@ class Config(metaclass=SingletonMeta):
             sys.exit(f"配置文件{path}加载错误: {e}")
 
     def unsaved_set_value(
-        self, key: str, value: Any, *, config_obj: Optional[BaseModel | dict] = None, stacklevel: int = 2
+        self,
+        key: str,
+        value: Any,
+        *,
+        config_obj: Optional[BaseModel | dict] = None,
+        stacklevel: int = 2,
     ) -> None:
         """仅设置配置项的值 不保存"""
         if self.config is None:
@@ -571,26 +653,40 @@ class Config(metaclass=SingletonMeta):
                     cls = "None"
                 log.debug(f"{cls}::{key} change to: {value}", stacklevel=stacklevel)
             else:
-                log.debug(f"{config_obj.__class__.__name__}::{key} change to: {value}", stacklevel=stacklevel)
+                log.debug(
+                    f"{config_obj.__class__.__name__}::{key} change to: {value}",
+                    stacklevel=stacklevel,
+                )
         else:
-            log.debug(f"{key} change to: {value}", stacklevel=stacklevel)  # 增加设置修改的信息
+            log.debug(
+                f"{key} change to: {value}", stacklevel=stacklevel
+            )  # 增加设置修改的信息
 
     def backup_config(self) -> None:
         """备份当前配置到备份目录"""
         if not self.backup_path.exists():
             self.backup_path.mkdir(parents=True, exist_ok=True)
         now_time = localtime(time())
-        files = [f for f in self.backup_path.iterdir() if f.is_file() and f.suffix == ".yaml"]
+        files = [
+            f for f in self.backup_path.iterdir() if f.is_file() and f.suffix == ".yaml"
+        ]
         if files:
             files.sort(key=lambda f: f.stat().st_birthtime)
             # 确保上次保存的文件日期不同于今天，避免重复备份
             latest_time = localtime(files[-1].stat().st_birthtime)
             if latest_time.tm_mday != now_time.tm_mday:
-                backup_file = self.backup_path / f"config_{strftime('%Y%m%d_%H%M%S', now_time)}.yaml"
+                backup_file = (
+                    self.backup_path
+                    / f"config_{strftime('%Y%m%d_%H%M%S', now_time)}.yaml"
+                )
                 with open(backup_file, "w", encoding="utf-8") as f:
                     self.yaml.dump(self.config.model_dump(), f)
             # 删除旧备份文件，保留最近的10个
-            files = [f for f in self.backup_path.iterdir() if f.is_file() and f.suffix == ".yaml"]
+            files = [
+                f
+                for f in self.backup_path.iterdir()
+                if f.is_file() and f.suffix == ".yaml"
+            ]
             files.sort(key=lambda f: f.stat().st_birthtime)
             while len(files) > 10:
                 try:
@@ -600,11 +696,15 @@ class Config(metaclass=SingletonMeta):
                     log.error(f"删除旧备份文件 {files[0]} 失败: {e}")
                     break
         else:
-            backup_file = self.backup_path / f"config_{strftime('%Y%m%d_%H%M%S', now_time)}.yaml"
+            backup_file = (
+                self.backup_path / f"config_{strftime('%Y%m%d_%H%M%S', now_time)}.yaml"
+            )
             with open(backup_file, "w", encoding="utf-8") as f:
                 self.yaml.dump(self.config.model_dump(), f)
 
-    def unsaved_del_key(self, key: str, *, config_obj: Optional[BaseModel | dict] = None) -> None:
+    def unsaved_del_key(
+        self, key: str, *, config_obj: Optional[BaseModel | dict] = None
+    ) -> None:
         """仅删除配置项 不保存"""
         if self.config is None:
             self.just_load_config()
@@ -616,7 +716,9 @@ class Config(metaclass=SingletonMeta):
         else:
             delattr(self.config, key)
 
-    def del_key(self, key: str, *, config_obj: Optional[BaseModel | dict] = None) -> None:
+    def del_key(
+        self, key: str, *, config_obj: Optional[BaseModel | dict] = None
+    ) -> None:
         """删除配置项并保存"""
         self.unsaved_del_key(key, config_obj=config_obj)
         self._schedule_save()
@@ -665,7 +767,11 @@ class Theme_pack_list(metaclass=SingletonMeta):
         # 先同步全局和队伍配置文件，再从全局配置文件加载 self.config
         self._sync_team_weight_configs(default_config)
         loaded_config = self.load_config(self.theme_pack_list_path)
-        self.config = copy.deepcopy(loaded_config) if loaded_config else copy.deepcopy(default_config)
+        self.config = (
+            copy.deepcopy(loaded_config)
+            if loaded_config
+            else copy.deepcopy(default_config)
+        )
 
     def build_setting_key(self, hard_switch: bool, language: str | None) -> list[str]:
         """构建配置项键名列表。开启困难模式时同时返回普通和困难键。"""
@@ -678,7 +784,10 @@ class Theme_pack_list(metaclass=SingletonMeta):
 
     def build_team_weight_path(self, team_num: int) -> str:
         """构建特定队伍的权重配置文件路径"""
-        return str(Path(self.theme_pack_weight_path) / f"theme_pack_weight_team_{team_num}.yaml")
+        return str(
+            Path(self.theme_pack_weight_path)
+            / f"theme_pack_weight_team_{team_num}.yaml"
+        )
 
     def delete_team_weight_config(self, team_num: int) -> None:
         """删除指定队伍的自定义主题包权重配置文件。"""
@@ -689,7 +798,9 @@ class Theme_pack_list(metaclass=SingletonMeta):
         if path.exists():
             path.unlink()
 
-    def set_team_weight_config_from_team(self, target_team_num: int, source_team_num: int) -> None:
+    def set_team_weight_config_from_team(
+        self, target_team_num: int, source_team_num: int
+    ) -> None:
         """将 source 队伍的自定义主题包权重配置写入到 target 队伍。"""
         if target_team_num < 1 or source_team_num < 1:
             return
@@ -728,13 +839,16 @@ class Theme_pack_list(metaclass=SingletonMeta):
             merged_global_config = copy.deepcopy(default_config)
             self._update_config(merged_global_config, global_loaded_config)
             if merged_global_config != global_loaded_config:
-                self.save_config(path=self.theme_pack_list_path, config_data=merged_global_config)
+                self.save_config(
+                    path=self.theme_pack_list_path, config_data=merged_global_config
+                )
 
         if not self.theme_pack_weight_path.exists():
             return
 
         for team_weight_path in sorted(
-            self.theme_pack_weight_path.glob("theme_pack_weight_team_*.yaml"), key=lambda item: item.name
+            self.theme_pack_weight_path.glob("theme_pack_weight_team_*.yaml"),
+            key=lambda item: item.name,
         ):
             loaded_config = self.load_config(str(team_weight_path))
             if not loaded_config:
@@ -746,7 +860,11 @@ class Theme_pack_list(metaclass=SingletonMeta):
                 self.save_config(path=str(team_weight_path), config_data=merged_config)
 
     def get_effective_theme_pack_list(
-        self, hard_switch: bool, language: str | None, team_num: int, use_custom_theme_pack_weight: bool
+        self,
+        hard_switch: bool,
+        language: str | None,
+        team_num: int,
+        use_custom_theme_pack_weight: bool,
     ) -> tuple[dict]:
         """获取当前生效的主题包名单，考虑难度、语言、队伍和是否启用自定义权重等因素"""
         setting_keys = self.build_setting_key(hard_switch, language)
@@ -766,7 +884,9 @@ class Theme_pack_list(metaclass=SingletonMeta):
         effective_list = {}
         for key in setting_keys:
             effective_list.update(loaded_data.get(key, self.config.get(key, {})))
-        log.debug(f"已加载自定义权重。path={custom_path}, keys={setting_keys}, count={len(effective_list)}")
+        log.debug(
+            f"已加载自定义权重。path={custom_path}, keys={setting_keys}, count={len(effective_list)}"
+        )
         return effective_list
 
     def _load_version(self, version_path: str) -> str:

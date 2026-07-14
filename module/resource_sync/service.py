@@ -14,7 +14,11 @@ import requests
 
 from module.logger import log
 from utils.file_utils import sha256_file
-from module.resource_sync.manifest import ResourceFileEntry, ResourceManifest, ResourcePackageEntry
+from module.resource_sync.manifest import (
+    ResourceFileEntry,
+    ResourceManifest,
+    ResourcePackageEntry,
+)
 from module.resource_sync.source import ResourceSource, get_default_sources
 from module.resource_sync.state import LOCAL_STATE_PATH, ResourceSyncState
 from utils.archive_7z import extract_7z_archive
@@ -172,7 +176,11 @@ class ResourceSyncService:
         if etag and state.last_remote_etag and etag == state.last_remote_etag:
             return True
         # 再回退到 Last-Modified，用于不提供 ETag 的托管源。
-        if last_modified and state.last_remote_last_modified and last_modified == state.last_remote_last_modified:
+        if (
+            last_modified
+            and state.last_remote_last_modified
+            and last_modified == state.last_remote_last_modified
+        ):
             return True
         return False
 
@@ -188,7 +196,10 @@ class ResourceSyncService:
             资源包的完整下载地址。
         """
         # 先转义相对路径，再与 manifest_url 组合，兼容带子目录的资源仓库结构。
-        return urljoin(source.manifest_url, ResourceSyncService._quote_repository_path(package_path))
+        return urljoin(
+            source.manifest_url,
+            ResourceSyncService._quote_repository_path(package_path),
+        )
 
     @staticmethod
     def _ensure_package_metadata(manifest: ResourceManifest) -> ResourcePackageEntry:
@@ -238,7 +249,9 @@ class ResourceSyncService:
             return ResourceSyncState()
         try:
             # 读取并解析 JSON 状态文件，供本轮远端比对复用。
-            return ResourceSyncState.from_json(self.state_path.read_text(encoding="utf-8"))
+            return ResourceSyncState.from_json(
+                self.state_path.read_text(encoding="utf-8")
+            )
         except Exception as exc:
             # 状态文件损坏时不阻断主流程，回退为空状态继续检查。
             log.warning(f"读取图片资源同步状态失败，将使用空状态继续: {exc}")
@@ -258,7 +271,9 @@ class ResourceSyncService:
         self.state_path.write_text(state.to_json(), encoding="utf-8")
         return self.state_path
 
-    def check_for_updates(self, preferred_source: str, state: ResourceSyncState | None = None) -> ResourceCheckResult:
+    def check_for_updates(
+        self, preferred_source: str, state: ResourceSyncState | None = None
+    ) -> ResourceCheckResult:
         """检查远端资源清单是否发生更新。
 
         参数:
@@ -271,7 +286,9 @@ class ResourceSyncService:
         # 第一步：准备本地状态、当前本地轻量快照和候选资源源列表。
         local_state = state or self.load_state()
         local_snapshot = self._build_local_snapshot()
-        local_snapshot_unchanged = self._is_same_local_snapshot(local_state, local_snapshot)
+        local_snapshot_unchanged = self._is_same_local_snapshot(
+            local_state, local_snapshot
+        )
         candidates = self.resolve_candidate_sources(preferred_source)
 
         if not candidates:
@@ -300,8 +317,12 @@ class ResourceSyncService:
                     return ResourceCheckResult(
                         status=ResourceCheckStatus.UP_TO_DATE,
                         source=source,
-                        remote_last_modified=manifest_response.headers.get("Last-Modified") or local_state.last_remote_last_modified,
-                        remote_etag=manifest_response.headers.get("ETag") or local_state.last_remote_etag,
+                        remote_last_modified=manifest_response.headers.get(
+                            "Last-Modified"
+                        )
+                        or local_state.last_remote_last_modified,
+                        remote_etag=manifest_response.headers.get("ETag")
+                        or local_state.last_remote_etag,
                         message="远端图片资源清单未更新",
                     )
 
@@ -332,7 +353,9 @@ class ResourceSyncService:
                 if remote_version_unchanged:
                     # 若元数据命中但 manifest_id 未命中，则保守视为远端清单已变化。
                     # 这种情况理论上较少见，但继续走更新流程更安全。
-                    log.info("远端图片资源元数据命中缓存，但 manifest_id 已变化，将按更新处理")
+                    log.info(
+                        "远端图片资源元数据命中缓存，但 manifest_id 已变化，将按更新处理"
+                    )
 
                 # 第四步：走到这里说明资源清单版本已变化，交给上层继续规划同步动作。
                 return ResourceCheckResult(
@@ -346,7 +369,9 @@ class ResourceSyncService:
             except requests.RequestException as exc:
                 # 仅在网络访问失败时回退到下一个资源源。
                 # 协议错误、清单校验错误和本地逻辑错误都应直接暴露，避免被误判成普通源切换。
-                log.warning(f"检查资源源 {source.name} 失败，准备尝试下一个资源源: {exc}")
+                log.warning(
+                    f"检查资源源 {source.name} 失败，准备尝试下一个资源源: {exc}"
+                )
 
         # 第三步：全部候选源都失败时，统一返回错误状态给 UI 做后续提示。
         return ResourceCheckResult(
@@ -378,7 +403,11 @@ class ResourceSyncService:
         for relative_path in self._iter_local_files():
             local_path = self.assets_dir / relative_path
             stat_result = local_path.stat()
-            hasher.update(f"{relative_path}\t{stat_result.st_size}\t{stat_result.st_mtime_ns}\n".encode("utf-8"))
+            hasher.update(
+                f"{relative_path}\t{stat_result.st_size}\t{stat_result.st_mtime_ns}\n".encode(
+                    "utf-8"
+                )
+            )
             file_count += 1
 
         # 第二步：输出当前文件总数与摘要，供后续快速判断本地目录是否发生变化。
@@ -388,7 +417,9 @@ class ResourceSyncService:
         )
 
     @staticmethod
-    def _is_same_local_snapshot(state: ResourceSyncState, snapshot: LocalImageSnapshot) -> bool:
+    def _is_same_local_snapshot(
+        state: ResourceSyncState, snapshot: LocalImageSnapshot
+    ) -> bool:
         """根据已缓存状态与当前轻量快照判断本地图片目录是否保持不变。
 
         参数:
@@ -461,7 +492,11 @@ class ResourceSyncService:
                 plan.files_to_update.append(entry)
 
         # 第三步：本地只要存在“远端清单未记录”的图片，就统一记录为待删除文件。
-        plan.files_to_delete = sorted(relative_path for relative_path in local_files if relative_path not in remote_entries)
+        plan.files_to_delete = sorted(
+            relative_path
+            for relative_path in local_files
+            if relative_path not in remote_entries
+        )
 
         # 第四步：输出汇总日志，方便右侧日志栏和问题排查复用。
         log.debug(
@@ -501,7 +536,9 @@ class ResourceSyncService:
             last_local_snapshot_id=local_snapshot.snapshot_id,
         )
 
-    def accept_remote_state(self, check_result: ResourceCheckResult) -> ResourceSyncState:
+    def accept_remote_state(
+        self, check_result: ResourceCheckResult
+    ) -> ResourceSyncState:
         """在本地已与远端一致时，仅更新本地状态文件。
 
         参数:
@@ -521,7 +558,12 @@ class ResourceSyncService:
         self.save_state(state)
         return state
 
-    def _download_resource_package(self, source: ResourceSource, package_entry: ResourcePackageEntry, target_path: Path) -> Path:
+    def _download_resource_package(
+        self,
+        source: ResourceSource,
+        package_entry: ResourcePackageEntry,
+        target_path: Path,
+    ) -> Path:
         """下载完整资源包，并在下载过程中完成整体哈希与大小校验。
 
         参数:
@@ -534,7 +576,9 @@ class ResourceSyncService:
         """
         # 第一步：解析资源包下载地址并发起流式下载请求。
         package_url = self._resolve_package_url(source, package_entry.path)
-        with self.session.get(package_url, timeout=DEFAULT_REQUEST_TIMEOUT, stream=True) as response:
+        with self.session.get(
+            package_url, timeout=DEFAULT_REQUEST_TIMEOUT, stream=True
+        ) as response:
             response.raise_for_status()
 
             # 第二步：边下载边计算哈希与字节数，避免下载后再二次遍历文件。
@@ -551,7 +595,9 @@ class ResourceSyncService:
 
         # 第三步：对照 manifest 元数据校验大小和哈希，确保整包完整可靠。
         if total_bytes != package_entry.size:
-            raise ValueError(f"资源包大小校验失败: 期望 {package_entry.size}，实际 {total_bytes}")
+            raise ValueError(
+                f"资源包大小校验失败: 期望 {package_entry.size}，实际 {total_bytes}"
+            )
         if hasher.hexdigest() != package_entry.sha256:
             raise ValueError("资源包哈希校验失败")
         return target_path
@@ -605,7 +651,11 @@ class ResourceSyncService:
         download_entries = sync_plan.download_entries
         has_download_entries = bool(download_entries)
         deletion_candidates = list(sync_plan.files_to_delete)
-        package_entry = self._ensure_package_metadata(check_result.remote_manifest) if has_download_entries else None
+        package_entry = (
+            self._ensure_package_metadata(check_result.remote_manifest)
+            if has_download_entries
+            else None
+        )
 
         # 第二步：仅在存在新增或变更文件时，才准备资源包下载与解压环境。
         if has_download_entries:
@@ -617,7 +667,12 @@ class ResourceSyncService:
         else:
             log.info("当前同步计划仅包含删除项，跳过图片资源包下载与解压")
 
-        total_steps = max(1, (2 if has_download_entries else 0) + len(download_entries) + len(deletion_candidates))
+        total_steps = max(
+            1,
+            (2 if has_download_entries else 0)
+            + len(download_entries)
+            + len(deletion_candidates),
+        )
         current_step = 0
 
         try:
@@ -631,7 +686,9 @@ class ResourceSyncService:
                 if progress_callback:
                     progress_callback(current_step, total_steps)
                 log.info("正在下载图片资源包")
-                self._download_resource_package(check_result.source, package_entry, package_download_path)
+                self._download_resource_package(
+                    check_result.source, package_entry, package_download_path
+                )
 
                 current_step += 1
                 if progress_callback:
@@ -680,7 +737,9 @@ class ResourceSyncService:
             )
             self.save_state(state)
             self._refresh_runtime_image_cache()
-            log.info("图片资源同步完成：更新 %s，删除 %s", downloaded_count, deleted_count)
+            log.info(
+                "图片资源同步完成：更新 %s，删除 %s", downloaded_count, deleted_count
+            )
             return ResourceApplyResult(
                 downloaded_count=downloaded_count,
                 deleted_count=deleted_count,

@@ -85,7 +85,9 @@ class CheckBoxWithButton(QFrame):
 
         self.hBoxLayout = QHBoxLayout(self)
         self.box_text = check_box_title
-        self.box = BaseCheckBox(check_box_name, check_box_icon, check_box_title, parent=self)
+        self.box = BaseCheckBox(
+            check_box_name, check_box_icon, check_box_title, parent=self
+        )
         self.button = ChangePageButton(button_name, parent=self)
         self.hBoxLayout.addWidget(self.box)
         self.hBoxLayout.addWidget(self.button)
@@ -97,6 +99,7 @@ class CheckBoxWithButton(QFrame):
 
     def retranslateUi(self):
         self.box.check_box.setText(self.tr(self.box_text))
+
 
 class CheckBoxWithComboBox(QFrame):
     def __init__(
@@ -114,7 +117,14 @@ class CheckBoxWithComboBox(QFrame):
         self.additional_combo_box = None
         self.hBoxLayout = QHBoxLayout(self)
         self.box_text = check_box_title
-        self.box = BaseCheckBox(check_box_name, check_box_icon, check_box_title, parent=self, center=False, tips=tips)
+        self.box = BaseCheckBox(
+            check_box_name,
+            check_box_icon,
+            check_box_title,
+            parent=self,
+            center=False,
+            tips=tips,
+        )
         self.box.setFixedWidth(150)
         self.combo_box = BaseComboBox(combo_box_name, combo_box_width)
         self.combo_box.setFixedWidth(300)
@@ -203,7 +213,9 @@ class LabelWithSpinBox(QFrame):
         self.tips = tips
         self.text = label_text
         self.label = BaseLabel(label_text)
-        self.box = BaseSpinBox(box_name, double=double, min_value=min_value, min_step=min_step)
+        self.box = BaseSpinBox(
+            box_name, double=double, min_value=min_value, min_step=min_step
+        )
         self.vbox_layout.addWidget(self.label)
         self.vbox_layout.addWidget(self.box)
         self.vbox_layout.setAlignment(Qt.AlignCenter)
@@ -221,12 +233,16 @@ class LabelWithSpinBox(QFrame):
 
 
 class MirrorSpinBox(QFrame):
-    def __init__(self, label_text, box_name, parent=None, double=False, min_value=0, min_step=1):
+    def __init__(
+        self, label_text, box_name, parent=None, double=False, min_value=0, min_step=1
+    ):
         super().__init__(parent)
         self.box_layout = QHBoxLayout(self)
         self.text = label_text
         self.label = BaseLabel(label_text)
-        self.box = BaseSpinBox(box_name, double=double, min_value=min_value, min_step=min_step)
+        self.box = BaseSpinBox(
+            box_name, double=double, min_value=min_value, min_step=min_step
+        )
         self.box_layout.addWidget(self.label, stretch=1)
         self.box_layout.addWidget(self.box, stretch=2)
         self.setMaximumHeight(70)
@@ -251,7 +267,9 @@ class MirrorTeamCombination(QFrame):
         self.box_text = check_box_title
 
         self.hBoxLayout = QHBoxLayout(self)
-        self.box = BaseCheckBox(check_box_name, check_box_icon, check_box_title, parent=self)
+        self.box = BaseCheckBox(
+            check_box_name, check_box_icon, check_box_title, parent=self
+        )
         self.button = ToSettingButton(button_name, parent=self)
 
         self.hBoxLayout.setAlignment(Qt.AlignCenter)
@@ -333,7 +351,9 @@ class MirrorTeamCombination(QFrame):
             team_config = TeamSetting(**data)
         except Exception:
             BaseInfoBar.error(
-                title=QT_TRANSLATE_NOOP("BaseInfoBar", "导入数据失败，可能是因为设置版本过旧或过新"),
+                title=QT_TRANSLATE_NOOP(
+                    "BaseInfoBar", "导入数据失败，可能是因为设置版本过旧或过新"
+                ),
                 content="",
                 orient=Qt.Horizontal,
                 isClosable=True,
@@ -363,7 +383,9 @@ class MirrorTeamCombination(QFrame):
         name = cfg.config.teams[f"{self.team_number}"].remark_name
         if name is None:
             name = ""
-        message_box = MessageBoxEdit(QT_TRANSLATE_NOOP("MessageBoxEdit", "设置备注名"), name, self.window())
+        message_box = MessageBoxEdit(
+            QT_TRANSLATE_NOOP("MessageBoxEdit", "设置备注名"), name, self.window()
+        )
         self.retranslateTempUi(message_box)
         if message_box.exec():
             new_name = str(message_box.getText())
@@ -416,23 +438,19 @@ class SinnerSelect(QFrame):
         # Disable clipping so banner/overlays can extend beyond widget bounds
         self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
         # Initial Style
-        self.setStyleSheet(
-            """
+        self.setStyleSheet("""
             QFrame{
                 border-radius: 16px;
             }
-        """
-        )
+        """)
         # Image Label
         self.label_pic = QFrame(self)
-        self.label_pic.setStyleSheet(
-            f"""
+        self.label_pic.setStyleSheet(f"""
             QFrame {{
                 background-color: transparent;
                 border-image: url({img_path}/Sinner.png) 0 0 0 0 stretch stretch;
                 border-width: 0px;
-            }}"""
-        )
+            }}""")
 
         # Internal CheckBox
         self.box = BaseCheckBox(config_name, None, "", parent=self)
@@ -448,11 +466,9 @@ class SinnerSelect(QFrame):
         font.setPointSize(30)
         font.setBold(True)
         self.number_label.setFont(font)
-        self.number_label.setStyleSheet(
-            """
+        self.number_label.setStyleSheet("""
             color: rgb(255, 185, 0);
-            """
-        )  # Amber number color with glow
+            """)  # Amber number color with glow
 
         # Initialize persistent glow effect
         self.number_glow_effect = QGraphicsDropShadowEffect()
@@ -489,13 +505,11 @@ class SinnerSelect(QFrame):
         family = font_manager.load_font("./assets/app/fonts/ChineseFont.ttf")
         name_font = QFont(family, 16)
         self.name_label.setFont(name_font)
-        self.name_label.setStyleSheet(
-            """
+        self.name_label.setStyleSheet("""
             color: rgb(251, 197, 0);
             padding-right: 8px;
             padding-bottom: 12px;
-            """
-        )
+            """)
 
         # sinner card size in game: 537 x 827
         self.setFixedHeight(239)
@@ -503,8 +517,7 @@ class SinnerSelect(QFrame):
 
         # 遮罩层
         self.mask_widget = QFrame(self)
-        self.mask_widget.setStyleSheet(
-            """
+        self.mask_widget.setStyleSheet("""
             QFrame[checked="true"] {
                 background-color: rgba(28, 28, 28, 0.4); /* 半透明深色遮罩 */
                 border-radius: 12px;
@@ -513,8 +526,7 @@ class SinnerSelect(QFrame):
                 background-color: transparent;
                 border-radius: 12px;
             }
-        """
-        )
+        """)
 
         self._update_style(self.box.check_box.isChecked())
 
@@ -579,28 +591,30 @@ class SinnerSelect(QFrame):
                 number = int(text)
                 if number >= 8:
                     # BACKUP: Teal style
-                    banner_pixmap = QPixmap("./assets/app/sinner/ui_components/SinnerBackup.png")
-                    self.number_label.setStyleSheet(
-                        """
-                        color: rgb(34, 255, 227);
-                        """
+                    banner_pixmap = QPixmap(
+                        "./assets/app/sinner/ui_components/SinnerBackup.png"
                     )
+                    self.number_label.setStyleSheet("""
+                        color: rgb(34, 255, 227);
+                        """)
                     # Teal Glow
                     self.number_glow_effect.setColor(QColor(7, 104, 92))
                 else:
                     # SELECTED: Amber style
-                    banner_pixmap = QPixmap("./assets/app/sinner/ui_components/SinnerSelected.png")
-                    self.number_label.setStyleSheet(
-                        """
-                        color: rgb(255, 185, 0);
-                        """
+                    banner_pixmap = QPixmap(
+                        "./assets/app/sinner/ui_components/SinnerSelected.png"
                     )
+                    self.number_label.setStyleSheet("""
+                        color: rgb(255, 185, 0);
+                        """)
                     # Amber Glow
                     self.number_glow_effect.setColor(QColor(254, 95, 0))
                 self.banner_label.setPixmap(banner_pixmap)
             except ValueError:
                 # Fallback if text is not a number
-                banner_pixmap = QPixmap("./assets/app/sinner/ui_components/SinnerSelected.png")
+                banner_pixmap = QPixmap(
+                    "./assets/app/sinner/ui_components/SinnerSelected.png"
+                )
                 self.banner_label.setPixmap(banner_pixmap)
                 # Fallback Glow
                 self.number_glow_effect.setColor(QColor(254, 95, 0))
@@ -730,7 +744,9 @@ class BaseSettingCardGroup(SettingCardGroup):
 
 
 class BasePushSettingCard(PushSettingCard):
-    def __init__(self, text, icon: str | QIcon | FluentIconBase, title, content=None, parent=None):
+    def __init__(
+        self, text, icon: str | QIcon | FluentIconBase, title, content=None, parent=None
+    ):
         super().__init__(text, icon, title, content, parent)
         self.text = text
         self.title = title
@@ -807,7 +823,9 @@ class PushSettingCardMirrorchyan(SettingCard):
 
     def __onclicked(self):
         """保存 Mirror 酱 CDK，并立即触发一次更新检查刷新结果。"""
-        message_box = MessageBoxEdit(self.tr(self.title), self.config_value, self.window())
+        message_box = MessageBoxEdit(
+            self.tr(self.title), self.config_value, self.window()
+        )
         if message_box.exec():
             # 先写回新的 CDK 配置，再主动触发更新检查，便于立即验证下载源状态。
             base64_cdk = encrypt_string(message_box.getText())
@@ -869,7 +887,9 @@ class SwitchSettingCard(SettingCard):
         self.switchButton.setText(self.tr("开") if isChecked else self.tr("关"))
 
     def retranslateUi(self):
-        self.switchButton.setText(self.tr("开") if self.switchButton.checked else self.tr("关"))
+        self.switchButton.setText(
+            self.tr("开") if self.switchButton.checked else self.tr("关")
+        )
         self.titleLabel.setText(self.tr(self.title))
         self.contentLabel.setText(self.tr(self.content))
 
@@ -886,11 +906,15 @@ class PushSettingCardDate(BasePushSettingCard):
     ):
         self.config_name = config_name
         self.config_value = datetime.datetime.fromtimestamp(cfg.get_value(config_name))
-        super().__init__(text, icon, title, self.config_value.strftime("%Y-%m-%d %H:%M"), parent)
+        super().__init__(
+            text, icon, title, self.config_value.strftime("%Y-%m-%d %H:%M"), parent
+        )
         self.button.clicked.connect(self.__onclicked)
 
     def __onclicked(self):
-        message_box = MessageBoxDate(self.tr(self.title), self.config_value, self.window())
+        message_box = MessageBoxDate(
+            self.tr(self.title), self.config_value, self.window()
+        )
         if message_box.exec():
             self.config_value = message_box.getDateTime()
             cfg.set_value(self.config_name, self.config_value.timestamp())
@@ -953,7 +977,9 @@ class AutoDailyView(FlyoutViewBase):
             "autodaily_buy_enkephalin",
             "autodaily_mirror",
         ]
-        self.box_daily = BaseCheckBox("autodaily_daily", None, QT_TRANSLATE_NOOP("BaseCheckBox", "自动执行日常"))
+        self.box_daily = BaseCheckBox(
+            "autodaily_daily", None, QT_TRANSLATE_NOOP("BaseCheckBox", "自动执行日常")
+        )
         self.box_get_reward = BaseCheckBox(
             "autodaily_get_reward",
             None,
@@ -964,7 +990,9 @@ class AutoDailyView(FlyoutViewBase):
             None,
             QT_TRANSLATE_NOOP("BaseCheckBox", "自动狂气换体"),
         )
-        self.box_mirror = BaseCheckBox("autodaily_mirror", None, QT_TRANSLATE_NOOP("BaseCheckBox", "自动镜牢"))
+        self.box_mirror = BaseCheckBox(
+            "autodaily_mirror", None, QT_TRANSLATE_NOOP("BaseCheckBox", "自动镜牢")
+        )
         self.line_1.addWidget(self.box_daily)
         self.line_1.addWidget(self.box_get_reward)
         self.line_1.addWidget(self.box_buy_enkephalin)
@@ -983,15 +1011,29 @@ class AutoDailyView(FlyoutViewBase):
             "autodaily_lock",
             "autodaily_exit_emulator",
         ]
-        self.box_exit_game = BaseCheckBox("autodaily_exit_game", None, QT_TRANSLATE_NOOP("BaseCheckBox", "退出游戏"))
-        self.box_exit_emulator = BaseCheckBox(
-            "autodaily_exit_emulator", None, QT_TRANSLATE_NOOP("BaseCheckBox", "退出模拟器")
+        self.box_exit_game = BaseCheckBox(
+            "autodaily_exit_game", None, QT_TRANSLATE_NOOP("BaseCheckBox", "退出游戏")
         )
-        self.box_exit_aalc = BaseCheckBox("autodaily_exit_aalc", None, QT_TRANSLATE_NOOP("BaseCheckBox", "退出AALC"))
-        self.box_sleep = BaseCheckBox("autodaily_sleep", None, QT_TRANSLATE_NOOP("BaseCheckBox", "睡眠"))
-        self.box_hibernate = BaseCheckBox("autodaily_hibernate", None, QT_TRANSLATE_NOOP("BaseCheckBox", "休眠"))
-        self.box_shutdown = BaseCheckBox("autodaily_shutdown", None, QT_TRANSLATE_NOOP("BaseCheckBox", "关机"))
-        self.box_lock = BaseCheckBox("autodaily_lock", None, QT_TRANSLATE_NOOP("BaseCheckBox", "锁屏"))
+        self.box_exit_emulator = BaseCheckBox(
+            "autodaily_exit_emulator",
+            None,
+            QT_TRANSLATE_NOOP("BaseCheckBox", "退出模拟器"),
+        )
+        self.box_exit_aalc = BaseCheckBox(
+            "autodaily_exit_aalc", None, QT_TRANSLATE_NOOP("BaseCheckBox", "退出AALC")
+        )
+        self.box_sleep = BaseCheckBox(
+            "autodaily_sleep", None, QT_TRANSLATE_NOOP("BaseCheckBox", "睡眠")
+        )
+        self.box_hibernate = BaseCheckBox(
+            "autodaily_hibernate", None, QT_TRANSLATE_NOOP("BaseCheckBox", "休眠")
+        )
+        self.box_shutdown = BaseCheckBox(
+            "autodaily_shutdown", None, QT_TRANSLATE_NOOP("BaseCheckBox", "关机")
+        )
+        self.box_lock = BaseCheckBox(
+            "autodaily_lock", None, QT_TRANSLATE_NOOP("BaseCheckBox", "锁屏")
+        )
         self.line_2.addWidget(self.box_exit_game)
         self.line_2.addWidget(self.box_exit_emulator)
         self.line_2.addWidget(self.box_exit_aalc)
@@ -1008,7 +1050,12 @@ class AutoDailyView(FlyoutViewBase):
 
         self.line_3.addWidget(self.save_button)
 
-        self.checkboxes = [self.box_sleep, self.box_hibernate, self.box_shutdown, self.box_lock]
+        self.checkboxes = [
+            self.box_sleep,
+            self.box_hibernate,
+            self.box_shutdown,
+            self.box_lock,
+        ]
         for cb in self.checkboxes:
             cb.check_box.clicked.connect(self.__on_checkbox_clicked)
 
@@ -1076,7 +1123,9 @@ class AutoDailyView(FlyoutViewBase):
 
     def __save(self):
         if len(self.exit_setting) < 7:
-            self.exit_setting = list(self.exit_setting) + [False] * (7 - len(self.exit_setting))
+            self.exit_setting = list(self.exit_setting) + [False] * (
+                7 - len(self.exit_setting)
+            )
         cfg.set_value(self.config_name + "_task", self.setting)
         cfg.set_value(self.config_name + "_task_exit", self.exit_setting)
         # 关闭弹出窗
@@ -1144,7 +1193,9 @@ class DailySettingCard(SwitchSettingCard):
         self.hBoxLayout.insertWidget(current_count - 2, self.button)
         self.hBoxLayout.insertSpacing(current_count - 1, 20)
         self.autodaily_timepicker.setDisabled(not self.switchButton.isChecked())
-        self.autodaily_timepicker.timeChanged.connect(self.__onAutoDailyTimepickerChanged)
+        self.autodaily_timepicker.timeChanged.connect(
+            self.__onAutoDailyTimepickerChanged
+        )
         self.button.clicked.connect(self.__show_view)
         self.__connect_signal()
         self.retranslateUi()
@@ -1160,7 +1211,9 @@ class DailySettingCard(SwitchSettingCard):
 
     def __connect_signal(self):
         self.switchButton.checkedChanged.connect(self.__onAutoDailyCheckboxChanged)
-        self.autodaily_timepicker.timeChanged.connect(self.__onAutoDailyTimepickerChanged)
+        self.autodaily_timepicker.timeChanged.connect(
+            self.__onAutoDailyTimepickerChanged
+        )
 
     @staticmethod
     def __autodaily_taskname() -> str:
@@ -1198,7 +1251,9 @@ class DailySettingCard(SwitchSettingCard):
 
         cfg.set_value(self.value_name, time.toString("HH:mm"))
         helper.unregister_task(task_name)
-        helper.register_daily_task(task_name, f"start --exit {self.config_name}", time.hour(), time.minute())
+        helper.register_daily_task(
+            task_name, f"start --exit {self.config_name}", time.hour(), time.minute()
+        )
 
     def retranslateUi(self):
         self.button.setText(self.tr(self.button_text))
@@ -1295,7 +1350,9 @@ class KeyEditButton(PushButton):
             index += 1
 
     def __on_clicked(self):
-        input_card = HotketInputCard(self.tr("设置快捷键"), self.key_config, self.window())
+        input_card = HotketInputCard(
+            self.tr("设置快捷键"), self.key_config, self.window()
+        )
         mediator.hotkey_listener_stop_signal.emit()
         if input_card.exec():
             self.key_name = cfg.get_value(self.key_config)
@@ -1375,7 +1432,9 @@ class HotketInputCard(MessageBox):
         self.resetButton = PushButton(self.tr("重置"))
         self.buttonLayout.insertWidget(1, self.resetButton, 1, Qt.AlignVCenter)
         self.cancelButton.setText(self.tr("取消"))
-        self.contentLabel.setText(self.tr("按下键盘以设置快捷键, 部分特殊按键可能无法使用"))
+        self.contentLabel.setText(
+            self.tr("按下键盘以设置快捷键, 部分特殊按键可能无法使用")
+        )
 
         self.key_widget = QWidget()
         self.key_widget.setFixedSize(400, 200)
@@ -1547,16 +1606,22 @@ class TextProgressBar(ProgressBar):
         """计算百分比"""
         if self.maximum() <= self.minimum():
             return 100
-        return int((self.value() - self.minimum()) * 100 / (self.maximum() - self.minimum()))
-
-
+        return int(
+            (self.value() - self.minimum()) * 100 / (self.maximum() - self.minimum())
+        )
 
 
 class ObserveGiftSelectionRow(QFrame):
     selectionChanged = Signal(int, object)
     removeRequested = Signal(int)
 
-    def __init__(self, row_index: int, system_options: list[tuple[str, str]], labels: dict[str, str], parent=None):
+    def __init__(
+        self,
+        row_index: int,
+        system_options: list[tuple[str, str]],
+        labels: dict[str, str],
+        parent=None,
+    ):
         super().__init__(parent)
         self.row_index = row_index
         self._system_options = system_options
@@ -1619,7 +1684,9 @@ class ObserveGiftSelectionRow(QFrame):
         self.level_combo.currentIndexChanged.connect(self._emit_selection_changed)
         self.row_combo.currentIndexChanged.connect(self._emit_selection_changed)
         self.col_combo.currentIndexChanged.connect(self._emit_selection_changed)
-        self.remove_button.clicked.connect(lambda: self.removeRequested.emit(self.row_index))
+        self.remove_button.clicked.connect(
+            lambda: self.removeRequested.emit(self.row_index)
+        )
 
         self.set_selection(ObserveGiftSelection())
 
@@ -1662,7 +1729,12 @@ class ObserveGiftSelectionRow(QFrame):
         )
 
     def set_selection(self, selection: ObserveGiftSelection):
-        for combo in (self.system_combo, self.level_combo, self.row_combo, self.col_combo):
+        for combo in (
+            self.system_combo,
+            self.level_combo,
+            self.row_combo,
+            self.col_combo,
+        ):
             combo.blockSignals(True)
 
         self._set_combo_value(self.system_combo, selection.system)
@@ -1670,12 +1742,19 @@ class ObserveGiftSelectionRow(QFrame):
         self._set_combo_value(self.row_combo, selection.row)
         self._set_combo_value(self.col_combo, selection.col)
 
-        for combo in (self.system_combo, self.level_combo, self.row_combo, self.col_combo):
+        for combo in (
+            self.system_combo,
+            self.level_combo,
+            self.row_combo,
+            self.col_combo,
+        ):
             combo.blockSignals(False)
 
         self._refresh_style()
 
-    def retranslate_row(self, labels: dict[str, str], system_options: list[tuple[str, str]]):
+    def retranslate_row(
+        self, labels: dict[str, str], system_options: list[tuple[str, str]]
+    ):
         self._labels = labels
         self._system_options = system_options
         self.system_label.setText(labels["system"])

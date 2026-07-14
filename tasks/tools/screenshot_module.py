@@ -21,7 +21,9 @@ class ScreenshotGet(QThread):
             from tasks.base.script_task_scheme import init_game
 
             init_game()
-            should_reset_window = cfg.set_windows and cfg.set_reduce_miscontact and not cfg.simulator
+            should_reset_window = (
+                cfg.set_windows and cfg.set_reduce_miscontact and not cfg.simulator
+            )
         except Exception as e:
             log.error(f"初始化游戏失败: {str(e)}")
             return

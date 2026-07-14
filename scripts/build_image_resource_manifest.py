@@ -55,13 +55,19 @@ def iter_resource_files(source_dir: Path) -> list[Path]:
         按相对路径排序后的资源文件路径列表。
     """
     if not source_dir.exists():
-        raise FileNotFoundError(f"Source resource directory does not exist: {source_dir}")
+        raise FileNotFoundError(
+            f"Source resource directory does not exist: {source_dir}"
+        )
     if not source_dir.is_dir():
-        raise NotADirectoryError(f"Source resource path is not a directory: {source_dir}")
+        raise NotADirectoryError(
+            f"Source resource path is not a directory: {source_dir}"
+        )
 
     # 先扫描全部文件，再按归一化相对路径排序，保证每次构建顺序一致。
     files = [path for path in source_dir.rglob("*") if path.is_file()]
-    return sorted(files, key=lambda path: _normalize_relative_path(path.relative_to(source_dir)))
+    return sorted(
+        files, key=lambda path: _normalize_relative_path(path.relative_to(source_dir))
+    )
 
 
 def collect_resource_entries(source_dir: Path) -> list[ResourceFileEntry]:
@@ -102,7 +108,9 @@ def _build_manifest_id(entries: list[ResourceFileEntry]) -> str:
         "files": [entry.to_dict() for entry in entries],
     }
     # 再对规范化 JSON 求哈希，得到可用于增量判断的 manifest_id。
-    canonical_json = json.dumps(canonical_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    canonical_json = json.dumps(
+        canonical_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
     return hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
 
 
@@ -113,10 +121,17 @@ def default_generated_at() -> str:
         ISO 8601 格式的 UTC 时间文本。
     """
     # 统一去掉微秒并保留 Z 后缀，便于清单比对与人工阅读。
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
-def build_resource_manifest(source_dir: Path, generated_at: str | None = None) -> ResourceManifest:
+def build_resource_manifest(
+    source_dir: Path, generated_at: str | None = None
+) -> ResourceManifest:
     """根据源资源目录构建完整清单模型。
 
     参数:
@@ -149,7 +164,9 @@ def build_resource_package(source_dir: Path, output_package_path: Path) -> Path:
     return create_7z_archive(source_dir, output_package_path)
 
 
-def build_package_entry(output_manifest_path: Path, output_package_path: Path) -> ResourcePackageEntry:
+def build_package_entry(
+    output_manifest_path: Path, output_package_path: Path
+) -> ResourcePackageEntry:
     """根据已生成的资源包构建清单中的 package 元数据。
 
     参数:
@@ -161,7 +178,9 @@ def build_package_entry(output_manifest_path: Path, output_package_path: Path) -
     """
     try:
         # 资源包路径必须相对 manifest 所在目录可表达，客户端才能稳定推导下载地址。
-        package_relative_path = output_package_path.relative_to(output_manifest_path.parent).as_posix()
+        package_relative_path = output_package_path.relative_to(
+            output_manifest_path.parent
+        ).as_posix()
     except ValueError as exc:
         raise ValueError(
             "Package output path must be located under the manifest output directory "
@@ -271,7 +290,6 @@ def main() -> int:
         output_package_path=args.output_package_path,
         generated_at=args.generated_at,
     )
-
 
     return 0
 

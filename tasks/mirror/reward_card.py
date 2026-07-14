@@ -54,13 +54,17 @@ def get_reward_card(model=0):
         auto.mouse_to_blank()
         if auto.find_element("mirror/road_in_mir/legend_assets.png"):
             return True
-        if auto.click_element("mirror/road_in_mir/ego_gift_get_confirm_assets.png", model="clam"):
+        if auto.click_element(
+            "mirror/road_in_mir/ego_gift_get_confirm_assets.png", model="clam"
+        ):
             log.debug("奖励卡领取后识别到EGO确认，领取流程结束")
             return True
         if auto.find_element("mirror/road_in_mir/acquire_ego_gift_card.png"):
             log.debug("奖励卡领取后进入饰品选择，交回镜牢主循环处理")
             return True
-        if auto.click_element("mirror/get_reward_card/continue_choosing_assets.png", model="clam"):
+        if auto.click_element(
+            "mirror/get_reward_card/continue_choosing_assets.png", model="clam"
+        ):
             state = "select_reward"
             continue
 

@@ -99,10 +99,15 @@ class UpdateThread(QThread):
             flags=re.IGNORECASE,
         )
         if cfg.update_source == "GitHub":
-            content = content + "\n\n若下载速度较慢，可尝试使用 Mirror酱（设置 → 关于 → 更新源） 高速下载"
+            content = (
+                content
+                + "\n\n若下载速度较慢，可尝试使用 Mirror酱（设置 → 关于 → 更新源） 高速下载"
+            )
         return content
 
-    def _emit_version_check_result(self, version: str, current_version, latest_version, content: str) -> None:
+    def _emit_version_check_result(
+        self, version: str, current_version, latest_version, content: str
+    ) -> None:
         """
         统一根据版本比较结果发出更新状态信号，并在有更新时准备弹窗展示内容。
 
@@ -114,10 +119,13 @@ class UpdateThread(QThread):
         """
         # 第一步：若远端版本更高，则准备更新弹窗标题与渲染后的正文。
         if latest_version > current_version:
-            self.title = self.tr("发现新版本：{Old_version} ——> {New_version}\n更新日志:").format(
-                Old_version=cfg.version, New_version=version
+            self.title = self.tr(
+                "发现新版本：{Old_version} ——> {New_version}\n更新日志:"
+            ).format(Old_version=cfg.version, New_version=version)
+            self.content = (
+                "<style>a {color: #586f50; font-weight: bold;}</style>"
+                + md_renderer.render(content)
             )
-            self.content = "<style>a {color: #586f50; font-weight: bold;}</style>" + md_renderer.render(content)
             self.updateSignal.emit(UpdateStatus.UPDATE_AVAILABLE)
             return
 
@@ -143,7 +151,9 @@ class UpdateThread(QThread):
             content = self._build_release_note_content(data["release_note"])
 
             # 第三步：比较当前版本与最新版本，并统一发出检查结果信号。
-            self._emit_version_check_result(version, current_version, latest_version, content)
+            self._emit_version_check_result(
+                version, current_version, latest_version, content
+            )
         except Exception as e:
             # Mirror酱 失败后自动回退到 GitHub，保持原有软件更新逻辑不变。
             log.error(f"从Mirror酱源检查更新失败:{e},尝试使用GitHub源检查更新")
@@ -162,7 +172,9 @@ class UpdateThread(QThread):
                     return
 
                 # 最后继续复用同一套版本比较逻辑，决定是否弹出更新提示。
-                self._emit_version_check_result(version, current_version, latest_version, content)
+                self._emit_version_check_result(
+                    version, current_version, latest_version, content
+                )
             except Exception as e:
                 # 异常处理，发送失败信号
                 log.error(f"Mirror酱源与GitHub源均检查更新失败:{e}")
@@ -259,7 +271,10 @@ class UpdateThread(QThread):
                 response = self.check_update_info_mirrorchyan(cdk)
                 if response.status_code == 200:
                     mirrorchyan_data = response.json()
-                    if mirrorchyan_data["code"] == 0 and mirrorchyan_data["msg"] == "success":
+                    if (
+                        mirrorchyan_data["code"] == 0
+                        and mirrorchyan_data["msg"] == "success"
+                    ):
                         url = mirrorchyan_data["data"]["url"]
                         return url
                 else:
@@ -321,7 +336,9 @@ def handle_update_status(
         if not show_update_dialog:
             return
 
-        messages_box = MessageBoxUpdate(update_thread.title, update_thread.content, self.window())
+        messages_box = MessageBoxUpdate(
+            update_thread.title, update_thread.content, self.window()
+        )
         if messages_box.exec():
             # 如果用户确认更新，则从指定的URL下载更新资源
             assets_url = update_thread.get_assets_url()
@@ -510,4 +527,6 @@ def start_update_thread(assets_url):
 
 def start_update(assert_name):
     source_file = os.path.abspath("./AALC Updater.exe")
-    subprocess.Popen([source_file, assert_name], creationflags=subprocess.DETACHED_PROCESS)
+    subprocess.Popen(
+        [source_file, assert_name], creationflags=subprocess.DETACHED_PROCESS
+    )

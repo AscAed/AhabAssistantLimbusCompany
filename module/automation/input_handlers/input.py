@@ -1,4 +1,5 @@
 import random
+import numpy as np
 from time import sleep, time
 from typing import overload
 
@@ -15,6 +16,9 @@ from utils.singletonmeta import SingletonMeta
 from ...game_and_screen import screen
 from ...logger import log
 from . import AbstractInput
+from .bezier import generate_bezier_path
+from .delay import humanised_delay
+from .driver_interface import InputDriver
 
 key_list = {
     "a": 0x41,
@@ -100,9 +104,16 @@ class WinAbstractInput(AbstractInput):
     Tips: 有特殊需求写在对应方法描述中
     """
 
-    def __init__(self) -> None:
+    def __init__(self, driver: InputDriver | None = None) -> None:
         super().__init__()
         self.use_post_message = cfg.config.use_post_message
+        self.driver = driver
+
+    def set_driver(self, driver: InputDriver | None) -> None:
+        self.driver = driver
+
+    def get_driver(self) -> InputDriver | None:
+        return self.driver
 
     def get_mouse_position(self) -> tuple[int, int]:
         """获取鼠标当前位置
@@ -137,6 +148,12 @@ class WinAbstractInput(AbstractInput):
         return MESSAGE_KEY_WPARAMS.get(vk, vk)
 
 
+def human_delay(base_time=0.1, std_dev=0.03):
+    """生成正态分布的随机延迟，更符合人类操作习惯，下限保护为0.01"""
+    delay = np.random.normal(base_time, std_dev)
+    return max(0.01, delay)
+
+
 class Input(WinAbstractInput, metaclass=SingletonMeta):
     """基于 `pyautogui` 的输入类, 仅支持前台操作"""
 
@@ -166,9 +183,18 @@ class Input(WinAbstractInput, metaclass=SingletonMeta):
         msg = f"点击位置:({x},{y})"
         log.debug(msg, stacklevel=2)
         x, y = self.pos_offset(x, y)
+        self.mouse_move((x, y))
         for i in range(times):
-            pyautogui.click(x, y)
-            # 多次点击执行很快所以暂停放到循环外
+            if self.driver:
+                self.driver.mouse_down(x, y)
+                sleep(humanised_delay(0.05, "gaussian"))
+                self.driver.mouse_up(x, y)
+            else:
+                pyautogui.mouseDown(x, y)
+                sleep(humanised_delay(0.05, "gaussian"))
+                pyautogui.mouseUp(x, y)
+            if times > 1 and i < times - 1:
+                sleep(humanised_delay(0.1, "gaussian"))
 
         if move_back and current_mouse_position:
             self.mouse_move(current_mouse_position)
@@ -183,10 +209,26 @@ class Input(WinAbstractInput, metaclass=SingletonMeta):
 
         scale = cfg.set_win_size / 1080
         x, y = self.pos_offset(x, y)
-        pyautogui.moveTo(x, y)
-        pyautogui.mouseDown()
-        pyautogui.dragTo(x, y + int(300 * scale * reverse), duration=0.4)
-        pyautogui.mouseUp()
+        self.mouse_move((x, y))
+        if self.driver:
+            self.driver.mouse_down(x, y)
+        else:
+            pyautogui.mouseDown()
+        
+        end_y = y + int(300 * scale * reverse)
+        path = generate_bezier_path((x, y), (x, end_y))
+        step_time = 0.4 / max(1, len(path))
+        for px, py in path:
+            if self.driver:
+                self.driver.mouse_move(px, py)
+            else:
+                pyautogui.moveTo(px, py)
+            sleep(humanised_delay(step_time, "gaussian"))
+            
+        if self.driver:
+            self.driver.mouse_up(x, end_y)
+        else:
+            pyautogui.mouseUp()
 
         if move_back and current_mouse_position:
             self.mouse_move(current_mouse_position)
@@ -195,14 +237,27 @@ class Input(WinAbstractInput, metaclass=SingletonMeta):
         if move_back:
             current_mouse_position = self.get_mouse_position()
         x, y = self.pos_offset(x, y)
-        pyautogui.moveTo(x, y)
-        pyautogui.mouseDown()
-        pyautogui.moveTo(x + dx, y + dy, duration=drag_time)
-        if drag_time * 0.3 > 0.5:
-            sleep(drag_time * 0.3)
+        self.mouse_move((x, y))
+        if self.driver:
+            self.driver.mouse_down(x, y)
         else:
-            sleep(0.5)
-        pyautogui.mouseUp()
+            pyautogui.mouseDown()
+            
+        path = generate_bezier_path((x, y), (x + dx, y + dy))
+        step_time = drag_time / max(1, len(path))
+        for px, py in path:
+            if self.driver:
+                self.driver.mouse_move(px, py)
+            else:
+                pyautogui.moveTo(px, py)
+            sleep(humanised_delay(step_time, "gaussian"))
+            
+        # 注入随机拖拽延迟
+        sleep(humanised_delay(drag_time * 0.3 if drag_time * 0.3 > 0.2 else 0.2, "gaussian"))
+        if self.driver:
+            self.driver.mouse_up(x + dx, y + dy)
+        else:
+            pyautogui.mouseUp()
 
         if move_back and current_mouse_position:
             self.mouse_move(current_mouse_position)
@@ -224,9 +279,7 @@ class Input(WinAbstractInput, metaclass=SingletonMeta):
         log.debug(msg, stacklevel=2)
         x = coordinate[0] + random.randint(0, 10)
         y = coordinate[1] + random.randint(0, 10)
-        x, y = self.pos_offset(x, y)
-        for i in range(times):
-            pyautogui.click(x, y)
+        self.mouse_click(x, y, times=times, move_back=False)
 
         if move_back and current_mouse_position:
             self.mouse_move(current_mouse_position)
@@ -240,7 +293,7 @@ class Input(WinAbstractInput, metaclass=SingletonMeta):
 
         msg = "鼠标移动到空白，避免遮挡"
         log.debug(msg, stacklevel=2)
-        pyautogui.moveTo(coordinate[0], coordinate[1])
+        self.mouse_move(coordinate)
 
         if move_back and current_mouse_position:
             self.mouse_move(current_mouse_position)
@@ -252,7 +305,15 @@ class Input(WinAbstractInput, metaclass=SingletonMeta):
         Args:
             coordinate (tuple): 坐标元组 (x, y)
         """
-        pyautogui.moveTo(coordinate[0], coordinate[1])
+        start_pos = self.get_mouse_position()
+        target_pos = (coordinate[0], coordinate[1])
+        path = generate_bezier_path(start_pos, target_pos)
+        for px, py in path:
+            if self.driver:
+                self.driver.mouse_move(px, py)
+            else:
+                pyautogui.moveTo(px, py)
+            sleep(humanised_delay(0.005, "gaussian"))
         self.wait_pause()
 
     def mouse_drag_link(self, position: list, drag_time=0.1, move_back=False) -> None:
@@ -260,65 +321,74 @@ class Input(WinAbstractInput, metaclass=SingletonMeta):
             current_mouse_position = self.get_mouse_position()
 
         x, y = self.pos_offset(position[0][0], position[0][1])
-        pyautogui.moveTo(x, y)
-        pyautogui.mouseDown()
+        self.mouse_move((x, y))
+        if self.driver:
+            self.driver.mouse_down(x, y)
+        else:
+            pyautogui.mouseDown()
+            
+        curr_x, curr_y = x, y
         for pos in position:
-            x, y = self.pos_offset(pos[0], pos[1])
-            pyautogui.moveTo(x, y, duration=drag_time)
-        pyautogui.mouseUp()
+            tx, ty = self.pos_offset(pos[0], pos[1])
+            path = generate_bezier_path((curr_x, curr_y), (tx, ty))
+            step_time = drag_time / max(1, len(path))
+            for px, py in path:
+                if self.driver:
+                    self.driver.mouse_move(px, py)
+                else:
+                    pyautogui.moveTo(px, py)
+                sleep(humanised_delay(step_time, "gaussian"))
+            curr_x, curr_y = tx, ty
+            
+        if self.driver:
+            self.driver.mouse_up(curr_x, curr_y)
+        else:
+            pyautogui.mouseUp()
 
         if move_back and current_mouse_position:
             self.mouse_move(current_mouse_position)
 
     def key_press(self, key):
-        return pyautogui.press(key)
-
-    def input_text(self, text: str):
-        """将 `text` 粘贴到前台窗口。仅用于前台操作，内部使用 `pyperclip.copy` + Ctrl+V，
-        在 `pyperclip.copy` 失败时回退到直接打字。"""
-        if not text:
-            log.warning("未提供要粘贴的文本")
-            return
-        try:
-            pyperclip.copy(text)
-        except Exception:
-            try:
-                pyautogui.typewrite(text)
-                return
-            except Exception:
-                log.error("pyautogui 直接输入失败")
-                return
-        pyautogui.hotkey("ctrl", "v")
-
+        if self.driver:
+            self.driver.key_down(key)
+            sleep(humanised_delay(0.05, "gaussian"))
+            self.driver.key_up(key)
+        else:
+            return pyautogui.press(key)
 
 class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
     """基于 `pywin32` 的输入类, 支持后台操作
     \n 除了不支持滚轮事件, 其余同 `Input` 类
     """
 
+    def __init__(self, driver: InputDriver | None = None) -> None:
+        super().__init__(driver)
+        self.last_x = 0
+        self.last_y = 0
+
+    def _post_bezier_move(self, target_x: int, target_y: int) -> None:
+        start_pos = (self.last_x, self.last_y)
+        target_pos = (target_x, target_y)
+        path = generate_bezier_path(start_pos, target_pos)
+        hwnd = screen.handle.hwnd
+        for px, py in path:
+            if self.driver:
+                self.driver.mouse_move(px, py)
+            else:
+                long_position = win32api.MAKELONG(px, py)
+                if self.use_post_message:
+                    win32api.PostMessage(hwnd, win32con.WM_MOUSEMOVE, 0, long_position)
+                else:
+                    win32gui.SendMessage(hwnd, win32con.WM_MOUSEMOVE, 0, long_position)
+            sleep(humanised_delay(0.005, "gaussian"))
+        self.last_x = target_x
+        self.last_y = target_y
+
     def mouse_to_blank(self, coordinate=(1, 1), move_back=True) -> None:
-        """鼠标移动到空白位置，避免遮挡（然而为了避免影响用户操作，这个暂时没用）
-        Args:
-            coordinate (tuple): 坐标元组 (x, y)
-            move_back (bool): 是否在移动后将鼠标移动回原位置
-        """
-        # FIXME：既不能影响用户操作，也要避免遮挡，似乎没有好办法
-        # FIXME：目前是不在游戏窗口内不移动鼠标, 但是我觉得应该把这个功能集成在截图里 - 233 25.10.4
-        if move_back:
-            current_mouse_position = self.get_mouse_position()
-            rect = screen.handle.rect(True)
-            if current_mouse_position[0] > rect[2] or current_mouse_position[1] > rect[3]:
-                # 在窗口右下角外
-                log.debug("当前鼠标位置不在游戏窗口内，取消移动到空白", stacklevel=2)
-                return
-            elif current_mouse_position[0] < rect[0] or current_mouse_position[1] < rect[1]:
-                # 在窗口左上角外
-                log.debug("当前鼠标位置不在游戏窗口内，取消移动到空白", stacklevel=2)
-                return
-        self._mouse_move_to(coordinate[0], coordinate[1])
-
+        """鼠标移动到空白位置，避免遮挡"""
+        # 后台模式下，只向窗口发送后台鼠标移动消息，不移动物理鼠标，避免干扰用户并导致Unity点击坐标漂移
+        self._post_bezier_move(coordinate[0], coordinate[1])
         log.debug("鼠标移动到空白，避免遮挡", stacklevel=2)
-
         self.wait_pause()
 
     def mouse_click(self, x, y, times=1, move_back=True) -> bool:
@@ -341,9 +411,10 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
             self.set_mouse_pos(x, y)
             self.set_active()
             self.mouse_down(x, y)
-            sleep(0.03)
+            sleep(humanised_delay(0.05, "gaussian"))  # 模拟人类按下和松开的时间间隔
             self.mouse_up(x, y)
-            # 多次点击执行很快所以暂停放到循环外
+            if times > 1 and i < times - 1:
+                sleep(humanised_delay(0.1, "gaussian"))
 
         if move_back and current_mouse_position:
             self.mouse_move(current_mouse_position)
@@ -366,10 +437,27 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
 
         scale = cfg.set_win_size / 1080
         self.set_active()
-        self.set_mouse_pos(x, y)
+        self._post_bezier_move(x, y)
         self.mouse_down(x, y)
         end_y = y + int(300 * scale * reverse)
-        self.set_mouse_pos(x, end_y, duration=0.4)
+        
+        path = generate_bezier_path((x, y), (x, end_y))
+        hwnd = screen.handle.hwnd
+        step_time = 0.4 / max(1, len(path))
+        for px, py in path:
+            if self.driver:
+                self.driver.mouse_move(px, py)
+            else:
+                long_position = win32api.MAKELONG(px, py)
+                wparam = win32con.MK_LBUTTON
+                if self.use_post_message:
+                    win32api.PostMessage(hwnd, win32con.WM_MOUSEMOVE, wparam, long_position)
+                else:
+                    win32gui.SendMessage(hwnd, win32con.WM_MOUSEMOVE, wparam, long_position)
+            sleep(humanised_delay(step_time, "gaussian"))
+            
+        self.last_x = x
+        self.last_y = end_y
         self.mouse_up(x, end_y)
 
         if move_back and current_mouse_position:
@@ -387,14 +475,29 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         """
         if move_back:
             current_mouse_position = self.get_mouse_position()
-        self.set_mouse_pos(x, y)
         self.set_active()
+        self._post_bezier_move(x, y)
         self.mouse_down(x, y)
-        self.set_mouse_pos(x + dx, y + dy, duration=drag_time)
-        if drag_time * 0.3 > 0.5:
-            sleep(drag_time * 0.3)
-        else:
-            sleep(0.5)
+        
+        path = generate_bezier_path((x, y), (x + dx, y + dy))
+        hwnd = screen.handle.hwnd
+        step_time = drag_time / max(1, len(path))
+        for px, py in path:
+            if self.driver:
+                self.driver.mouse_move(px, py)
+            else:
+                long_position = win32api.MAKELONG(px, py)
+                wparam = win32con.MK_LBUTTON
+                if self.use_post_message:
+                    win32api.PostMessage(hwnd, win32con.WM_MOUSEMOVE, wparam, long_position)
+                else:
+                    win32gui.SendMessage(hwnd, win32con.WM_MOUSEMOVE, wparam, long_position)
+            sleep(humanised_delay(step_time, "gaussian"))
+            
+        self.last_x = x + dx
+        self.last_y = y + dy
+        # 注入随机拖拽延迟
+        sleep(humanised_delay(drag_time * 0.3 if drag_time * 0.3 > 0.2 else 0.2, "gaussian"))
         self.mouse_up(x + dx, y + dy)
 
         if move_back and current_mouse_position:
@@ -432,8 +535,10 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
             self.set_mouse_pos(x, y)
             self.set_active()
             self.mouse_down(x, y)
-            sleep(0.03)
+            sleep(humanised_delay(0.05, "gaussian"))  # 模拟人类按下 and 松开时间间隔
             self.mouse_up(x, y)
+            if times > 1 and i < times - 1:
+                sleep(humanised_delay(0.1, "gaussian"))
 
         if move_back and current_mouse_position:
             self.mouse_move(current_mouse_position)
@@ -452,12 +557,33 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         if move_back:
             current_mouse_position = self.get_mouse_position()
 
-        self.set_mouse_pos(position[0][0], position[0][1])
         self.set_active()
-        self.mouse_down(position[0][0], position[0][1])
+        start_x, start_y = position[0][0], position[0][1]
+        self._post_bezier_move(start_x, start_y)
+        self.mouse_down(start_x, start_y)
+        
+        curr_x, curr_y = start_x, start_y
+        hwnd = screen.handle.hwnd
         for pos in position:
-            self.set_mouse_pos(pos[0], pos[1], duration=drag_time)
-        self.mouse_up(position[-1][0], position[-1][1])
+            tx, ty = pos[0], pos[1]
+            path = generate_bezier_path((curr_x, curr_y), (tx, ty))
+            step_time = drag_time / max(1, len(path))
+            for px, py in path:
+                if self.driver:
+                    self.driver.mouse_move(px, py)
+                else:
+                    long_position = win32api.MAKELONG(px, py)
+                    wparam = win32con.MK_LBUTTON
+                    if self.use_post_message:
+                        win32api.PostMessage(hwnd, win32con.WM_MOUSEMOVE, wparam, long_position)
+                    else:
+                        win32gui.SendMessage(hwnd, win32con.WM_MOUSEMOVE, wparam, long_position)
+                sleep(humanised_delay(step_time, "gaussian"))
+            curr_x, curr_y = tx, ty
+            
+        self.last_x = curr_x
+        self.last_y = curr_y
+        self.mouse_up(curr_x, curr_y)
 
         if move_back and current_mouse_position:
             self.mouse_move(current_mouse_position)
@@ -486,6 +612,9 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
             x (number): 相对于窗口左上角的 x 轴坐标
             y (number): 相对于窗口左上角的 y 轴坐标
         """
+        if self.driver:
+            self.driver.mouse_down(int(x), int(y))
+            return
         x = int(x)
         y = int(y)
         hwnd = screen.handle.hwnd
@@ -503,6 +632,9 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
             x (number): 相对于窗口左上角的 x 轴坐标
             y (number): 相对于窗口左上角的 y 轴坐标
         """
+        if self.driver:
+            self.driver.mouse_up(int(x), int(y))
+            return
         x = int(x)
         y = int(y)
         hwnd = screen.handle.hwnd
@@ -533,6 +665,9 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         Args:
             key (str): 按键名称
         """
+        if self.driver:
+            self.driver.key_down(key)
+            return
         hwnd = screen.handle.hwnd
         vk = key_list[key.lower()]
         wparam = self._make_key_wparam(vk)
@@ -547,6 +682,9 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         Args:
             key (str): 按键名称
         """
+        if self.driver:
+            self.driver.key_up(key)
+            return
         hwnd = screen.handle.hwnd
         vk = key_list[key.lower()]
         wparam = self._make_key_wparam(vk)
@@ -563,13 +701,14 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         """
         self.set_active()
         self.key_down(key)
+        sleep(humanised_delay(0.05, "gaussian"))
         self.key_up(key)
 
     def input_text(self, text: str):
         """将 `text` 通过 WM_CHAR 消息逐字符输入目标窗口（后台模式）。
 
         使用 WM_CHAR 消息而非 WM_SETTEXT，因为游戏窗口通常不处理 WM_SETTEXT。
-        对每个字符发送单独的 WM_CHAR 消息。
+        对每个字符发送单独 the WM_CHAR 消息。
         """
         if not text:
             log.warning("未提供要粘贴的文本")
@@ -610,16 +749,17 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         """
         x = int(x)
         y = int(y)
-        if duration <= 0:
-            self._set_mouse_pos(x, y)
-        else:
-            start_x, start_y = self.get_mouse_position()
-            steps = int(duration / 0.01)
-            for i in range(steps):
-                new_x = int(start_x + (x - start_x) * (i + 1) / steps)
-                new_y = int(start_y + (y - start_y) * (i + 1) / steps)
-                self._set_mouse_pos(new_x, new_y)
-                sleep(0.01)
+        start_x, start_y = self.get_mouse_position()
+        path = generate_bezier_path((start_x, start_y), (x, y))
+        step_time = 0.01
+        if duration > 0:
+            step_time = duration / max(1, len(path))
+        for px, py in path:
+            if self.driver:
+                self.driver.mouse_move(px, py)
+            else:
+                self._set_mouse_pos(px, py)
+            sleep(humanised_delay(step_time, "gaussian"))
 
     def _set_mouse_pos(self, x: int, y: int):
         """将鼠标移动到指定位置（绝对于屏幕坐标）
@@ -628,6 +768,9 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
             x (int): x坐标
             y (int): y坐标
         """
+        if self.driver:
+            self.driver.mouse_move(x, y)
+            return
         try:
             win32api.SetCursorPos((x, y))
         except PyWinTypesError as e:
@@ -656,10 +799,8 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
         self.set_active()
         self.mouse_down(x, y)
         self._window_move_to(x + dx, y + dy, duration=drag_time)
-        if drag_time * 0.3 > 0.5:
-            sleep(drag_time * 0.3)
-        else:
-            sleep(0.5)
+        # 注入随机拖拽延迟
+        sleep(humanised_delay(drag_time * 0.3 if drag_time * 0.3 > 0.2 else 0.2, "gaussian"))
         self.mouse_up(x + dx, y + dy)
         screen.handle.set_window_pos(*pos)
 
@@ -692,7 +833,9 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
         self.mouse_click(x, y, times=times)
         return True
 
-    def _window_move_to(self, x_or_pos: int | tuple[int, int], y: int = -32000, duration: float = 0) -> tuple[int, int]:
+    def _window_move_to(
+        self, x_or_pos: int | tuple[int, int], y: int = -32000, duration: float = 0
+    ) -> tuple[int, int]:
         if duration <= 0:
             return self._set_window_pos(x_or_pos, y)
         else:
@@ -702,21 +845,14 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
                 target_x = x_or_pos
                 target_y = y
         raw_pos = screen.handle.rect()[:2]
-        current_x, current_y = screen.handle.mouse_pos_to_client_mouse(*self.get_mouse_position())
-        accur = 7000
-        duration = int(max(duration, 0.01) * accur)
-        dx = (target_x - current_x) / duration * 100
-        dy = (target_y - current_y) / duration * 100
-        steps = duration // 100
-        time_per_step = duration / steps / accur
-        for index in range(steps - 1):
-            start = time()
-            x = int(current_x + dx * (index + 1))
-            y = int(current_y + dy * (index + 1))
-            self._set_window_pos(x, y)
-            elapsed = time() - start
-            if time_per_step - elapsed > 0.01:
-                sleep(time_per_step - elapsed)
+        current_x, current_y = screen.handle.mouse_pos_to_client_mouse(
+            *self.get_mouse_position()
+        )
+        path = generate_bezier_path((current_x, current_y), (target_x, target_y))
+        step_time = duration / max(1, len(path))
+        for px, py in path:
+            self._set_window_pos(px, py)
+            sleep(humanised_delay(step_time, "gaussian"))
 
         self._set_window_pos(target_x, target_y)
         return raw_pos
@@ -750,19 +886,23 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
         else:
             dx = 0
             dy = 0
-        win32gui.SetWindowPos(
-            hwnd,
-            None,
-            mouse_pos[0] - x + dx,
-            mouse_pos[1] - y + dy,
-            0,
-            0,
-            win32con.SWP_NOSIZE
-            | win32con.SWP_NOZORDER
-            | win32con.SWP_NOACTIVATE
-            | win32con.SWP_NOSENDCHANGING
-            | win32con.SWP_NOREDRAW,
-        )
+
+        if self.driver:
+            self.driver.mouse_move(mouse_pos[0] + x, mouse_pos[1] + y)
+        else:
+            win32gui.SetWindowPos(
+                hwnd,
+                None,
+                mouse_pos[0] - x + dx,
+                mouse_pos[1] - y + dy,
+                0,
+                0,
+                win32con.SWP_NOSIZE
+                | win32con.SWP_NOZORDER
+                | win32con.SWP_NOACTIVATE
+                | win32con.SWP_NOSENDCHANGING
+                | win32con.SWP_NOREDRAW,
+            )
 
         return original_rect[:2]
 
@@ -789,6 +929,9 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
         Args:
             key (str): 按键名称
         """
+        if self.driver:
+            self.driver.key_down(key)
+            return
         hwnd = screen.handle.hwnd
         vk = key_list[key.lower()]
         wparam = self._make_key_wparam(vk)
@@ -803,6 +946,9 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
         Args:
             key (str): 按键名称
         """
+        if self.driver:
+            self.driver.key_up(key)
+            return
         hwnd = screen.handle.hwnd
         vk = key_list[key.lower()]
         wparam = self._make_key_wparam(vk)
@@ -819,6 +965,7 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
         """
         self.set_active()
         self.key_down(key)
+        sleep(humanised_delay(0.05, "gaussian"))
         self.key_up(key)
 
     def input_text(self, text: str):
@@ -854,6 +1001,9 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
             x (number): 相对于窗口左上角的 x 轴坐标
             y (number): 相对于窗口左上角的 y 轴坐标
         """
+        if self.driver:
+            self.driver.mouse_down(int(x), int(y))
+            return
         x = int(x)
         y = int(y)
         hwnd = screen.handle.hwnd
@@ -871,6 +1021,9 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
             x (number): 相对于窗口左上角的 x 轴坐标
             y (number): 相对于窗口左上角的 y 轴坐标
         """
+        if self.driver:
+            self.driver.mouse_up(int(x), int(y))
+            return
         x = int(x)
         y = int(y)
         hwnd = screen.handle.hwnd
@@ -893,6 +1046,7 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
                 self._set_window_pos(x, y)
             self.set_active()
             self.mouse_down(x, y)
+            sleep(humanised_delay(0.05, "gaussian"))
             self.mouse_up(x, y)
         assert pos is not None
         screen.handle.set_window_pos(*pos)

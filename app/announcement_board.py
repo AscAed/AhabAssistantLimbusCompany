@@ -97,7 +97,9 @@ class Announcement(QWidget):
         if show_title:
             if content_type == "html":
                 # 在内容前添加标题
-                styled_content = f"<h1 style='margin-bottom: 20px;'>{title}</h1>" + content
+                styled_content = (
+                    f"<h1 style='margin-bottom: 20px;'>{title}</h1>" + content
+                )
                 self.content.setHtml(styled_content)
             elif content_type == "markdown":
                 try:
@@ -293,7 +295,9 @@ class AnnouncementBoard(FramelessDialog):
         # 为ALL页面设置滚动监听
         if hasattr(self.all.content, "verticalScrollBar"):
             scroll_bar = self.all.content.verticalScrollBar()
-            scroll_bar.valueChanged.connect(lambda: self.check_scroll_position(self.tr("ALL~ 全部公告")))
+            scroll_bar.valueChanged.connect(
+                lambda: self.check_scroll_position(self.tr("ALL~ 全部公告"))
+            )
 
         # 监听内容栈切换事件，以便为新显示的页面设置滚动监听
         self.content_stack.currentChanged.connect(self.on_stack_changed)
@@ -413,8 +417,7 @@ class AnnouncementBoard(FramelessDialog):
             # 应用内容区样式
             self._apply_content_style(dark_content)
             # 设置标题栏样式
-            self.titleBar.setStyleSheet(
-                """
+            self.titleBar.setStyleSheet("""
                 TitleBar {
                     background-color: rgba(45, 45, 45, 1);
                     color: white;
@@ -422,17 +425,17 @@ class AnnouncementBoard(FramelessDialog):
                 TitleBar > QLabel#titleLabel {
                     color: white;
                 }
-                """
+                """)
+            self.setStyleSheet(
+                "AnnouncementBoard { background-color: rgba(28, 28, 28, 1); }"
             )
-            self.setStyleSheet("AnnouncementBoard { background-color: rgba(28, 28, 28, 1); }")
         else:
             self.sidebar.setStyleSheet(light_sidebar)
             self.title_list.setStyleSheet(light_list)
             self.footer.setStyleSheet(light_footer)
             self._apply_content_style(light_content)
             # 设置标题栏样式
-            self.titleBar.setStyleSheet(
-                """
+            self.titleBar.setStyleSheet("""
                 TitleBar {
                     background-color: rgba(245, 245, 245, 1);
                     color: black;
@@ -440,8 +443,7 @@ class AnnouncementBoard(FramelessDialog):
                 TitleBar > QLabel#titleLabel {
                     color: black;
                 }
-                """
-            )
+                """)
             self.setStyleSheet("AnnouncementBoard { background-color: white; }")
 
     def _apply_content_style(self, qss: str):
@@ -453,13 +455,17 @@ class AnnouncementBoard(FramelessDialog):
 
         # 加载 GitHub Markdown 样式
         css_path = (
-            "./assets/styles/github-markdown-dark.css" if isDarkTheme() else "./assets/styles/github-markdown-light.css"
+            "./assets/styles/github-markdown-dark.css"
+            if isDarkTheme()
+            else "./assets/styles/github-markdown-light.css"
         )
         try:
             with open(css_path, encoding="utf-8") as f:
                 css_content = f.read()
                 for title, widget in self.title_content_map.items():
-                    if hasattr(widget, "content") and hasattr(widget.content, "document"):
+                    if hasattr(widget, "content") and hasattr(
+                        widget.content, "document"
+                    ):
                         widget.content.document().setDefaultStyleSheet(css_content)
         except Exception:
             pass  # 样式加载失败时使用默认样式
