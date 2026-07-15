@@ -244,6 +244,13 @@ class ToSettingButton(BaseButton):
         self.setFixedWidth(50)
 
         self.button = SplitToolButton(icon, self)
+        self.button.setCursor(Qt.PointingHandCursor)
+        self.button.setToolTip("设置")
+        self.button.installEventFilter(
+            ToolTipFilter(
+                self.button, showDelay=300, position=ToolTipPosition.BOTTOM
+            )
+        )
 
         self.menu = RoundMenu(parent=self)
         self.edit_name = Action(FIF.EDIT, "命名")
@@ -271,6 +278,7 @@ class ToSettingButton(BaseButton):
         mediator.switch_team_setting.emit(target)
 
     def retranslateUi(self):
+        self.button.setToolTip(self.tr("设置"))
         self.edit_name.setText(self.tr("命名"))
         self.del_action.setText(self.tr("删除"))
         self.copy_settings.setText(self.tr("复制"))
@@ -290,6 +298,13 @@ class ChangePageButton(BaseButton):
         self.setFixedWidth(50)
 
         self.button = ToggleToolButton(icon, self)
+        self.button.setCursor(Qt.PointingHandCursor)
+        self.button.setToolTip("切换页面")
+        self.button.installEventFilter(
+            ToolTipFilter(
+                self.button, showDelay=300, position=ToolTipPosition.BOTTOM
+            )
+        )
         toggle_button_group[config_name] = self.button
         self.button.clicked.connect(self.on_click)
 
@@ -306,6 +321,9 @@ class ChangePageButton(BaseButton):
     def send_switch_signal(self, target: str):
         mediator.switch_page.emit(target)
 
+    def retranslateUi(self):
+        self.button.setToolTip(self.tr("切换页面"))
+
 
 class SettingTeamsButton(BaseButton):
     def __init__(
@@ -320,12 +338,22 @@ class SettingTeamsButton(BaseButton):
         self.setFixedWidth(50)
 
         self.button = ToolButton(icon, self)
+        self.button.setCursor(Qt.PointingHandCursor)
+        self.button.setToolTip("设置队伍")
+        self.button.installEventFilter(
+            ToolTipFilter(
+                self.button, showDelay=300, position=ToolTipPosition.BOTTOM
+            )
+        )
         self.button.clicked.connect(self.on_click)
 
         self.hBoxLayout.addWidget(self.button)
 
     def on_click(self):
         pass
+
+    def retranslateUi(self):
+        self.button.setToolTip(self.tr("设置队伍"))
 
 
 class BaseLabel(BaseLayout):
