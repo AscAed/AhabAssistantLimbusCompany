@@ -146,15 +146,21 @@ class ImageUtils:
         :param threshold: float，定义有效像素的阈值，默认为0。
         :return tuple: (xmin, ymin, xmax, ymax) 表示有效区域的边界框坐标。
         """
-        # 检查图像是否有3个通道（RGB），如果有，则转换为灰度图像
+        # 优化：避免在 Python 中使用 np.max 产生高昂的跨维数组遍历性能开销
         if ImageUtils.image_channel(image) == 3:
-            image = np.max(image, axis=2)
-        # 计算在x轴方向上有效像素的投影，并找到投影大于阈值的像素列
-        x = np.where(np.max(image, axis=0) > threshold)[0]
-        # 计算在y轴方向上有效像素的投影，并找到投影大于阈值的像素行
-        y = np.where(np.max(image, axis=1) > threshold)[0]
-        # 返回有效区域的边界框坐标
-        return x[0], y[0], x[-1] + 1, y[-1] + 1
+            max_c = cv2.max(cv2.max(image[:, :, 0], image[:, :, 1]), image[:, :, 2])
+        else:
+            max_c = image
+
+        # 获取掩码，以支持包含浮点在内的各种类型
+        mask = (max_c > threshold).astype(np.uint8)
+
+        # cv2.boundingRect 要求输入为 8 位单通道图像 (CV_8UC1)
+        x, y, w, h = cv2.boundingRect(mask)
+        if w == 0 or h == 0:
+            # 保持向下兼容，如果没有符合条件像素，引发类似原 np.where 的 IndexError
+            raise IndexError("index 0 is out of bounds for axis 0 with size 0")
+        return int(x), int(y), int(x + w), int(y + h)
 
     @staticmethod
     def crop(image, area, copy=True):
