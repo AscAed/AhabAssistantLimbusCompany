@@ -1174,7 +1174,7 @@ class DailySettingCard(SwitchSettingCard):
         super().__init__(icon, title, content, config_name, parent)
         self.config_name = config_name
         self.autodaily_timepicker = TimePicker()
-        if self.config_name[-1] in ["2", "3", "4"]:
+        if self.config_name[-1] in ("2", "3", "4"):
             self.value_name = "autodaily_time" + self.config_name[-1]
         else:
             self.value_name = "autodaily_time"
@@ -1224,7 +1224,7 @@ class DailySettingCard(SwitchSettingCard):
 
         helper = ScheduleHelper()
         task_name = self.__autodaily_taskname()
-        if self.config_name[-1] in ["2", "3", "4"]:
+        if self.config_name[-1] in ("2", "3", "4"):
             task_name += self.config_name[-1]
 
         cfg.set_value(self.config_name, isChecked)
@@ -1246,7 +1246,7 @@ class DailySettingCard(SwitchSettingCard):
 
         helper = ScheduleHelper()
         task_name = self.__autodaily_taskname()
-        if self.config_name[-1] in ["2", "3", "4"]:
+        if self.config_name[-1] in ("2", "3", "4"):
             task_name += self.config_name[-1]
 
         cfg.set_value(self.value_name, time.toString("HH:mm"))
@@ -1498,7 +1498,7 @@ class HotketInputCard(MessageBox):
         key_name = QKeySequence(key).toString().lower()
         if key_name in self.SHIFT_KEYS:
             key_name = self.SHIFT_KEYS[key_name]
-        if key_name and key_name not in [
+        if key_name and key_name not in (
             "control",
             "alt",
             "shift",

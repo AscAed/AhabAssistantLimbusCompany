@@ -291,7 +291,7 @@ class MainWindow(FramelessWindow):
     def restore_window(self):
         """Restore window from minimized/hidden state and reset title bar button states"""
         # 避免最小化按钮处于focus状态
-        for btn in [self.titleBar.minBtn, self.titleBar.closeBtn, self.titleBar.maxBtn]:
+        for btn in (self.titleBar.minBtn, self.titleBar.closeBtn, self.titleBar.maxBtn):
             btn.setState(TitleBarButtonState.NORMAL)
 
         # 隐藏从托盘恢复时短暂显示的白色窗口
@@ -450,7 +450,7 @@ class MainWindow(FramelessWindow):
         self.titleBar.titleLabel.setStyleSheet(
             f"QLabel {{ background: transparent; font-size: 13px; padding: 0 4px; color: {titleBar_style['text_color']}; }}"
         )
-        for btn in [self.titleBar.minBtn, self.titleBar.maxBtn, self.titleBar.closeBtn]:
+        for btn in (self.titleBar.minBtn, self.titleBar.maxBtn, self.titleBar.closeBtn):
             btn.setNormalColor(titleBar_style["btn_color"])
             btn.setHoverColor(titleBar_style["btn_color"])
             btn.setPressedColor(titleBar_style["btn_color"])

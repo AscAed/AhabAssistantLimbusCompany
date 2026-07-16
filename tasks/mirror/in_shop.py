@@ -1413,7 +1413,7 @@ class Shop:
         my_scale = cfg.set_win_size / 1440
         sinner_x = [
             x * my_scale
-            for x in [
+            for x in (
                 198,
                 353,
                 510,
@@ -1426,7 +1426,7 @@ class Shop:
                 1581,
                 1737,
                 1889,
-            ]
+            )
         ]  # 人格图像位置硬编码
         sinner_y = 1299 * my_scale
         sinner_nums = {0: 1, 1: 3, 2: 7}.get(self.skill_replacement_select, 12)
