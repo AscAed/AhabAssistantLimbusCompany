@@ -1,6 +1,7 @@
 import gc
 import math
 import random
+import subprocess
 import time
 from ast import List
 from dataclasses import dataclass
@@ -301,16 +302,14 @@ class Automation(metaclass=SingletonMeta):
             time.sleep(1)
             if time.time() - start_time > 60 or is_game_die:
                 log.error("截图超时，尝试重启游戏")
-                import os
-
                 import win32process
 
                 from module.game_and_screen import screen
 
                 try:
                     _, pid = win32process.GetWindowThreadProcessId(screen.handle.hwnd)
-                    os.system(f"taskkill /F /PID {pid}")
-                except:
+                    subprocess.run(["taskkill", "/F", "/PID", str(pid)], check=False)
+                except Exception:
                     pass
                 from tasks.base.script_task_scheme import init_game
 
