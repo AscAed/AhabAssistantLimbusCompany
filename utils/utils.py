@@ -105,11 +105,14 @@ def find_skill3(background, known_rgb, threshold=40, min_pixels=10):
 
     # merging neightbouring clusters
     merged = []
+    limit_in = (67 * comp) ** 2
+    limit_out = (66 * comp) ** 2
     while cluster_centers:
         current = cluster_centers.pop()
-        group = [c for c in cluster_centers if np.linalg.norm(current - c) <= 67 * comp]
+        # ⚡ Bolt: Replace np.linalg.norm with squared distance for O(n) performance improvement avoiding numpy allocations
+        group = [c for c in cluster_centers if (current[0] - c[0])**2 + (current[1] - c[1])**2 <= limit_in]
         cluster_centers = [
-            c for c in cluster_centers if np.linalg.norm(current - c) > 66 * comp
+            c for c in cluster_centers if (current[0] - c[0])**2 + (current[1] - c[1])**2 > limit_out
         ]
         merged.append(np.mean([current] + group, axis=0))
 

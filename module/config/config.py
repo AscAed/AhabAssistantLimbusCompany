@@ -230,7 +230,7 @@ class Config(metaclass=SingletonMeta):
                     ]
                     if backup_files:
                         backup_files.sort(
-                            key=lambda f: f.stat().st_birthtime, reverse=True
+                            key=lambda f: f.stat().st_ctime, reverse=True
                         )
                         log.info("配置文件不存在，存在备份配置，尝试从备份文件恢复配置")
                         self._load_config(backup_files[0])
@@ -251,7 +251,7 @@ class Config(metaclass=SingletonMeta):
                         backup_files = []
                     if backup_files:
                         backup_files.sort(
-                            key=lambda f: f.stat().st_birthtime, reverse=True
+                            key=lambda f: f.stat().st_ctime, reverse=True
                         )
                         with open(
                             backup_files[0], "r", encoding="utf-8"
@@ -297,7 +297,7 @@ class Config(metaclass=SingletonMeta):
                     if f.is_file() and f.suffix == ".yaml"
                 ]
                 if backup_files:
-                    backup_files.sort(key=lambda f: f.stat().st_birthtime, reverse=True)
+                    backup_files.sort(key=lambda f: f.stat().st_ctime, reverse=True)
                     log.info("配置文件不存在，尝试从备份文件恢复配置")
                     self._load_config(backup_files[0])
                     return
@@ -314,7 +314,7 @@ class Config(metaclass=SingletonMeta):
                     if not backup_files:
                         log.error("备份目录下没有可用的备份文件，无法恢复配置")
                         raise
-                    backup_files.sort(key=lambda f: f.stat().st_birthtime, reverse=True)
+                    backup_files.sort(key=lambda f: f.stat().st_ctime, reverse=True)
                     for i, backup_file in enumerate(backup_files):
                         try:
                             self._load_config(backup_file)
@@ -350,7 +350,7 @@ class Config(metaclass=SingletonMeta):
                     if not backup_files:
                         log.error("备份目录下没有可用的备份文件，无法恢复配置")
                         raise
-                    backup_files.sort(key=lambda f: f.stat().st_birthtime, reverse=True)
+                    backup_files.sort(key=lambda f: f.stat().st_ctime, reverse=True)
                     for i, backup_file in enumerate(backup_files):
                         try:
                             self._load_config(backup_file)
@@ -671,9 +671,9 @@ class Config(metaclass=SingletonMeta):
             f for f in self.backup_path.iterdir() if f.is_file() and f.suffix == ".yaml"
         ]
         if files:
-            files.sort(key=lambda f: f.stat().st_birthtime)
+            files.sort(key=lambda f: f.stat().st_ctime)
             # 确保上次保存的文件日期不同于今天，避免重复备份
-            latest_time = localtime(files[-1].stat().st_birthtime)
+            latest_time = localtime(files[-1].stat().st_ctime)
             if latest_time.tm_mday != now_time.tm_mday:
                 backup_file = (
                     self.backup_path
@@ -687,7 +687,7 @@ class Config(metaclass=SingletonMeta):
                 for f in self.backup_path.iterdir()
                 if f.is_file() and f.suffix == ".yaml"
             ]
-            files.sort(key=lambda f: f.stat().st_birthtime)
+            files.sort(key=lambda f: f.stat().st_ctime)
             while len(files) > 10:
                 try:
                     files[0].unlink()
