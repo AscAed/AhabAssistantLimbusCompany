@@ -37,4 +37,4 @@ __main_dev_temp__.py
 /test*.py
 
 # 其他
-.worktrees
+.worktrees.venv2/

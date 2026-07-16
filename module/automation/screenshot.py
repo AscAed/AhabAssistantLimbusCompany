@@ -1,3 +1,4 @@
+import subprocess
 import time
 from ctypes import windll
 
@@ -232,14 +233,12 @@ class ScreenShot:
 
         except pywintypes.error as e:
             log.error(f"后台截图报错: {e}，尝试重启游戏")
-            import os
-
             import win32process
 
             try:
                 _, pid = win32process.GetWindowThreadProcessId(screen.handle.hwnd)
-                os.system(f"taskkill /F /PID {pid}")
-            except:
+                subprocess.run(["taskkill", "/F", "/PID", str(pid)], check=False)
+            except Exception:
                 pass
             from tasks.base.script_task_scheme import init_game
 

@@ -272,7 +272,7 @@ class Updater:
         input(
             "已完成更新，按回车键退出并打开软件\nThe update is complete, press enter to exit and open the software"
         )
-        if os.system(f'cmd /c start "" "{os.path.abspath("./AALC.exe")}"'):
+        if subprocess.run(["cmd", "/c", "start", '""', os.path.abspath("./AALC.exe")], check=False).returncode != 0:
             subprocess.Popen(os.path.abspath("./AALC.exe"))
 
 
