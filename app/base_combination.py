@@ -58,16 +58,16 @@ from app.card.messagebox_custom import (
     MessageBoxSpinbox,
 )
 from app.language_manager import LanguageManager
-from module.font_manager import font_manager
-from module.logger import log
-from module.my_error.my_error import settingsTypeError
-from module.update.check_update import check_update
 from app.observe_ego_gift_selection import (
     OBSERVE_COL_VALUES,
     OBSERVE_LEVEL_VALUES,
     OBSERVE_ROW_VALUES,
     ObserveGiftSelection,
 )
+from module.font_manager import font_manager
+from module.logger import log
+from module.my_error.my_error import settingsTypeError
+from module.update.check_update import check_update
 from utils.utils import decrypt_string, encrypt_string
 
 
@@ -99,6 +99,7 @@ class CheckBoxWithButton(QFrame):
 
     def retranslateUi(self):
         self.box.check_box.setText(self.tr(self.box_text))
+        self.button.retranslateUi()
 
 
 class CheckBoxWithComboBox(QFrame):
@@ -437,6 +438,7 @@ class SinnerSelect(QFrame):
         self.setObjectName(config_name)
         # Disable clipping so banner/overlays can extend beyond widget bounds
         self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
+        self.setCursor(Qt.PointingHandCursor)
         # Initial Style
         self.setStyleSheet("""
             QFrame{
