@@ -10,3 +10,7 @@
 **Vulnerability:** Invoking `os.system` with a formatted string containing dynamic variables (like `pid`) is a textbook command injection vulnerability vector. If the variable is tampered with, an attacker can append arbitrary shell commands.
 **Learning:** Even if the dynamic input is intended to be a safe integer (like a process ID), parsing it through a shell string with `os.system` is a bad practice. The system was relying on shell evaluation where not strictly necessary.
 **Prevention:** Replace all `os.system()` invocations that accept dynamic strings with `subprocess.run()` using a structured list of arguments (e.g., `["taskkill", "/F", "/PID", str(pid)]`) and `check=False`. This completely bypasses the shell's string evaluation and guarantees arguments are passed safely to the target process.
+## 2025-02-20 - [Network Request Timeout Enhancements]
+**Vulnerability:** Network requests made using `requests.get()` without a `timeout` parameter can hang indefinitely if the remote server is unresponsive, leading to resource exhaustion or application lock-up.
+**Learning:** Even for simple JSON fetches or file downloads, omitting the `timeout` parameter creates a Denial of Service (DoS) risk, as default behavior blocks indefinitely. This was observed in `app/announcement_board.py` and `module/automation/input_handlers/simulator/pyminitouch/utils.py`.
+**Prevention:** Always specify a `timeout` (e.g., `timeout=10`) for all external network calls using the `requests` library.
