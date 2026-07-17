@@ -1063,7 +1063,7 @@ class Mirror:
                             dy = -180 * my_scale
                 else:
                     found_any = False
-                    for lvl in [1, 2, 3]:
+                    for lvl in (1, 2, 3):
                         any_p = auto.find_element(
                             f"mirror/road_to_mir/observe_ego_gift/Level_{'I'*lvl}.png",
                             take_screenshot=False,
