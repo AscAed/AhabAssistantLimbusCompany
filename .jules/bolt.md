@@ -7,3 +7,7 @@
 ## 2025-02-14 - Constant Folding in List Memberships
 **Learning:** Checking for membership against lists `["val1", "val2"]` is slightly slower than using sets `{"val1", "val2"}`.
 **Action:** Use set literals when checking for membership in fixed collections to optimize speed with constant folding.
+## 2026-07-17 - Add Screen Bounds Checking for Minitouch Input
+
+**Learning:** When developing screen simulation components (like minitouch), it's important to pass screen max coordinate limits downwards into the builder layer so that logic bounds logic can evaluate whether the `x` and `y` offsets exceed display parameters locally before commands are pushed onto device stacks and potentially crash.
+**Action:** Always retrieve and supply `max_x`, `max_y` limit configuration parameters into underlying structural components during their instantiation, and ensure explicit boundary exceptions are raised directly instead of silently clipping to improve failure visibility.
