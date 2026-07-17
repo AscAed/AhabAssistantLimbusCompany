@@ -1063,7 +1063,7 @@ class Mirror:
                             dy = -180 * my_scale
                 else:
                     found_any = False
-                    for lvl in [1, 2, 3]:
+                    for lvl in (1, 2, 3):
                         any_p = auto.find_element(
                             f"mirror/road_to_mir/observe_ego_gift/Level_{'I'*lvl}.png",
                             take_screenshot=False,
@@ -1334,9 +1334,7 @@ class Mirror:
             time.sleep(1)
             if retry() is False:
                 return False
-        # TODO耗时
-        msg = f"满 身 疮 痍 ！ 重 开 ！此次战败耗时{time.time() - self.start_time}"
-        log.info(msg)
+        to_log_with_time("满 身 疮 痍 ！ 重 开 ！此次战败", time.time() - self.start_time)
         self.first_battle = True
         self.start_time = time.time()
 

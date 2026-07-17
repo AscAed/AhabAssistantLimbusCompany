@@ -675,10 +675,10 @@ def identify_road(bus_x, min_length=160, merge_distance=230):
             # 合并组内线段，生成新的代表线段（基于所有点的最小二乘拟合）
             # 提取组内所有线段的端点坐标（用于拟合）
             all_x = [
-                pt[0] for info in cluster for pt in [info["line"][:2], info["line"][2:]]
+                pt[0] for info in cluster for pt in (info["line"][:2], info["line"][2:])
             ]  # 所有点的x坐标
             all_y = [
-                pt[1] for info in cluster for pt in [info["line"][:2], info["line"][2:]]
+                pt[1] for info in cluster for pt in (info["line"][:2], info["line"][2:])
             ]  # 所有点的y坐标
 
             if len(set(all_x)) > 1:  # 非垂直线（x坐标有变化），用线性拟合
@@ -897,7 +897,7 @@ class RouteGraph:
                 )
 
         for i in range(1, self.layer_nums):
-            for j in [Position.TOP, Position.MID, Position.BOTTOM]:
+            for j in (Position.TOP, Position.MID, Position.BOTTOM):
                 if (
                     self.layers[f"layer{i}"][j].weight != DEFAULT_WEIGHT
                     and self.layers[f"layer{i + 1}"][j].weight != DEFAULT_WEIGHT
@@ -908,32 +908,30 @@ class RouteGraph:
 
         if self.hard_mode is False:
             exit_flag = False
-            for j in [Position.TOP, Position.MID, Position.BOTTOM]:
-                if self.layers[f"layer{self.layer_nums}"][j].node_class in [
+            for j in (Position.TOP, Position.MID, Position.BOTTOM):
+                if self.layers[f"layer{self.layer_nums}"][j].node_class in (
                     "shop",
                     "boss_battle",
-                ]:
+                ):
                     exit_flag = True
                     break
             if exit_flag is False:
                 self._add_new_layer()
                 self._set_node(self.layer_nums, Position.MID, "shop", 1)
-                for j in [Position.TOP, Position.MID, Position.BOTTOM]:
+                for j in (Position.TOP, Position.MID, Position.BOTTOM):
                     self.layers[f"layer{self.layer_nums - 1}"][j].add_next_node(
                         self.layers[f"layer{self.layer_nums}"][Position.MID]
                     )
 
             exit_flag = False
-            for j in [Position.TOP, Position.MID, Position.BOTTOM]:
-                if self.layers[f"layer{self.layer_nums}"][j].node_class in [
-                    "boss_battle"
-                ]:
+            for j in (Position.TOP, Position.MID, Position.BOTTOM):
+                if self.layers[f"layer{self.layer_nums}"][j].node_class == "boss_battle":
                     exit_flag = True
                     break
             if exit_flag is False:
                 self._add_new_layer()
                 self._set_node(self.layer_nums, Position.MID, "boss_battle", 1)
-                for j in [Position.TOP, Position.MID, Position.BOTTOM]:
+                for j in (Position.TOP, Position.MID, Position.BOTTOM):
                     self.layers[f"layer{self.layer_nums - 1}"][j].add_next_node(
                         self.layers[f"layer{self.layer_nums}"][Position.MID]
                     )
@@ -1002,7 +1000,7 @@ class RouteGraph:
         end_nodes = []
         for layer in self.layers.values():
             for pos_node in layer.values():
-                if pos_node.node_class in ["boss_battle"]:
+                if pos_node.node_class == "boss_battle":
                     end_nodes.append(pos_node)
 
         if not end_nodes:
@@ -1025,7 +1023,7 @@ class RouteGraph:
                 node: float("inf")
                 for layer in self.layers.values()
                 for pos_node in layer.values()
-                for node in [pos_node]
+                for node in (pos_node,)
             }
             distances[start_node] = start_node.weight
 
@@ -1082,7 +1080,7 @@ class RouteGraph:
             node: float("inf")
             for layer in self.layers.values()
             for pos_node in layer.values()
-            for node in [pos_node]
+            for node in (pos_node,)
         }
         distances[start_node] = start_node.weight
 

@@ -719,7 +719,7 @@ class ThemePackSettingDialog(FramelessDialog):
         self.titleBar.titleLabel.setStyleSheet(
             f"QLabel {{ background: transparent; font-size: 13px; padding: 0 4px; color: {text_color}; }}"
         )
-        for btn in [self.titleBar.minBtn, self.titleBar.maxBtn, self.titleBar.closeBtn]:
+        for btn in (self.titleBar.minBtn, self.titleBar.maxBtn, self.titleBar.closeBtn):
             btn.setNormalColor(
                 Qt.GlobalColor.white if isDarkTheme() else Qt.GlobalColor.black
             )
