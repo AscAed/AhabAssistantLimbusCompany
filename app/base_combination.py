@@ -1511,7 +1511,7 @@ class HotketInputCard(MessageBox):
             "pgup",
             "pgdown",
             "capslock",
-        ]:
+        ):
             if len(key_name) > 1:
                 key_parts.append(f"<{key_name.lower()}>")
             else:
