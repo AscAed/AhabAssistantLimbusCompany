@@ -47,6 +47,10 @@ class MirrorMap:
     def enter_next_node(self, next_step):
         if cfg.mirror_keyboard_navigation:
             log.debug(f"通过键盘按键寻路: {next_step}")
+            # 先发送取消选择按键 (A / left)，确保状态清除
+            auto.key_press("left")
+            sleep(0.3)
+            # 发送对应方向按键
             if next_step == "U":
                 auto.key_press("up")
             elif next_step == "D":
@@ -54,6 +58,7 @@ class MirrorMap:
             elif next_step == "M":
                 auto.key_press("right")
             sleep(0.5)
+            # 发送进入确认按键 (Enter)
             auto.key_press("enter")
             sleep(1.25)
             if auto.click_element(
@@ -273,125 +278,176 @@ def search_road_farthest_distance():
 
 
 def search_road_from_road_map(hard_mode=False):
-    start_time = time.time()
+    import numpy as np
     scale = cfg.set_win_size / 1440
-    road = []
-    bus = None
-
-    if auto.click_element("mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=True):
-        sleep(0.75)
-        if auto.click_element(
-            "mirror/road_in_mir/enter_assets.png", take_screenshot=True
-        ):
-            return True, True
-
-    if bus_position := auto.find_element(
-        "mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=True
-    ):
-        from tasks.base.retry import check_times
-
-        change_times = 5
-        while True:
-            if auto.get_restore_time() is not None:
-                start_time = max(start_time, auto.get_restore_time())
-            if check_times(start_time, logs=False):
-                from tasks.base.back_init_menu import back_init_menu
-
-                back_init_menu()
-                return False, []
-            if (
-                675 * scale < bus_position[1] < 700 * scale
-                and 150 * scale > bus_position[0]
-            ):
-                bus = bus_position
-                break
-            dx = 80 * scale - bus_position[0]
-            dy = 690 * scale - bus_position[1]
-            auto.mouse_drag(
-                bus_position[0], bus_position[1], drag_time=1.5, dx=dx, dy=dy
-            )
+    
+    # 1. 自动缩小重试与扫描机制
+    if not hard_mode:
+        log.info("普通难度启动：开始尝试鼠标滚轮缩小地图以获得完整视野...")
+        auto.mouse_click_blank()
+        for i in range(2):
+            auto.mouse_scroll(-3)
             sleep(0.5)
-            auto.mouse_to_blank()
-
-            bus_position = auto.find_element(
-                "mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=True
-            )
-            if bus_position is None:
-                break
-            change_times -= 1
-            if change_times <= 0:
-                bus = bus_position
-                break
-
-    if bus is None:
+            
+    # 2. 地图定位与图像拼接（普通难度全局）/ 寻找身前一格（困难难度单步）
+    bus_position = None
+    for attempt in range(3):
+        auto.take_screenshot()
+        bus_position = auto.find_element("mirror/mybus_default_distance.png", threshold=0.65)
+        if bus_position is None:
+            bus_position = auto.find_element("mirror/mybus_maximum_distance.png", threshold=0.65)
+        if bus_position is not None:
+            break
+        sleep(0.5)
+        
+    if bus_position is None:
         log.warning("无法定位当前玩家（巴士）位置，寻路失败")
         return False, []
-    bus_pos = auto.find_element("mirror/mybus_default_distance.png", threshold=0.7)
-    if bus_pos is None:
-        bus_pos = bus
-    all_nodes = identify_nodes(bus[0])
-    y_area = divide_the_area_by_y(all_nodes)
-    reset_position = False
-    initial_bus_pos = Position.MID
-    if len(y_area) == 2:
-        if bus_pos[1] > y_area[0][0][1][1] + 50 * scale:
-            reset_position = "Bottom"
-            initial_bus_pos = Position.BOTTOM
+        
+    bus_x, bus_y = bus_position[0], bus_position[1]
+    
+    # 困难难度 (有迷雾)：只做单步最优决策，无需滚动拼接
+    if hard_mode:
+        log.info("困难难度启动：仅进行身前一格节点单步最优决策...")
+        all_nodes = identify_nodes(bus_x)
+        if not all_nodes:
+            log.warning("未检测到前方任何节点")
+            return ["M"], ["unknown"]
+            
+        next_layer_nodes = []
+        for class_name, (nx, ny) in all_nodes:
+            if bus_x + 80 * scale <= nx <= bus_x + 350 * scale:
+                next_layer_nodes.append((class_name, (nx, ny)))
+                
+        if not next_layer_nodes:
+            all_nodes.sort(key=lambda n: n[1][0])
+            next_layer_nodes = [all_nodes[0]]
+            
+        next_layer_nodes.sort(key=lambda n: all_node_weight.get(n[0], DEFAULT_WEIGHT))
+        best_node = next_layer_nodes[0]
+        best_class, (best_x, best_y) = best_node
+        
+        if best_y < bus_y - 80 * scale:
+            direction = "U"
+        elif best_y > bus_y + 80 * scale:
+            direction = "D"
         else:
-            reset_position = "Top"
-            initial_bus_pos = Position.TOP
-    elif len(y_area) == 1:
-        all_road = divide_the_area_by_x(identify_road(bus[0]))
-        if len(all_road) == 0:
-            road = ["M"]
-        else:
-            if all_road[0][0][0] == "DOWN":
-                road = ["D"]
+            direction = "M"
+            
+        log.info(f"困难难度单步最优决策：选择 {best_class} 节点，方向为 {direction}")
+        return [direction], [best_class]
+
+    # 普通难度：拼接多次平移的截图以获取全局地图
+    log.info("普通难度：开始平移扫描与地图拼接...")
+    all_screens_nodes = []
+    all_screens_roads = []
+    
+    for scan_idx in range(3):
+        if scan_idx > 0:
+            if cfg.mirror_keyboard_navigation:
+                log.debug("使用键盘 'E' 键平移地图...")
+                for _ in range(6):
+                    auto.key_press("e")
+                    sleep(0.1)
+                sleep(0.5)
             else:
-                road = ["U"]
-    if reset_position is not False:
-        if reset_position == "Bottom":
-            set_y_position = 1100 * scale
-        else:
-            set_y_position = 250 * scale
-        if bus_position := auto.find_element(
-            "mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=True
-        ):
-            from tasks.base.retry import check_times
-
-            while True:
-                if auto.get_restore_time() is not None:
-                    start_time = max(start_time, auto.get_restore_time())
-                if check_times(start_time, logs=False):
-                    from tasks.base.back_init_menu import back_init_menu
-
-                    back_init_menu()
-                    return False, []
-                if (
-                    set_y_position - 50 * scale
-                    < bus_position[1]
-                    < set_y_position + 50 * scale
-                    and 500 * scale < bus_position[0] < 600 * scale
-                ):
-                    bus = bus_position
-                    break
-                dx = 550 * scale - bus_position[0]
-                dy = set_y_position - bus_position[1]
-                auto.mouse_drag(
-                    bus_position[0], bus_position[1], drag_time=1.5, dx=dx, dy=dy
-                )
+                log.debug("使用鼠标拖拽平移地图...")
+                auto.mouse_drag(int(900 * scale), int(540 * scale), drag_time=1.0, dx=int(-300 * scale), dy=0)
                 sleep(0.5)
                 auto.mouse_to_blank()
-
-                bus_position = auto.find_element(
-                    "mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=True
-                )
-                if bus_position is None:
+                
+        auto.take_screenshot()
+        nodes = identify_nodes(bus_x if scan_idx == 0 else 0)
+        roads = identify_road(bus_x if scan_idx == 0 else 0)
+        
+        if nodes:
+            all_screens_nodes.append(nodes)
+        if roads:
+            all_screens_roads.append(roads)
+            
+    merged_nodes = []
+    merged_roads = []
+    
+    if len(all_screens_nodes) > 0:
+        merged_nodes = list(all_screens_nodes[0])
+        
+    dx = 0
+    for scan_idx in range(1, len(all_screens_nodes)):
+        curr_nodes = all_screens_nodes[scan_idx]
+        dx_list = []
+        for c_class, (cx, cy) in curr_nodes:
+            for m_class, (mx, my) in merged_nodes:
+                if c_class == m_class and abs(cy - my) < 20 * scale:
+                    dx_list.append(mx - cx)
+                    
+        dx = np.median(dx_list) if len(dx_list) > 0 else (300 * scale * scan_idx)
+        
+        for c_class, (cx, cy) in curr_nodes:
+            shifted_x = cx + dx
+            duplicate = False
+            for m_class, (mx, my) in merged_nodes:
+                if abs(shifted_x - mx) < 30 * scale and abs(cy - my) < 20 * scale:
+                    duplicate = True
                     break
-        all_nodes = identify_nodes(bus[0])
+            if not duplicate:
+                merged_nodes.append((c_class, (shifted_x, cy)))
+                
+    if len(all_screens_roads) > 0:
+        merged_roads = list(all_screens_roads[0])
+        
+    for scan_idx in range(1, len(all_screens_roads)):
+        curr_roads = all_screens_roads[scan_idx]
+        for c_dir, (cx, cy) in curr_roads:
+            shifted_x = cx + dx
+            duplicate = False
+            for m_dir, (mx, my) in merged_roads:
+                if abs(shifted_x - mx) < 40 * scale and abs(cy - my) < 20 * scale:
+                    duplicate = True
+                    break
+            if not duplicate:
+                merged_roads.append((c_dir, (shifted_x, cy)))
 
-    if len(road) != 0:
-        return road, ["unknown"]
+    if cfg.mirror_keyboard_navigation:
+        log.debug("使用键盘 'Q' 键复位地图...")
+        for _ in range(12):
+            auto.key_press("q")
+            sleep(0.1)
+        sleep(0.5)
+    else:
+        log.debug("使用鼠标拖拽复位地图...")
+        auto.mouse_drag(int(300 * scale), int(540 * scale), drag_time=1.0, dx=int(600 * scale), dy=0)
+        sleep(0.5)
+        auto.mouse_to_blank()
+
+    log.info(f"全局路网扫描完成。合并后共有节点 {len(merged_nodes)} 个，连线 {len(merged_roads)} 条。开始 Dijkstra 规划...")
+    
+    initial_bus_pos = Position.MID
+    if bus_y < 540 * scale - 100 * scale:
+        initial_bus_pos = Position.TOP
+    elif bus_y > 540 * scale + 100 * scale:
+        initial_bus_pos = Position.BOTTOM
+        
+    y_area = divide_the_area_by_y(merged_nodes)
+    all_layers_nodes = divide_the_area_by_x(merged_nodes)
+    all_layers_nodes.sort(key=lambda layer: layer[0][1][0])
+    
+    graph = RouteGraph(
+        all_layers_nodes,
+        initial_bus_pos=initial_bus_pos,
+        mid_line=540,
+        hard_mode=False
+    )
+    graph.init_road(divide_the_area_by_x(merged_roads), bus_x, bus_y)
+    
+    min_weight, best_path = graph.find_min_weight_route()
+    if not best_path or min_weight == float("inf"):
+        log.warning("无法利用拼合地图规划到终点路径，尝试采用单步备用决策")
+        return ["M"], ["unknown"]
+        
+    directions, classes = graph.get_path_directions(best_path)
+    log.info(f"Dijkstra 规划成功！路径节点：{[n.node_class for n in best_path]}，方向序列：{directions}")
+    
+    return directions, classes
 def identify_nodes(bus_x):
     import numpy as np
     import onnxruntime as ort
@@ -426,6 +482,11 @@ def identify_nodes(bus_x):
 
     # Crop to ROI
     cropped_image = original_image[y_min:y_max, x_min:x_max]
+    # Apply CLAHE to grayscale and convert back to BGR to maintain ONNX input format
+    gray = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    clahe_img = clahe.apply(gray)
+    cropped_image = cv2.cvtColor(clahe_img, cv2.COLOR_GRAY2BGR)
     [c_height, c_width, _] = cropped_image.shape
 
     # 创建正方形空白图像（边长为裁剪图像的最大边），用于保持图像比例并避免变形
@@ -561,7 +622,11 @@ def identify_road(bus_x, min_length=160, merge_distance=230):
     y_max = int(screenshot.shape[0] * 0.9)
 
     roi_img = screenshot[y_min:y_max, x_min:x_max]
-    raw_lines = get_detected_lines(roi_img)  # 调用检测函数获取原始线段数据
+    # Apply CLAHE to grayscale for robust LSD line segment detection
+    gray = cv2.cvtColor(roi_img, cv2.COLOR_BGR2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    clahe_img = clahe.apply(gray)
+    raw_lines = get_detected_lines(clahe_img)  # 调用检测函数获取原始线段数据
     if raw_lines is None or len(raw_lines) == 0:  # 检测结果为空
         log.warning("⚠️ 未检测到任何线段")  # 提示无结果
         return []  # 返回空列表
@@ -806,13 +871,13 @@ import heapq
 from enum import Enum
 
 all_node_weight = {
-    "battle": 30,
-    "boss_battle": 1,
-    "event": 18,
-    "hard_battle": 75,
-    "hard_battle_2": 100,
+    "event": 10,
+    "battle": 20,
+    "hard_battle_2": 30,
+    "hard_battle": 40,
+    "small_boss_battle": 90,
     "shop": 1,
-    "small_boss_battle": 999,
+    "boss_battle": 1,
 }
 
 DEFAULT_WEIGHT = 999  # 默认不可达权重

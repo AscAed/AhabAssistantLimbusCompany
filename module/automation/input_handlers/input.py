@@ -515,14 +515,21 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
 
     def mouse_scroll(self, direction: int = -3) -> bool:
         """
-        不支持的方法\n
-        进行鼠标滚动操作
+        在后台进行鼠标滚动操作
         Args:
             direction (int): 滚动方向，正值表示拉近，负值表示缩小
         Returns:
-            bool (False) : 表示是否支持该操作
+            bool (True) : 表示支持该操作
         """
-        # 不支持的方法
+        hwnd = screen.handle.hwnd
+        if hwnd:
+            delta = direction * 120
+            wparam = (delta << 16) & 0xFFFFFFFF
+            # 发送到窗口中央以防坐标错误
+            lparam = 0
+            win32api.PostMessage(hwnd, win32con.WM_MOUSEWHEEL, wparam, lparam)
+            sleep(0.5)
+            return True
         return False
 
     def mouse_click_blank(self, coordinate=(1, 1), times=1, move_back=False) -> bool:
