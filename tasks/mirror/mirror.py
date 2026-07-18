@@ -363,6 +363,10 @@ class Mirror:
                     self.find_road_total_time += elapsed
                 continue
 
+            elif state == GameState.MIRROR_TEAM_SELECT:
+                self.select_mirror_team()
+                continue
+
             elif state == GameState.BATTLE_FORMATION:
                 if self.first_battle:
                     team_formation(self.sinner_team)
@@ -1114,6 +1118,7 @@ class Mirror:
             )
         )
 
+        selected_count = 0
         # 选择观测饰品
         for gift_id in self.observe_ego_gift_selected:
             gm = re.match(r"^([a-z]+)_", gift_id)
@@ -1133,60 +1138,95 @@ class Mirror:
                 system_index = [
                     k for k, v in observe_system.items() if v == file_system
                 ][0]
-            # 选择体系，先点一下其他体系，再点回来，重置页面
-            auto.mouse_click(
-                benchmark_point[0] + 110 * (system_index + 1) * my_scale,
-                benchmark_point[1],
-            )
-            sleep(0.5)
-            auto.mouse_click(
-                benchmark_point[0] + 110 * (system_index - 1) * my_scale,
-                benchmark_point[1],
-            )
-            sleep(0.5)
+            # 选择体系
             auto.mouse_click(
                 benchmark_point[0] + 110 * system_index * my_scale, benchmark_point[1]
             )
             sleep(0.5)
 
-            _select_and_verify_gift(gift_level, gift_row, gift_col)
-            sleep(0.5)
+            if _select_and_verify_gift(gift_level, gift_row, gift_col):
+                sleep(0.5)
+                # Refresh screenshot to capture the newly opened details panel
+                auto.take_screenshot()
+                select_bbox = ImageUtils.get_bbox(
+                    ImageUtils.load_image(
+                        "mirror/road_to_mir/observe_ego_gift/select_gift_bbox.png"
+                    )
+                )
+                ocr_result = auto.find_language_text("选择", "select", select_bbox)
+                if ocr_result:
+                    # Click "选择" button on the details panel to select the EGO gift
+                    auto.mouse_click((select_bbox[0] + select_bbox[2]) / 2, (select_bbox[1] + select_bbox[3]) / 2)
+                    selected_count += 1
+                    sleep(0.5)
 
         # 观测饰品选择完毕
         for _ in range(5):
+            if auto.take_screenshot() is None:
+                continue
+            # Check if we transitioned to next screen
+            if not (
+                auto.find_element("mirror/road_to_mir/observe_ego_gift/observe_bleed_assets.png", model="clam")
+                or auto.find_element("mirror/road_to_mir/observe_ego_gift/observe_burn_assets.png", model="clam")
+            ):
+                log.debug("已离开观测饰品界面")
+                return
+
+            # Check if starlight consumption confirmation dialog is open
+            confirm_p = auto.find_language_text("确认", "confirm")
+            if confirm_p:
+                log.debug(f"检测到观测确认弹窗，点击确认: {confirm_p}")
+                auto.mouse_click(confirm_p[0], confirm_p[1])
+                sleep(1.0)
+                # Verify transition after click
+                auto.take_screenshot()
+                if not (
+                    auto.find_element("mirror/road_to_mir/observe_ego_gift/observe_bleed_assets.png", model="clam")
+                    or auto.find_element("mirror/road_to_mir/observe_ego_gift/observe_burn_assets.png", model="clam")
+                ):
+                    log.debug("确认后成功离开观测饰品界面")
+                    return
+                continue
+
             bbox = ImageUtils.get_bbox(
                 ImageUtils.load_image(
                     "mirror/road_to_mir/observe_ego_gift/select_gift_bbox.png"
                 )
             )
-            ocr_result = auto.find_language_text("选择", "select", bbox)
+            # Find and click confirm button (e.g. "确定" / "观测" / "开始" / "选择")
+            ocr_result = auto.find_language_text(["确定", "观测", "开始", "选择"], ["confirm", "start", "select"], bbox)
             if ocr_result:
                 auto.mouse_click((bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2)
                 sleep(1)
                 if auto.click_element(
                     "mirror/shop/leave_shop_confirm_assets.png", take_screenshot=True
                 ):
-                    break
+                    sleep(1)
+                    return
+
+        # 兜底：处理可能的弹窗确认
         for _ in range(5):
             auto.click_element(
                 "mirror/road_in_mir/ego_gift_get_confirm_assets.png",
                 take_screenshot=True,
             )
 
-        for _ in range(3):
-            bbox = ImageUtils.get_bbox(
-                ImageUtils.load_image(
-                    "mirror/road_to_mir/observe_ego_gift/reject_gift_bbox.png"
+        # 拒绝/跳过逻辑（仅在未选择任何饰品时运行）
+        if selected_count == 0:
+            for _ in range(3):
+                bbox = ImageUtils.get_bbox(
+                    ImageUtils.load_image(
+                        "mirror/road_to_mir/observe_ego_gift/reject_gift_bbox.png"
+                    )
                 )
-            )
-            ocr_result = auto.find_language_text("拒绝", "reject", bbox)
-            if ocr_result:
-                auto.mouse_click((bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2)
-                sleep(1)
-                if auto.click_element(
-                    "mirror/shop/leave_shop_confirm_assets.png", take_screenshot=True
-                ):
-                    return
+                ocr_result = auto.find_language_text("拒绝", "reject", bbox)
+                if ocr_result:
+                    auto.mouse_click((bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2)
+                    sleep(1)
+                    if auto.click_element(
+                        "mirror/shop/leave_shop_confirm_assets.png", take_screenshot=True
+                    ):
+                        return
 
     def select_mirror_team(self):
         chance_to_select_team = 5

@@ -798,8 +798,12 @@ class FarmingInterfaceLeft(QWidget):
 
     def stop_script(self):
         if self.my_script and self.my_script.isRunning():
-            log.debug("正在终止脚本线程...")
-            self.my_script.terminate()  # 终止线程
+            log.debug("正在请求脚本线程安全停止...")
+            self.my_script.is_stop = True
+            # 等待最多 2000 毫秒让其协同停止
+            if not self.my_script.wait(2000):
+                log.warning("脚本线程未能在规定时间内停止，执行强制终止。")
+                self.my_script.terminate()  # 强制终止线程
 
     def my_stop_shortcut(self):
         current_text = self.link_start_button.get_text()
