@@ -39,3 +39,4 @@ __main_dev_temp__.py
 # 其他
 .worktrees.venv2
 .venv2/
+isolated_test_env/
