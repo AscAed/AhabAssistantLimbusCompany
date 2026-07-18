@@ -19,20 +19,20 @@ def select_theme_pack(
     scale = cfg.set_win_size / 1080
     if path_manager.current_language == "zh_cn":
         theme_pack_list_zh = theme_list.get_effective_theme_pack_list(
-            hard_switch, "zh_cn", team_num, use_custom_theme_pack_weight
+            hard_switch, "zh_cn", team_num, use_custom_theme_pack_weight, floor
         )
         theme_pack_list_en = {}
     elif path_manager.current_language == "en":
         theme_pack_list_zh = {}
         theme_pack_list_en = theme_list.get_effective_theme_pack_list(
-            hard_switch, "en", team_num, use_custom_theme_pack_weight
+            hard_switch, "en", team_num, use_custom_theme_pack_weight, floor
         )
     else:
         theme_pack_list_zh = theme_list.get_effective_theme_pack_list(
-            hard_switch, "zh_cn", team_num, use_custom_theme_pack_weight
+            hard_switch, "zh_cn", team_num, use_custom_theme_pack_weight, floor
         )
         theme_pack_list_en = theme_list.get_effective_theme_pack_list(
-            hard_switch, "en", team_num, use_custom_theme_pack_weight
+            hard_switch, "en", team_num, use_custom_theme_pack_weight, floor
         )
     refresh_times = 3
     difficulty = None

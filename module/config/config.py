@@ -865,29 +865,48 @@ class Theme_pack_list(metaclass=SingletonMeta):
         language: str | None,
         team_num: int,
         use_custom_theme_pack_weight: bool,
+        floor: int | None = None,
     ) -> tuple[dict]:
-        """获取当前生效的主题包名单，考虑难度、语言、队伍和是否启用自定义权重等因素"""
+        """获取当前生效的主题包名单，考虑难度、语言、队伍、是否启用自定义权重以及楼层覆盖"""
         setting_keys = self.build_setting_key(hard_switch, language)
+        
+        # 1. 基础全局配置
         theme_pack_list = {}
         for key in setting_keys:
             theme_pack_list.update(self.config.get(key, {}))
+
+        # 2. 合并全局楼层特定覆盖
+        if floor is not None:
+            floor_key = f"floor_{floor}"
+            global_floor_overrides = self.config.get("floors", {}).get(floor_key, {})
+            for key in setting_keys:
+                theme_pack_list.update(global_floor_overrides.get(key, {}))
+
+        # 若未启用自定义权重，直接返回全局有效列表
         if not use_custom_theme_pack_weight:
-            log.debug("未启用自定义权重，返回默认主题包名单")
+            log.debug("未启用自定义权重，返回默认(含全局楼层)主题包名单")
             return theme_pack_list
 
         custom_path = self.build_team_weight_path(team_num)
         loaded_data = self.load_config(custom_path)
         if loaded_data is None:
-            log.debug(f"自定义文件不存在或读取失败，回退默认配置。path={custom_path}")
+            log.debug(f"自定义文件不存在或读取失败，返回默认配置。path={custom_path}")
             return theme_pack_list
 
-        effective_list = {}
+        # 3. 合并队伍自定义整体权重覆盖
         for key in setting_keys:
-            effective_list.update(loaded_data.get(key, self.config.get(key, {})))
+            theme_pack_list.update(loaded_data.get(key, {}))
+
+        # 4. 合并队伍自定义楼层特定覆盖
+        if floor is not None:
+            team_floor_overrides = loaded_data.get("floors", {}).get(floor_key, {})
+            for key in setting_keys:
+                theme_pack_list.update(team_floor_overrides.get(key, {}))
+
         log.debug(
-            f"已加载自定义权重。path={custom_path}, keys={setting_keys}, count={len(effective_list)}"
+            f"已成功混合生效权重列表。path={custom_path}, floor={floor}, count={len(theme_pack_list)}"
         )
-        return effective_list
+        return theme_pack_list
 
     def _load_version(self, version_path: str) -> str:
         """加载版本信息"""
