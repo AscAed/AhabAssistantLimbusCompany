@@ -24,21 +24,20 @@ from qfluentwidgets import (
     ScrollArea,
     SubtitleLabel,
     TitleLabel,
-    isDarkTheme,
+    ToolTipFilter,
+    ToolTipPosition,
     TransparentToolButton,
+    isDarkTheme,
 )
 from qfluentwidgets import (
     FluentIcon as FIF,
 )
-from app.common.ui_config import get_segmented_widget_qss
-from app.widget.custom_segmented_widget import CustomSegmentedWidget
 from qframelesswindow import FramelessDialog, StandardTitleBar
-from ruamel.yaml import YAML
 
 from app.base_tools import BaseSpinBox
 from app.card.messagebox_custom import BaseInfoBar, MessageBoxConfirm, MessageBoxEdit
 from app.language_manager import LanguageManager
-from module import THEME_PACK_LIST_EXAMPLE_PATH
+from app.widget.custom_segmented_widget import CustomSegmentedWidget
 from module.config import cfg, theme_list
 from module.config.theme_pack_import_export import (
     export_theme_pack_weight,
@@ -385,7 +384,13 @@ class ThemePackCard(QFrame):
         self.weight_label.setAlignment(Qt.AlignCenter)
         # 重置按钮，默认隐藏
         self.reset_btn = TransparentToolButton(FIF.SYNC, self)
+        self.reset_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.reset_btn.setToolTip(self.tr("撤销覆盖"))
+        self.reset_btn.installEventFilter(
+            ToolTipFilter(
+                self.reset_btn, showDelay=0, position=ToolTipPosition.BOTTOM
+            )
+        )
         self.reset_btn.setVisible(False)
         self.reset_btn.clicked.connect(self._on_reset_clicked)
     def __init_layout(self):
