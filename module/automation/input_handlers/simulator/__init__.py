@@ -64,6 +64,8 @@ def insert_swipe(p0, p3, speed=15, min_distance=10):
             + p3 * t**3
         )
         point = point.astype(int).tolist()
+        # ⚡ Bolt: Replace np.linalg.norm with squared distance for O(n) performance improvement avoiding numpy allocations
+        if (point[0] - prev[0]) ** 2 + (point[1] - prev[1]) ** 2 < min_dist_sq:
         if (point[0] - prev[0])**2 + (point[1] - prev[1])**2 < min_dist_sq:
             continue
 
