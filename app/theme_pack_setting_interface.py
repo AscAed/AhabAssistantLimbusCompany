@@ -24,18 +24,20 @@ from qfluentwidgets import (
     ScrollArea,
     SubtitleLabel,
     TitleLabel,
+    ToolTipFilter,
+    ToolTipPosition,
+    TransparentToolButton,
     isDarkTheme,
 )
 from qfluentwidgets import (
     FluentIcon as FIF,
 )
 from qframelesswindow import FramelessDialog, StandardTitleBar
-from ruamel.yaml import YAML
 
 from app.base_tools import BaseSpinBox
 from app.card.messagebox_custom import BaseInfoBar, MessageBoxConfirm, MessageBoxEdit
 from app.language_manager import LanguageManager
-from module import THEME_PACK_LIST_EXAMPLE_PATH
+from app.widget.custom_segmented_widget import CustomSegmentedWidget
 from module.config import cfg, theme_list
 from module.config.theme_pack_import_export import (
     export_theme_pack_weight,
@@ -299,24 +301,36 @@ class ThemePackCard(QFrame):
     """单个主题包卡片组件"""
 
     weight_changed = Signal(str, int, bool, bool)  # pack_key, weight, is_hard, is_cn
+    reset_requested = Signal(str, bool, bool)  # pack_key, is_hard, is_cn
 
-    def __init__(
-        self, pack_key: str, weight: int, is_hard=False, is_cn=False, parent=None
-    ):
+    def __init__(self, pack_key: str, weight: int, is_hard=False, is_cn=False, is_team_specific=False, parent=None):
         super().__init__(parent)
         self.pack_key = str(pack_key)  # 确保是字符串，与 Signal 声明一致
         self.is_hard = is_hard
         self.is_cn = is_cn  # 是否为中文配置
+        self.is_team_specific = is_team_specific
         self.weight = int(weight)  # 确保是整数
         self.setObjectName(f"ThemePackCard_{pack_key}_{'cn' if is_cn else 'en'}")
         self.setFixedSize(200, 395)  # 按设置卡片尺寸
 
         self.__init_widget()
         self.__init_layout()
+
+        # Initialize floor selection for team-specific configs
+        self.current_floor: int | None = None  # None means global config
+        if self.is_team_specific:
+            self._init_floor_selector()
+
         self._apply_styles()
 
         # 设置初始权重值
         self.weight_spinbox.spin_box.setValue(self.weight)
+        # 初始状态：未自定义，隐藏重置按钮
+        self.update_state(self.weight, False)
+
+    def _init_floor_selector(self):
+        # Implementation for floor selector widget
+        pass
 
     def __init_widget(self):
         self.main_layout = QVBoxLayout(self)
@@ -325,9 +339,7 @@ class ThemePackCard(QFrame):
 
         # 图片标签 - 根据原始图片分辨率 170x330 按比例缩放
         self.image_label = QLabel(self)
-        self.image_label.setFixedSize(
-            140, 272
-        )  # 保持 170:330 原始比例 (140*330/170≈272)
+        self.image_label.setFixedSize(140, 272)  # 保持 170:330 原始比例 (140*330/170≈272)
         self.image_label.setScaledContents(True)
         self.image_label.setAlignment(Qt.AlignCenter)
 
@@ -339,14 +351,10 @@ class ThemePackCard(QFrame):
                 self.image_label.setPixmap(pixmap)
             else:
                 self.image_label.setText(self.tr("无图片"))
-                self.image_label.setStyleSheet(
-                    "background-color: rgba(128, 128, 128, 0.3); border-radius: 5px;"
-                )
+                self.image_label.setStyleSheet("background-color: rgba(128, 128, 128, 0.3); border-radius: 5px;")
         else:
             self.image_label.setText(self.tr("无图片"))
-            self.image_label.setStyleSheet(
-                "background-color: rgba(128, 128, 128, 0.3); border-radius: 5px;"
-            )
+            self.image_label.setStyleSheet("background-color: rgba(128, 128, 128, 0.3); border-radius: 5px;")
 
         # 主题包名称标签
         self.name_label = TitleLabel()
@@ -366,6 +374,18 @@ class ThemePackCard(QFrame):
         self.weight_label = BodyLabel()
         self.weight_label.setText(self.tr("权重:"))
         self.weight_label.setAlignment(Qt.AlignCenter)
+        # 重置按钮，默认隐藏
+        self.reset_btn = TransparentToolButton(FIF.SYNC, self)
+        self.reset_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.reset_btn.setToolTip(self.tr("撤销覆盖"))
+        self.reset_btn.installEventFilter(ToolTipFilter(self.reset_btn, showDelay=300, position=ToolTipPosition.BOTTOM))
+        self.reset_btn.installEventFilter(
+            ToolTipFilter(
+                self.reset_btn, showDelay=0, position=ToolTipPosition.BOTTOM
+            )
+        )
+        self.reset_btn.setVisible(False)
+        self.reset_btn.clicked.connect(self._on_reset_clicked)
 
     def __init_layout(self):
         self.main_layout.addWidget(self.image_label, 0, Qt.AlignCenter)
@@ -376,6 +396,7 @@ class ThemePackCard(QFrame):
         self.weight_layout.addStretch()
         self.weight_layout.addWidget(self.weight_label)
         self.weight_layout.addWidget(self.weight_spinbox)
+        self.weight_layout.addWidget(self.reset_btn)
         self.weight_layout.addStretch()
 
         self.main_layout.addLayout(self.weight_layout)
@@ -456,6 +477,60 @@ class ThemePackCard(QFrame):
     def _on_weight_changed(self, value):
         """权重值改变时触发"""
         self.weight_changed.emit(self.pack_key, value, self.is_hard, self.is_cn)
+        # 当在楼层模式下修改，标记为已自定义
+        if self.is_team_specific and self.current_floor is not None:
+            self.update_state(value, True)
+
+    def _on_reset_clicked(self):
+        """点击重置按钮时触发"""
+        self.reset_requested.emit(self.pack_key, self.is_hard, self.is_cn)
+
+    def update_state(self, weight, is_customized):
+        """更新卡片的状态和样式（是否已被自定义覆盖）"""
+        self.weight = int(weight)
+        self.weight_spinbox.spin_box.setValue(self.weight)
+        self.reset_btn.setVisible(is_customized)
+
+        # 根据自定义状态应用不同的边框高亮颜色
+        is_dark = isDarkTheme()
+        if is_customized:
+            # 自定义覆盖状态：高亮边框
+            border_color = "rgba(0, 150, 255, 0.8)" if is_dark else "rgba(0, 120, 215, 0.8)"
+            bg_color = "rgba(0, 150, 255, 0.1)" if is_dark else "rgba(0, 120, 215, 0.05)"
+        else:
+            # 继承全局默认状态
+            border_color = "rgba(255, 255, 255, 0.15)" if is_dark else "rgba(0, 0, 0, 0.1)"
+            bg_color = "rgba(255, 255, 255, 0.05)" if is_dark else "rgba(0, 0, 0, 0.03)"
+
+        self.setStyleSheet(f"""
+            ThemePackCard {{
+                background-color: {bg_color};
+                border: 1px solid {border_color};
+                border-radius: 8px;
+            }}
+            ThemePackCard:hover {{
+                border: 1px solid {"rgba(0, 150, 255, 1)" if is_dark else "rgba(0, 120, 215, 1)"};
+            }}
+            TitleLabel {{
+                color: {"white" if is_dark else "black"};
+                background-color: transparent;
+            }}
+            BodyLabel {{
+                color: {"rgba(255, 255, 255, 0.85)" if is_dark else "rgba(0, 0, 0, 0.85)"};
+                background-color: transparent;
+                border: none;
+            }}
+            BaseSpinBox {{
+                background-color: transparent;
+                border: none;
+            }}
+            SpinBox {{
+                background-color: {"rgba(255, 255, 255, 0.08)" if is_dark else "rgba(255, 255, 255, 0.8)"};
+                border: 1px solid {"rgba(255, 255, 255, 0.2)" if is_dark else "rgba(0, 0, 0, 0.15)"};
+                border-radius: 4px;
+                color: {"white" if is_dark else "black"};
+            }}
+        """)
 
     def update_weight(self, weight):
         """更新权重显示值"""
@@ -470,9 +545,7 @@ class ThemePackCard(QFrame):
     def cleanup(self):
         """清理资源，断开信号连接"""
         try:
-            self.weight_spinbox.spin_box.valueChanged.disconnect(
-                self._on_weight_changed
-            )
+            self.weight_spinbox.spin_box.valueChanged.disconnect(self._on_weight_changed)
         except (RuntimeError, TypeError):
             pass  # 信号可能已经被断开或对象已被销毁
 
@@ -482,9 +555,29 @@ class ThemePackSettingDialog(FramelessDialog):
 
     def __init__(self, parent, config_data, save_path):
         super().__init__(parent)
+        self.setAttribute(Qt.WA_StyledBackground, True)
         self.setObjectName("ThemePackSettingDialog")
         LanguageManager().register_component(self)
         self.setWindowTitle(self.tr("主题包权重配置"))
+        self.scroll_area = ScrollArea(self)
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        # 滚动内容容器
+        self.scroll_widget = QWidget()
+        self.scroll_layout = QVBoxLayout(self.scroll_widget)
+        self.scroll_layout.setSpacing(20)
+        self.scroll_layout.setContentsMargins(20, 20, 20, 20)
+
+        self.scroll_area.setWidget(self.scroll_widget)
+
+        # 标题
+        self.title_label = TitleLabel(self.tr("主题包权重配置"), self)
+        self.title_label.setAlignment(Qt.AlignCenter)
+
+        # Floor selector (only for team-specific)
+        self.floor_selector = None  # will be initialized later
+        self.current_floor = None  # None means global default
         self.setMinimumSize(1100, 600)
         self.resize(1200, 700)
 
@@ -518,27 +611,9 @@ class ThemePackSettingDialog(FramelessDialog):
 
         self.__init_widget()
         self.__init_layout()
-        self.load_theme_packs()
         self._apply_styles()
 
     def __init_widget(self):
-        # 主滚动区域
-        self.scroll_area = ScrollArea(self)
-        self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
-        # 滚动内容容器
-        self.scroll_widget = QWidget()
-        self.scroll_layout = QVBoxLayout(self.scroll_widget)
-        self.scroll_layout.setSpacing(20)
-        self.scroll_layout.setContentsMargins(20, 20, 20, 20)
-
-        self.scroll_area.setWidget(self.scroll_widget)
-
-        # 标题
-        self.title_label = TitleLabel(self.tr("主题包权重配置"), self)
-        self.title_label.setAlignment(Qt.AlignCenter)
-
         # 说明标签
         self.info_label = BodyLabel(
             self.tr(
@@ -557,17 +632,11 @@ class ThemePackSettingDialog(FramelessDialog):
         self.threshold_layout.setSpacing(8)
 
         self.threshold_label = BodyLabel(self.tr("优选阈值"), self.threshold_widget)
-        self.preferred_threshold_spinbox = BaseSpinBox(
-            None, parent=self.threshold_widget, min_value=-10, min_step=1
-        )
+        self.preferred_threshold_spinbox = BaseSpinBox(None, parent=self.threshold_widget, min_value=-10, min_step=1)
         self.preferred_threshold_spinbox.spin_box.setRange(-10, 10)
         self.preferred_threshold_spinbox.spin_box.setAlignment(Qt.AlignCenter)
-        self.preferred_threshold_spinbox.spin_box.setValue(
-            int(self.config_data.get("preferred_thresholds", 0))
-        )
-        self.preferred_threshold_spinbox.spin_box.valueChanged.connect(
-            self._on_preferred_threshold_changed
-        )
+        self.preferred_threshold_spinbox.spin_box.setValue(int(self.config_data.get("preferred_thresholds", 0)))
+        self.preferred_threshold_spinbox.spin_box.valueChanged.connect(self._on_preferred_threshold_changed)
 
         self.threshold_layout.addStretch()
         self.threshold_layout.addWidget(self.threshold_label)
@@ -608,16 +677,30 @@ class ThemePackSettingDialog(FramelessDialog):
         self.set_to_global_action.triggered.connect(self.set_to_global)
         self.batch_menu.addAction(self.set_to_global_action)
 
+        # Floor reset action (only when floor selected)
+        self.reset_floor_action = Action(FIF.CANCEL, self.tr("重置当前楼层"))
+        self.reset_floor_action.triggered.connect(self.reset_current_floor)
+        self.batch_menu.addAction(self.reset_floor_action)
+
         self.set_all_negative_action = Action(FIF.REMOVE, self.tr("全部设为 -5"))
         self.set_all_negative_action.triggered.connect(self.set_all_weights_negative)
         self.batch_menu.addAction(self.set_all_negative_action)
 
         self.batch_menu_button.setMenu(self.batch_menu)
 
+        # Floor selector (always shown)
+        self.floor_selector = CustomSegmentedWidget(self)
+        self.floor_selector.addItem(routeKey="global", text=self.tr("全局"))
+        for i in range(1, 6):
+            self.floor_selector.addItem(routeKey=str(i), text=str(i))
+        self.floor_selector.setFixedHeight(36)
+        self.floor_selector.setObjectName("FloorSelector")
+        self.floor_selector.currentItemChanged.connect(self._on_floor_changed)
+        self.floor_selector.setCurrentItem("global")
+        self.reset_floor_action.setEnabled(False)
+
         # 连接以向上显示菜单
-        self.batch_menu_button.clicked.connect(
-            lambda: self._show_menu_upward(self.batch_menu_button, self.batch_menu)
-        )
+        self.batch_menu_button.clicked.connect(lambda: self._show_menu_upward(self.batch_menu_button, self.batch_menu))
 
         # 导入导出按钮（仅队伍特定配置显示）
         self.export_button = PushButton(FIF.UP, self.tr("导出"))
@@ -665,6 +748,9 @@ class ThemePackSettingDialog(FramelessDialog):
         self.scroll_layout.addWidget(self.info_label)
         self.scroll_layout.addWidget(self.threshold_widget)
         self.scroll_layout.addSpacing(10)
+        # Insert floor selector widget above groups if available
+        if self.floor_selector:
+            self.scroll_layout.addWidget(self.floor_selector)
         self.scroll_layout.addWidget(self.normal_group_label)
         self.scroll_layout.addWidget(self.normal_grid_widget)
         self.scroll_layout.addWidget(self.hard_group_label)
@@ -719,34 +805,42 @@ class ThemePackSettingDialog(FramelessDialog):
         self.titleBar.titleLabel.setStyleSheet(
             f"QLabel {{ background: transparent; font-size: 13px; padding: 0 4px; color: {text_color}; }}"
         )
-        for btn in [self.titleBar.minBtn, self.titleBar.maxBtn, self.titleBar.closeBtn]:
-            btn.setNormalColor(
-                Qt.GlobalColor.white if isDarkTheme() else Qt.GlobalColor.black
-            )
-            btn.setHoverColor(
-                Qt.GlobalColor.white if isDarkTheme() else Qt.GlobalColor.black
-            )
-            btn.setPressedColor(
-                Qt.GlobalColor.white if isDarkTheme() else Qt.GlobalColor.black
-            )
+        for btn in (self.titleBar.minBtn, self.titleBar.maxBtn, self.titleBar.closeBtn):
+            btn.setNormalColor(Qt.GlobalColor.white if isDarkTheme() else Qt.GlobalColor.black)
+            btn.setHoverColor(Qt.GlobalColor.white if isDarkTheme() else Qt.GlobalColor.black)
+            btn.setPressedColor(Qt.GlobalColor.white if isDarkTheme() else Qt.GlobalColor.black)
         self.titleBar.closeBtn.setHoverColor(Qt.GlobalColor.white)
 
         # 直接设置各内容区域的背景色
+        self.scroll_area.setStyleSheet(f"QScrollArea {{ background-color: {bg_color}; border: none; }}")
+        self.scroll_area.viewport().setStyleSheet(f"background-color: {bg_color};")
         self.scroll_widget.setStyleSheet(f"background-color: {bg_color};")
         self.normal_grid_widget.setStyleSheet(f"background-color: {bg_color};")
         self.hard_grid_widget.setStyleSheet(f"background-color: {bg_color};")
 
     def load_theme_packs(self):
-        """加载主题包配置并创建卡片，根据语言参数加载对应配置"""
+        """加载主题包配置并创建卡片，根据语言参数和当前楼层加载对应配置"""
         # 根据语言参数决定加载哪种配置
         if self.is_cn:
-            # 中文界面，加载中文配置
-            normal_packs = self.config_data.get("theme_pack_list_cn", {})
-            hard_packs = self.config_data.get("theme_pack_list_hard_cn", {})
+            base_normal = self.config_data.get("theme_pack_list_cn", {})
+            base_hard = self.config_data.get("theme_pack_list_hard_cn", {})
         else:
-            # 英文界面，加载英文配置
-            normal_packs = self.config_data.get("theme_pack_list", {})
-            hard_packs = self.config_data.get("theme_pack_list_hard", {})
+            base_normal = self.config_data.get("theme_pack_list", {})
+            base_hard = self.config_data.get("theme_pack_list_hard", {})
+
+        normal_over = {}
+        hard_over = {}
+        # 合并楼层覆盖配置（如果有）
+        if self.current_floor is not None:
+            floor_key = f"floor_{self.current_floor}"
+            floor_cfg = self.config_data.get("floors", {}).get(floor_key, {})
+            normal_over = floor_cfg.get("theme_pack_list" if not self.is_cn else "theme_pack_list_cn", {})
+            hard_over = floor_cfg.get("theme_pack_list_hard" if not self.is_cn else "theme_pack_list_hard_cn", {})
+            normal_packs = {**base_normal, **normal_over}
+            hard_packs = {**base_hard, **hard_over}
+        else:
+            normal_packs = base_normal
+            hard_packs = base_hard
 
         col_count = 5  # 每行5个卡片
 
@@ -754,14 +848,17 @@ class ThemePackSettingDialog(FramelessDialog):
         row = 0
         col = 0
         for pack_key, weight in normal_packs.items():
-            # 如果是 OCR 备用名称，跳过不显示（但配置中保留）
             if self.is_cn and pack_key in CN_OCR_ALTERNATIVES:
                 continue
-            card = ThemePackCard(pack_key, weight, is_hard=False, is_cn=self.is_cn)
+            is_customized = (self.current_floor is not None) and (pack_key in normal_over)
+            card = ThemePackCard(
+                pack_key, weight, is_hard=False, is_cn=self.is_cn, is_team_specific=self.is_team_specific
+            )
             card.weight_changed.connect(self._on_weight_changed)
+            card.reset_requested.connect(self._on_card_reset_requested)
             self.normal_cards[pack_key] = card
-
             self.normal_grid_layout.addWidget(card, row, col)
+            card.update_state(weight, is_customized)
             col += 1
             if col >= col_count:
                 col = 0
@@ -771,18 +868,110 @@ class ThemePackSettingDialog(FramelessDialog):
         row = 0
         col = 0
         for pack_key, weight in hard_packs.items():
-            # 如果是 OCR 备用名称，跳过不显示（但配置中保留）
             if self.is_cn and pack_key in CN_OCR_ALTERNATIVES:
                 continue
-            card = ThemePackCard(pack_key, weight, is_hard=True, is_cn=self.is_cn)
+            is_customized = (self.current_floor is not None) and (pack_key in hard_over)
+            card = ThemePackCard(
+                pack_key, weight, is_hard=True, is_cn=self.is_cn, is_team_specific=self.is_team_specific
+            )
             card.weight_changed.connect(self._on_weight_changed)
+            card.reset_requested.connect(self._on_card_reset_requested)
             self.hard_cards[pack_key] = card
-
             self.hard_grid_layout.addWidget(card, row, col)
+            card.update_state(weight, is_customized)
             col += 1
             if col >= col_count:
                 col = 0
                 row += 1
+
+    def reload_theme_packs(self):
+        """重新加载主题包列表"""
+        # Clear existing cards from both grids
+        for layout in (self.normal_grid_layout, self.hard_grid_layout):
+            while layout.count():
+                item = layout.takeAt(0)
+                widget = item.widget()
+                if widget:
+                    widget.setParent(None)
+                    widget.deleteLater()
+        # Clear card dictionaries
+        self.normal_cards.clear()
+        self.hard_cards.clear()
+        # Reload packs based on current floor / config
+        self.load_theme_packs()
+
+    def _on_floor_changed(self, text: str):
+        """Handle floor selector changes."""
+        # Determine floor selection; "global" or "全局" means no specific floor
+        if text == "global" or text == self.tr("全局"):
+            self.current_floor = None
+            self.reset_floor_action.setEnabled(False)
+        else:
+            try:
+                self.current_floor = int(text)
+                self.reset_floor_action.setEnabled(True)
+            except ValueError:
+                self.current_floor = None
+                self.reset_floor_action.setEnabled(False)
+        # Reload theme packs to reflect new floor context
+        self.reload_theme_packs()
+
+    def _on_card_reset_requested(self, pack_key, is_hard, is_cn):
+        """处理单个卡片重置事件（仅在楼层覆盖状态下有效）"""
+        if self.current_floor is None:
+            return
+
+        pack_key_str = str(pack_key)
+        if is_hard:
+            en_config_key = "theme_pack_list_hard"
+            cn_config_key = "theme_pack_list_hard_cn"
+            name_map = THEME_PACK_HARD_NAME_MAP
+            reverse_map = CN_TO_EN_HARD_NAME_MAP
+        else:
+            en_config_key = "theme_pack_list"
+            cn_config_key = "theme_pack_list_cn"
+            name_map = THEME_PACK_NAME_MAP
+            reverse_map = CN_TO_EN_NAME_MAP
+
+        floor_key = f"floor_{self.current_floor}"
+        floor_cfg = self.config_data.get("floors", {}).get(floor_key, {})
+        if not floor_cfg:
+            return
+
+        # 撤销修改
+        en_config = floor_cfg.get(en_config_key, {})
+        cn_config = floor_cfg.get(cn_config_key, {})
+
+        if self.is_cn:
+            cn_config.pop(pack_key_str, None)
+            if pack_key_str in CN_OCR_ALTERNATIVES:
+                cn_config.pop(CN_OCR_ALTERNATIVES[pack_key_str], None)
+            else:
+                for alt_name, main_name in CN_OCR_ALTERNATIVES.items():
+                    if main_name == pack_key_str:
+                        cn_config.pop(alt_name, None)
+            en_key = reverse_map.get(pack_key_str)
+            if en_key:
+                en_config.pop(en_key, None)
+        else:
+            en_config.pop(pack_key_str, None)
+            cn_key = name_map.get(pack_key_str)
+            if cn_key:
+                cn_config.pop(cn_key, None)
+                for alt_name, main_name in CN_OCR_ALTERNATIVES.items():
+                    if main_name == cn_key:
+                        cn_config.pop(alt_name, None)
+
+        # 清理空字典以保持配置文件整洁
+        if not en_config:
+            floor_cfg.pop(en_config_key, None)
+        if not cn_config:
+            floor_cfg.pop(cn_config_key, None)
+        if not floor_cfg:
+            self.config_data.setdefault("floors", {}).pop(floor_key, None)
+
+        self._has_unsaved_changes = True
+        self.reload_theme_packs()
 
     def _on_weight_changed(self, pack_key, weight, is_hard, is_cn):
         """处理权重改变事件，只更新内存中的配置，不保存到文件"""
@@ -800,14 +989,19 @@ class ThemePackSettingDialog(FramelessDialog):
             name_map = THEME_PACK_NAME_MAP
             reverse_map = CN_TO_EN_NAME_MAP
 
-        # 同时更新两套配置
-        # 1. 更新英文配置
-        en_config = copy.deepcopy(self.config_data.get(en_config_key, {}))
-        en_config = {str(k): v for k, v in en_config.items()}
+        # 确定要写入的目标字典
+        if self.current_floor is not None:
+            floors_dict = self.config_data.setdefault("floors", {})
+            floor_key = f"floor_{self.current_floor}"
+            floor_cfg = floors_dict.setdefault(floor_key, {})
+            en_config = floor_cfg.setdefault(en_config_key, {})
+            cn_config = floor_cfg.setdefault(cn_config_key, {})
+        else:
+            en_config = self.config_data.setdefault(en_config_key, {})
+            cn_config = self.config_data.setdefault(cn_config_key, {})
 
-        # 2. 更新中文配置
-        cn_config = copy.deepcopy(self.config_data.get(cn_config_key, {}))
-        cn_config = {str(k): v for k, v in cn_config.items()}
+        en_config = {str(k): v for k, v in copy.deepcopy(en_config).items()}
+        cn_config = {str(k): v for k, v in copy.deepcopy(cn_config).items()}
 
         if self.is_cn:
             # 当前是中文界面，pack_key 是中文名称
@@ -815,35 +1009,37 @@ class ThemePackSettingDialog(FramelessDialog):
 
             # 检查是否有 OCR 备用名称，如果有则同步更新
             if pack_key_str in CN_OCR_ALTERNATIVES:
-                # pack_key 是备用名称，找到主名称并更新
                 main_name = CN_OCR_ALTERNATIVES[pack_key_str]
                 if main_name in cn_config:
                     cn_config[main_name] = weight
             else:
-                # pack_key 是主名称，检查是否有备用名称需要同步更新
                 for alt_name, main_name in CN_OCR_ALTERNATIVES.items():
                     if main_name == pack_key_str and alt_name in cn_config:
                         cn_config[alt_name] = weight
 
             # 找到对应的中文名称并更新英文配置
             en_key = reverse_map.get(pack_key_str)
-            if en_key and en_key in en_config:
+            if en_key:
                 en_config[en_key] = weight
         else:
             # 当前是英文界面，pack_key 是英文 key
             en_config[pack_key_str] = weight
             # 找到对应的英文 key 并更新中文配置
             cn_key = name_map.get(pack_key_str)
-            if cn_key and cn_key in cn_config:
+            if cn_key:
                 cn_config[cn_key] = weight
                 # 同时检查该中文名称是否有 OCR 备用名称，一并更新
                 for alt_name, main_name in CN_OCR_ALTERNATIVES.items():
                     if main_name == cn_key and alt_name in cn_config:
                         cn_config[alt_name] = weight
 
-        # 只更新内存中的配置，不保存到文件
-        self.config_data[en_config_key] = copy.deepcopy(en_config)
-        self.config_data[cn_config_key] = copy.deepcopy(cn_config)
+        # 写回数据
+        if self.current_floor is not None:
+            self.config_data["floors"][floor_key][en_config_key] = en_config
+            self.config_data["floors"][floor_key][cn_config_key] = cn_config
+        else:
+            self.config_data[en_config_key] = en_config
+            self.config_data[cn_config_key] = cn_config
 
         # 标记有未保存的修改
         self._has_unsaved_changes = True
@@ -862,40 +1058,25 @@ class ThemePackSettingDialog(FramelessDialog):
         self._has_unsaved_changes = True
 
     def reset_to_default(self):
-        """重置为默认配置，只更新内存中的配置和界面，不保存到文件"""
-        # 加载示例配置
-        with open(THEME_PACK_LIST_EXAMPLE_PATH, "r", encoding="utf-8") as f:
-            yaml = YAML()
-            example_config = yaml.load(f) or {}
-
-        # 用示例配置替换内存中的配置，但不保存到文件
-        self.config_data.clear()
-        self.config_data.update(copy.deepcopy(example_config))
-
-        # 根据当前语言更新界面显示
-        if self.is_cn:
-            normal_default = example_config.get("theme_pack_list_cn", {})
-            hard_default = example_config.get("theme_pack_list_hard_cn", {})
+        """Reset current view (global or floor) to default values."""
+        if self.current_floor is None:
+            # Reset global config to defaults (load from example)
+            default_cfg = theme_list.load_config(theme_list.theme_pack_list_path)
+            self.config_data = copy.deepcopy(default_cfg)
         else:
-            normal_default = example_config.get("theme_pack_list", {})
-            hard_default = example_config.get("theme_pack_list_hard", {})
-
-        self.preferred_threshold_spinbox.spin_box.setValue(
-            int(example_config.get("preferred_thresholds", 0))
-        )
-
-        # 重置普通模式显示
-        for pack_key, weight in normal_default.items():
-            if pack_key in self.normal_cards:
-                self.normal_cards[pack_key].update_weight(weight)
-
-        # 重置困难模式显示
-        for pack_key, weight in hard_default.items():
-            if pack_key in self.hard_cards:
-                self.hard_cards[pack_key].update_weight(weight)
-
-        # 标记有未保存的修改
+            # Reset specific floor overrides
+            if "floors" in self.config_data:
+                self.config_data["floors"].pop(f"floor_{self.current_floor}", None)
         self._has_unsaved_changes = True
+        self.reload_theme_packs()
+
+    def reset_current_floor(self):
+        """Reset the currently selected floor overrides to empty (fallback to global)."""
+        if self.current_floor is not None:
+            if "floors" in self.config_data:
+                self.config_data["floors"].pop(f"floor_{self.current_floor}", None)
+            self._has_unsaved_changes = True
+            self.reload_theme_packs()
 
     def set_to_global(self):
         """将当前配置设置为全局主题包配置（仅内存，不立即保存）。"""
@@ -916,9 +1097,7 @@ class ThemePackSettingDialog(FramelessDialog):
             normal_global = global_config.get("theme_pack_list", {})
             hard_global = global_config.get("theme_pack_list_hard", {})
 
-        self.preferred_threshold_spinbox.spin_box.setValue(
-            int(global_config.get("preferred_thresholds", 0))
-        )
+        self.preferred_threshold_spinbox.spin_box.setValue(int(global_config.get("preferred_thresholds", 0)))
 
         for pack_key, weight in normal_global.items():
             if pack_key in self.normal_cards:
@@ -989,9 +1168,7 @@ class ThemePackSettingDialog(FramelessDialog):
         if not self.is_team_specific:
             return
 
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, self.tr("导入主题包权重"), "", "YAML Files (*.yaml *.yml)"
-        )
+        file_path, _ = QFileDialog.getOpenFileName(self, self.tr("导入主题包权重"), "", "YAML Files (*.yaml *.yml)")
 
         if not file_path:
             return
@@ -1013,6 +1190,8 @@ class ThemePackSettingDialog(FramelessDialog):
             # 从文件重新加载配置数据
             self.config_data.clear()
             reloaded_config = theme_list.load_config(self.save_path)
+            # Update UI after reload
+            self.reload_theme_packs()
             self.config_data.update(copy.deepcopy(reloaded_config))
 
             # 更新界面以反映导入的数据
@@ -1023,9 +1202,7 @@ class ThemePackSettingDialog(FramelessDialog):
                 normal_imported = reloaded_config.get("theme_pack_list", {})
                 hard_imported = reloaded_config.get("theme_pack_list_hard", {})
 
-            self.preferred_threshold_spinbox.spin_box.setValue(
-                int(reloaded_config.get("preferred_thresholds", 0))
-            )
+            self.preferred_threshold_spinbox.spin_box.setValue(int(reloaded_config.get("preferred_thresholds", 0)))
 
             for pack_key, weight in normal_imported.items():
                 if pack_key in self.normal_cards:
@@ -1092,17 +1269,13 @@ class ThemePackSettingDialog(FramelessDialog):
         if not self.is_team_specific:
             return
         clipboard_text = QApplication.clipboard().text().strip()
-        dialog = MessageBoxEdit(
-            self.tr("导入配置码"), clipboard_text if clipboard_text else "", self
-        )
+        dialog = MessageBoxEdit(self.tr("导入配置码"), clipboard_text if clipboard_text else "", self)
         if not dialog.exec():
             return
         code = dialog.getText()
         if not code or not code.strip():
             return
-        confirm = MessageBoxConfirm(
-            self.tr("确认导入"), self.tr("导入将覆盖当前主题包权重设置"), self.window()
-        )
+        confirm = MessageBoxConfirm(self.tr("确认导入"), self.tr("导入将覆盖当前主题包权重设置"), self.window())
         if not confirm.exec():
             return
         team_num = self._extract_team_num_from_path()
@@ -1110,15 +1283,9 @@ class ThemePackSettingDialog(FramelessDialog):
             self.config_data.clear()
             reloaded = theme_list.load_config(self.save_path)
             self.config_data.update(copy.deepcopy(reloaded))
-            normal_imported = reloaded.get(
-                "theme_pack_list_cn" if self.is_cn else "theme_pack_list", {}
-            )
-            hard_imported = reloaded.get(
-                "theme_pack_list_hard_cn" if self.is_cn else "theme_pack_list_hard", {}
-            )
-            self.preferred_threshold_spinbox.spin_box.setValue(
-                int(reloaded.get("preferred_thresholds", 0))
-            )
+            normal_imported = reloaded.get("theme_pack_list_cn" if self.is_cn else "theme_pack_list", {})
+            hard_imported = reloaded.get("theme_pack_list_hard_cn" if self.is_cn else "theme_pack_list_hard", {})
+            self.preferred_threshold_spinbox.spin_box.setValue(int(reloaded.get("preferred_thresholds", 0)))
             for k, v in normal_imported.items():
                 if k in self.normal_cards:
                     self.normal_cards[k].update_weight(v)
@@ -1151,6 +1318,7 @@ class ThemePackSettingDialog(FramelessDialog):
         # save_path 必须提供
         if not self.save_path:
             return
+        # Save configuration, ensuring floor overrides are stored under 'floors' key
         theme_list.save_config(path=self.save_path, config_data=self.config_data)
         self._has_unsaved_changes = False
         self._is_save_and_close = True  # 标记是保存并关闭

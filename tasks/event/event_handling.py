@@ -142,7 +142,7 @@ def extract_levels(data):
             # 2. 尝试模糊匹配（允许一位错误或缺失）
             for level_str, level_name in fuzzy_match.items():
                 # 尝试不同长度的子串（原长度±1）
-                for sub_len in [len(level_str) - 1, len(level_str), len(level_str) + 1]:
+                for sub_len in (len(level_str) - 1, len(level_str), len(level_str) + 1):
                     if sub_len <= 0 or i + sub_len > len(s):
                         continue
 

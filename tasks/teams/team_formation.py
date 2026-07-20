@@ -4,6 +4,7 @@ from module.automation import auto
 from module.config import cfg
 from module.decorator.decorator import begin_and_finish_time_log
 from module.logger import log
+from module.game_and_screen import screen
 
 
 # 清队
@@ -80,32 +81,136 @@ def select_battle_team(num):
         my_position[1] += position[1]
         auto.mouse_click(my_position[0], my_position[1])
         sleep(0.5)
-        for _ in range(3):
-            auto.mouse_drag(
-                my_position[0], my_position[1], dy=1333 * scale, drag_time=0.3
-            )
-        sleep(0.75)
+
+        # screen imported at module level
+
+        def scroll_to_top(first_pos):
+            scroll_success = False
+            try:
+                # Use backend input handler (win32) only
+                input_type = auto.input_handler.__class__.__name__
+                if input_type == "BackgroundInput":
+                    import win32api
+                    import win32con
+                    import win32gui
+                    hwnd = screen.handle.hwnd
+                    # Convert logical position to screen coordinates
+                    screen_x, screen_y = win32gui.ClientToScreen(
+                        hwnd, (int(first_pos[0]), int(first_pos[1] + 150 * scale))
+                    )
+                    log.debug(f"尝试滚轮向上: hwnd={hwnd}, client_pos=({int(first_pos[0])}, {int(first_pos[1] + 150 * scale)}), screen_pos=({screen_x}, {screen_y})")
+                    
+                    # If game window is active, use win32api.mouse_event for reliable hardware wheel emulation
+                    if screen.handle.isActive:
+                        # Move physical cursor to target area to ensure Unity registers hover
+                        win32api.SetCursorPos((screen_x, screen_y))
+                        # Loop to send multiple small wheel events across frames (30 notches to fully scroll to top)
+                        for _ in range(30):
+                            win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, 120, 0)
+                            sleep(0.01)
+                        log.debug(f"前台系统滚轮向上完成: hwnd={hwnd}, notches=30")
+                        scroll_success = True
+                    else:
+                        # If game window is inactive, we try PostMessage but do not set scroll_success = True
+                        # to ensure that we still run the background drag fallback (which works unfocused)
+                        for _ in range(30):
+                            wparam = 120 << 16
+                            lparam = win32api.MAKELONG(screen_x, screen_y)
+                            win32api.PostMessage(hwnd, win32con.WM_MOUSEWHEEL, wparam, lparam)
+                            sleep(0.01)
+                        log.debug(f"后台WM_MOUSEWHEEL向上完成: hwnd={hwnd}, notches=30")
+                        scroll_success = False
+                else:
+                    raise RuntimeError("Non‑background input, fallback to drag")
+            except Exception as e:
+                log.warning(f"滚轮向上失败: {e}, 使用安全拖拽兜底")
+                scroll_success = False
+
+            if not scroll_success:
+                # Safe drag fallback
+                log.debug("使用安全范围拖拽滚动到顶部")
+                for _ in range(4):
+                    auto.mouse_drag(
+                        first_pos[0],
+                        first_pos[1],
+                        dy=250 * scale,
+                        drag_time=0.3,
+                    )
+                    sleep(0.2)
+
+        def scroll_down(first_pos, pages):
+            scroll_success = False
+            try:
+                input_type = auto.input_handler.__class__.__name__
+                if input_type == "BackgroundInput":
+                    import win32api
+                    import win32con
+                    import win32gui
+                    hwnd = screen.handle.hwnd
+                    screen_x, screen_y = win32gui.ClientToScreen(
+                        hwnd, (int(first_pos[0]), int(first_pos[1] + 150 * scale))
+                    )
+                    log.debug(f"尝试滚轮向下: hwnd={hwnd}, pages={pages}, client_pos=({int(first_pos[0])}, {int(first_pos[1] + 150 * scale)}), screen_pos=({screen_x}, {screen_y})")
+                    
+                    if screen.handle.isActive:
+                        # Move physical cursor to ensure hover
+                        win32api.SetCursorPos((screen_x, screen_y))
+                        # Loop to send multiple small wheel down events per page
+                        for _ in range(pages * 12):
+                            win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, -120, 0)
+                            sleep(0.01)
+                        log.debug(f"前台系统滚轮向下完成: hwnd={hwnd}, notches={pages * 12}")
+                        scroll_success = True
+                    else:
+                        # If game window is inactive, we try PostMessage but do not set scroll_success = True
+                        for _ in range(pages * 12):
+                            wparam = (-120 << 16) & 0xFFFFFFFF
+                            lparam = win32api.MAKELONG(screen_x, screen_y)
+                            win32api.PostMessage(hwnd, win32con.WM_MOUSEWHEEL, wparam, lparam)
+                            sleep(0.01)
+                        log.debug(f"后台WM_MOUSEWHEEL向下完成: hwnd={hwnd}, pages={pages}, notches={pages * 12}")
+                        scroll_success = False
+                else:
+                    raise RuntimeError("Non‑background input, fallback to drag")
+            except Exception as e:
+                log.warning(f"滚轮向下失败: {e}, 使用安全拖拽兜底")
+                scroll_success = False
+
+            if not scroll_success:
+                # Safe drag fallback
+                log.debug("使用安全范围拖拽向下滚动")
+                for _ in range(pages):
+                    auto.mouse_drag(
+                        first_pos[0],
+                        first_pos[1] + 375 * scale,
+                        dy=-375 * scale,
+                        drag_time=1.5,
+                    )
+                    sleep(1)
+
         first_position = [position[0], position[1] + 70 * scale]
+        scroll_to_top(first_position)
+        sleep(0.75)
+
         if cfg.select_team_by_order:
-            team_range = (num - 1) // 5
-            team_order = (num - 1) % 5
-            for _ in range(team_range):
-                auto.mouse_drag(
-                    first_position[0],
-                    first_position[1] + 375 * scale,
-                    dy=-375 * scale,
-                    drag_time=1.5,
-                )
-                sleep(1)
-            if num <= 15:
+            if num <= 7:
                 auto.mouse_click(
-                    first_position[0], first_position[1] + 75 * team_order * scale
+                    first_position[0], first_position[1] + 75 * (num - 1) * scale
                 )
             else:
-                auto.mouse_click(
-                    first_position[0],
-                    first_position[1] + 100 * scale + 75 * team_order * scale,
-                )
+                team_range = (num - 1) // 5
+                team_order = (num - 1) % 5
+                scroll_down(first_position, team_range)
+                sleep(0.75)
+                if num <= 15:
+                    auto.mouse_click(
+                        first_position[0], first_position[1] + 75 * team_order * scale
+                    )
+                else:
+                    auto.mouse_click(
+                        first_position[0],
+                        first_position[1] + 100 * scale + 75 * team_order * scale,
+                    )
             log.info(f"成功找到队伍 # {num}")
             sleep(1)
             return True

@@ -47,6 +47,7 @@ from qfluentwidgets import (
     TeachingTipTailPosition,
     TimePicker,
     setCustomStyleSheet,
+    ToolTipFilter,
 )
 
 from app.base_tools import *
@@ -1176,7 +1177,7 @@ class DailySettingCard(SwitchSettingCard):
         super().__init__(icon, title, content, config_name, parent)
         self.config_name = config_name
         self.autodaily_timepicker = TimePicker()
-        if self.config_name[-1] in ["2", "3", "4"]:
+        if self.config_name[-1] in ("2", "3", "4"):
             self.value_name = "autodaily_time" + self.config_name[-1]
         else:
             self.value_name = "autodaily_time"
@@ -1226,7 +1227,7 @@ class DailySettingCard(SwitchSettingCard):
 
         helper = ScheduleHelper()
         task_name = self.__autodaily_taskname()
-        if self.config_name[-1] in ["2", "3", "4"]:
+        if self.config_name[-1] in ("2", "3", "4"):
             task_name += self.config_name[-1]
 
         cfg.set_value(self.config_name, isChecked)
@@ -1248,7 +1249,7 @@ class DailySettingCard(SwitchSettingCard):
 
         helper = ScheduleHelper()
         task_name = self.__autodaily_taskname()
-        if self.config_name[-1] in ["2", "3", "4"]:
+        if self.config_name[-1] in ("2", "3", "4"):
             task_name += self.config_name[-1]
 
         cfg.set_value(self.value_name, time.toString("HH:mm"))
@@ -1500,7 +1501,7 @@ class HotketInputCard(MessageBox):
         key_name = QKeySequence(key).toString().lower()
         if key_name in self.SHIFT_KEYS:
             key_name = self.SHIFT_KEYS[key_name]
-        if key_name and key_name not in [
+        if key_name and key_name not in (
             "control",
             "alt",
             "shift",
@@ -1510,7 +1511,7 @@ class HotketInputCard(MessageBox):
             "pgup",
             "pgdown",
             "capslock",
-        ]:
+        ):
             if len(key_name) > 1:
                 key_parts.append(f"<{key_name.lower()}>")
             else:
@@ -1660,7 +1661,9 @@ class ObserveGiftSelectionRow(QFrame):
         self.row_combo.setFixedWidth(90)
         self.col_combo.setFixedWidth(90)
         self.remove_button.setFixedWidth(34)
+        self.remove_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.remove_button.setToolTip(self.tr("移除或清空当前控件组"))
+        self.remove_button.installEventFilter(ToolTipFilter(self.remove_button, showDelay=0))
 
         self._init_group_layout(self.system_group, self.system_label, self.system_combo)
         self._init_group_layout(self.level_group, self.level_label, self.level_combo)

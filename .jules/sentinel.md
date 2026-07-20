@@ -14,3 +14,7 @@
 **Vulnerability:** Network requests made using `requests.get()` without a `timeout` parameter can hang indefinitely if the remote server is unresponsive, leading to resource exhaustion or application lock-up.
 **Learning:** Even for simple JSON fetches or file downloads, omitting the `timeout` parameter creates a Denial of Service (DoS) risk, as default behavior blocks indefinitely. This was observed in `app/announcement_board.py` and `module/automation/input_handlers/simulator/pyminitouch/utils.py`.
 **Prevention:** Always specify a `timeout` (e.g., `timeout=10`) for all external network calls using the `requests` library.
+## 2024-06-13 - [Missing Timeout on External Network Requests]
+**Vulnerability:** External requests in automation scripts (e.g. `requests.get` in `pyminitouch/utils.py`) lack a configured `timeout` parameter, which can cause the process to hang indefinitely if the remote server fails to respond, leading to a Denial of Service.
+**Learning:** In utility functions dealing with downloading payloads/files, implicit infinite timeouts are a silent risk that can completely break long-running automation pipelines.
+**Prevention:** Always enforce a `timeout` argument on `requests.get`, `requests.post`, and similar networking functions.
