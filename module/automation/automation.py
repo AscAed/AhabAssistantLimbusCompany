@@ -993,6 +993,7 @@ class GameState:
     THEME_PACK = "THEME_PACK"
     EGO_GIFT_SELECT = "EGO_GIFT_SELECT"
     CLAIM_REWARD = "CLAIM_REWARD"
+    MIRROR_TEAM_SELECT = "MIRROR_TEAM_SELECT"
     UNKNOWN = "UNKNOWN"
 
 
@@ -1017,6 +1018,10 @@ class PageStateDispatcher:
             self.auto.find_element("battle/win_rate_card.png") or
             self.auto.find_element("battle/turn_assets.png")):
             return GameState.BATTLE
+
+        if (self.auto.find_element("mirror/road_to_mir/select_team_stars_assets.png") or
+            self.auto.find_element("mirror/road_to_mir/select_team_confirm_assets.png")):
+            return GameState.MIRROR_TEAM_SELECT
 
         if self.auto.find_element("teams/identify_assets.png"):
             return GameState.BATTLE_FORMATION

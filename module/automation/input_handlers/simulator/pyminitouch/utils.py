@@ -15,6 +15,7 @@ def str2byte(content):
 
 def download_file(target_url):
     """download file to temp path, and return its file path for further usage"""
+    # 🛡️ Sentinel: Add timeout to prevent infinite hang (DoS risk)
     resp = requests.get(target_url, timeout=10)
     with tempfile.NamedTemporaryFile("wb+", delete=False) as f:
         file_name = f.name
