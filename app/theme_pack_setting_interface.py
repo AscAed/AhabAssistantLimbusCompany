@@ -379,6 +379,11 @@ class ThemePackCard(QFrame):
         self.reset_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.reset_btn.setToolTip(self.tr("撤销覆盖"))
         self.reset_btn.installEventFilter(ToolTipFilter(self.reset_btn, showDelay=300, position=ToolTipPosition.BOTTOM))
+        self.reset_btn.installEventFilter(
+            ToolTipFilter(
+                self.reset_btn, showDelay=0, position=ToolTipPosition.BOTTOM
+            )
+        )
         self.reset_btn.setVisible(False)
         self.reset_btn.clicked.connect(self._on_reset_clicked)
 
