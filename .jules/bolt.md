@@ -16,3 +16,7 @@
 ## 2025-03-05 - Avoid np.linalg.norm in tight loops
 **Learning:** `np.linalg.norm` is slow in python tight loops (like connected component clustering) because it implicitly creates and handles small `np.array` differences causing memory allocation overhead.
 **Action:** Replace `np.linalg.norm(a - b) <= max_dist` with squared Euclidean distance math directly on coordinate indexes like `(a[0]-b[0])**2 + (a[1]-b[1])**2 <= max_dist**2`. It's O(1) inside an O(n) array iteration and prevents numpy instantiation overhead.
+
+## 2025-03-05 - Avoid np.linalg.norm in simulator input loops
+**Learning:** `np.linalg.norm` is extremely slow in python tight loops (like Bezier curve generation for input simulation) because it implicitly creates and handles small `np.array` differences, causing significant memory allocation overhead.
+**Action:** Replace `np.linalg.norm(a - b) <= max_dist` with squared Euclidean distance math directly on coordinate indexes like `(a[0]-b[0])**2 + (a[1]-b[1])**2 <= max_dist**2`. It's O(1) inside an O(n) array iteration and prevents numpy instantiation overhead.
