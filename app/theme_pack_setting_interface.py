@@ -300,9 +300,7 @@ class ThemePackCard(QFrame):
 
     weight_changed = Signal(str, int, bool, bool)  # pack_key, weight, is_hard, is_cn
 
-    def __init__(
-        self, pack_key: str, weight: int, is_hard=False, is_cn=False, parent=None
-    ):
+    def __init__(self, pack_key: str, weight: int, is_hard=False, is_cn=False, parent=None):
         super().__init__(parent)
         self.pack_key = str(pack_key)  # 确保是字符串，与 Signal 声明一致
         self.is_hard = is_hard
@@ -325,9 +323,7 @@ class ThemePackCard(QFrame):
 
         # 图片标签 - 根据原始图片分辨率 170x330 按比例缩放
         self.image_label = QLabel(self)
-        self.image_label.setFixedSize(
-            140, 272
-        )  # 保持 170:330 原始比例 (140*330/170≈272)
+        self.image_label.setFixedSize(140, 272)  # 保持 170:330 原始比例 (140*330/170≈272)
         self.image_label.setScaledContents(True)
         self.image_label.setAlignment(Qt.AlignCenter)
 
@@ -339,14 +335,10 @@ class ThemePackCard(QFrame):
                 self.image_label.setPixmap(pixmap)
             else:
                 self.image_label.setText(self.tr("无图片"))
-                self.image_label.setStyleSheet(
-                    "background-color: rgba(128, 128, 128, 0.3); border-radius: 5px;"
-                )
+                self.image_label.setStyleSheet("background-color: rgba(128, 128, 128, 0.3); border-radius: 5px;")
         else:
             self.image_label.setText(self.tr("无图片"))
-            self.image_label.setStyleSheet(
-                "background-color: rgba(128, 128, 128, 0.3); border-radius: 5px;"
-            )
+            self.image_label.setStyleSheet("background-color: rgba(128, 128, 128, 0.3); border-radius: 5px;")
 
         # 主题包名称标签
         self.name_label = TitleLabel()
@@ -470,9 +462,7 @@ class ThemePackCard(QFrame):
     def cleanup(self):
         """清理资源，断开信号连接"""
         try:
-            self.weight_spinbox.spin_box.valueChanged.disconnect(
-                self._on_weight_changed
-            )
+            self.weight_spinbox.spin_box.valueChanged.disconnect(self._on_weight_changed)
         except (RuntimeError, TypeError):
             pass  # 信号可能已经被断开或对象已被销毁
 
@@ -557,17 +547,11 @@ class ThemePackSettingDialog(FramelessDialog):
         self.threshold_layout.setSpacing(8)
 
         self.threshold_label = BodyLabel(self.tr("优选阈值"), self.threshold_widget)
-        self.preferred_threshold_spinbox = BaseSpinBox(
-            None, parent=self.threshold_widget, min_value=-10, min_step=1
-        )
+        self.preferred_threshold_spinbox = BaseSpinBox(None, parent=self.threshold_widget, min_value=-10, min_step=1)
         self.preferred_threshold_spinbox.spin_box.setRange(-10, 10)
         self.preferred_threshold_spinbox.spin_box.setAlignment(Qt.AlignCenter)
-        self.preferred_threshold_spinbox.spin_box.setValue(
-            int(self.config_data.get("preferred_thresholds", 0))
-        )
-        self.preferred_threshold_spinbox.spin_box.valueChanged.connect(
-            self._on_preferred_threshold_changed
-        )
+        self.preferred_threshold_spinbox.spin_box.setValue(int(self.config_data.get("preferred_thresholds", 0)))
+        self.preferred_threshold_spinbox.spin_box.valueChanged.connect(self._on_preferred_threshold_changed)
 
         self.threshold_layout.addStretch()
         self.threshold_layout.addWidget(self.threshold_label)
@@ -598,6 +582,7 @@ class ThemePackSettingDialog(FramelessDialog):
         # 批量操作下拉菜单按钮
         self.batch_menu_button = DropDownPushButton(self.tr("批量操作"), self)
         self.batch_menu_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.batch_menu_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.batch_menu = RoundMenu(parent=self)
 
         self.reset_action = Action(FIF.SYNC, self.tr("重置为默认"))
@@ -615,39 +600,43 @@ class ThemePackSettingDialog(FramelessDialog):
         self.batch_menu_button.setMenu(self.batch_menu)
 
         # 连接以向上显示菜单
-        self.batch_menu_button.clicked.connect(
-            lambda: self._show_menu_upward(self.batch_menu_button, self.batch_menu)
-        )
+        self.batch_menu_button.clicked.connect(lambda: self._show_menu_upward(self.batch_menu_button, self.batch_menu))
 
         # 导入导出按钮（仅队伍特定配置显示）
         self.export_button = PushButton(FIF.UP, self.tr("导出"))
         self.export_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.export_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.export_button.clicked.connect(self.on_export_settings)
         self.export_button.setVisible(self.is_team_specific)
 
         self.import_button = PushButton(FIF.DOWN, self.tr("导入"))
         self.import_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.import_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.import_button.clicked.connect(self.on_import_settings)
         self.import_button.setVisible(self.is_team_specific)
 
         # 配置码导入导出按钮
         self.copy_code_button = PushButton(FIF.SHARE, self.tr("导出配置码"))
         self.copy_code_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.copy_code_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.copy_code_button.clicked.connect(self.on_export_code)
         self.copy_code_button.setVisible(self.is_team_specific)
 
         self.paste_code_button = PushButton(FIF.EDIT, self.tr("导入配置码"))
         self.paste_code_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.paste_code_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.paste_code_button.clicked.connect(self.on_import_code)
         self.paste_code_button.setVisible(self.is_team_specific)
 
         # 主要操作按钮
         self.save_button = PrimaryPushButton(self.tr("保存并关闭"), self)
         self.save_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.save_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.save_button.clicked.connect(self.save_and_close)
 
         self.close_button = PushButton(self.tr("关闭"), self)
         self.close_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.close_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.close_button.clicked.connect(self.close)
 
         self.button_layout.addWidget(self.batch_menu_button)
@@ -720,15 +709,9 @@ class ThemePackSettingDialog(FramelessDialog):
             f"QLabel {{ background: transparent; font-size: 13px; padding: 0 4px; color: {text_color}; }}"
         )
         for btn in (self.titleBar.minBtn, self.titleBar.maxBtn, self.titleBar.closeBtn):
-            btn.setNormalColor(
-                Qt.GlobalColor.white if isDarkTheme() else Qt.GlobalColor.black
-            )
-            btn.setHoverColor(
-                Qt.GlobalColor.white if isDarkTheme() else Qt.GlobalColor.black
-            )
-            btn.setPressedColor(
-                Qt.GlobalColor.white if isDarkTheme() else Qt.GlobalColor.black
-            )
+            btn.setNormalColor(Qt.GlobalColor.white if isDarkTheme() else Qt.GlobalColor.black)
+            btn.setHoverColor(Qt.GlobalColor.white if isDarkTheme() else Qt.GlobalColor.black)
+            btn.setPressedColor(Qt.GlobalColor.white if isDarkTheme() else Qt.GlobalColor.black)
         self.titleBar.closeBtn.setHoverColor(Qt.GlobalColor.white)
 
         # 直接设置各内容区域的背景色
@@ -880,9 +863,7 @@ class ThemePackSettingDialog(FramelessDialog):
             normal_default = example_config.get("theme_pack_list", {})
             hard_default = example_config.get("theme_pack_list_hard", {})
 
-        self.preferred_threshold_spinbox.spin_box.setValue(
-            int(example_config.get("preferred_thresholds", 0))
-        )
+        self.preferred_threshold_spinbox.spin_box.setValue(int(example_config.get("preferred_thresholds", 0)))
 
         # 重置普通模式显示
         for pack_key, weight in normal_default.items():
@@ -916,9 +897,7 @@ class ThemePackSettingDialog(FramelessDialog):
             normal_global = global_config.get("theme_pack_list", {})
             hard_global = global_config.get("theme_pack_list_hard", {})
 
-        self.preferred_threshold_spinbox.spin_box.setValue(
-            int(global_config.get("preferred_thresholds", 0))
-        )
+        self.preferred_threshold_spinbox.spin_box.setValue(int(global_config.get("preferred_thresholds", 0)))
 
         for pack_key, weight in normal_global.items():
             if pack_key in self.normal_cards:
@@ -989,9 +968,7 @@ class ThemePackSettingDialog(FramelessDialog):
         if not self.is_team_specific:
             return
 
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, self.tr("导入主题包权重"), "", "YAML Files (*.yaml *.yml)"
-        )
+        file_path, _ = QFileDialog.getOpenFileName(self, self.tr("导入主题包权重"), "", "YAML Files (*.yaml *.yml)")
 
         if not file_path:
             return
@@ -1023,9 +1000,7 @@ class ThemePackSettingDialog(FramelessDialog):
                 normal_imported = reloaded_config.get("theme_pack_list", {})
                 hard_imported = reloaded_config.get("theme_pack_list_hard", {})
 
-            self.preferred_threshold_spinbox.spin_box.setValue(
-                int(reloaded_config.get("preferred_thresholds", 0))
-            )
+            self.preferred_threshold_spinbox.spin_box.setValue(int(reloaded_config.get("preferred_thresholds", 0)))
 
             for pack_key, weight in normal_imported.items():
                 if pack_key in self.normal_cards:
@@ -1092,17 +1067,13 @@ class ThemePackSettingDialog(FramelessDialog):
         if not self.is_team_specific:
             return
         clipboard_text = QApplication.clipboard().text().strip()
-        dialog = MessageBoxEdit(
-            self.tr("导入配置码"), clipboard_text if clipboard_text else "", self
-        )
+        dialog = MessageBoxEdit(self.tr("导入配置码"), clipboard_text if clipboard_text else "", self)
         if not dialog.exec():
             return
         code = dialog.getText()
         if not code or not code.strip():
             return
-        confirm = MessageBoxConfirm(
-            self.tr("确认导入"), self.tr("导入将覆盖当前主题包权重设置"), self.window()
-        )
+        confirm = MessageBoxConfirm(self.tr("确认导入"), self.tr("导入将覆盖当前主题包权重设置"), self.window())
         if not confirm.exec():
             return
         team_num = self._extract_team_num_from_path()
@@ -1110,15 +1081,9 @@ class ThemePackSettingDialog(FramelessDialog):
             self.config_data.clear()
             reloaded = theme_list.load_config(self.save_path)
             self.config_data.update(copy.deepcopy(reloaded))
-            normal_imported = reloaded.get(
-                "theme_pack_list_cn" if self.is_cn else "theme_pack_list", {}
-            )
-            hard_imported = reloaded.get(
-                "theme_pack_list_hard_cn" if self.is_cn else "theme_pack_list_hard", {}
-            )
-            self.preferred_threshold_spinbox.spin_box.setValue(
-                int(reloaded.get("preferred_thresholds", 0))
-            )
+            normal_imported = reloaded.get("theme_pack_list_cn" if self.is_cn else "theme_pack_list", {})
+            hard_imported = reloaded.get("theme_pack_list_hard_cn" if self.is_cn else "theme_pack_list_hard", {})
+            self.preferred_threshold_spinbox.spin_box.setValue(int(reloaded.get("preferred_thresholds", 0)))
             for k, v in normal_imported.items():
                 if k in self.normal_cards:
                     self.normal_cards[k].update_weight(v)
