@@ -19,3 +19,7 @@
 ## 2023-10-27 - [Scalar Distance Optimization]
 **Learning:** Python-to-C API calls (`np.subtract`, `np.linalg.norm`) on tiny 2-element lists inside a `for` loop have significant overhead compared to raw arithmetic.
 **Action:** Use scalar distance (`(x1-x2)**2 + (y1-y2)**2 < threshold**2`) in coordinate processing loops to bypass NumPy allocation overhead.
+
+## 2026-07-21 - Avoid Multiple Screenshots in UI Automation Polling
+**Learning:** Sequential `auto.find_element()` calls across a block of elements (e.g. searching for very_high to very_low buttons) will capture a new screenshot each time, causing massive I/O overhead.
+**Action:** Take one screenshot manually before the loop (`auto.take_screenshot()`), then pass `take_screenshot=False` to all subsequent `find_element` calls using that frame to dramatically speed up the check sequence.
