@@ -4,3 +4,6 @@
 ## 2024-03-24 - Qt Event Filters in Refresh Loops
 **Learning:** Avoid installing event filters (like `ToolTipFilter` in `qfluentwidgets`) inside dynamic UI update loops (e.g., `_refresh_preview`). Qt appends rather than overwrites event filters, leading to memory leaks and duplicated events on the same widget.
 **Action:** Always install event filters once during widget initialization (`__init__`) and only update properties (like `setToolTip()`) during dynamic refreshes.
+## 2024-07-20 - [Affordance and Tooltips for Small Buttons in qfluentwidgets]
+**Learning:** When adding icon-only or small buttons (like `TransparentToolButton`) in PySide6 with `qfluentwidgets`, they do not get clear hover cursor affordance or nice accessible tooltips automatically just from `setToolTip`. Qt appends event filters, so they must be installed carefully.
+**Action:** Explicitly set `Qt.CursorShape.PointingHandCursor` for visual affordance, and install a `ToolTipFilter(btn, showDelay=0, position=ToolTipPosition.BOTTOM)` to render accessible, readable tooltips.

@@ -445,6 +445,13 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         scale = cfg.set_win_size / 1080
         self.set_active()
         rx, ry = self._randomize_coords(x, y)
+        
+        is_active = screen.handle.isActive
+        client_rect = screen.handle.rect() if is_active else None
+
+        if is_active and client_rect:
+            win32api.SetCursorPos((client_rect[0] + rx, client_rect[1] + ry))
+        
         self._post_bezier_move(rx, ry)
         self.mouse_down(rx, ry)
         end_y = ry + int(300 * scale * reverse)
@@ -453,6 +460,8 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         hwnd = screen.handle.hwnd
         step_time = 0.4 / max(1, len(path))
         for px, py in path:
+            if is_active and client_rect:
+                win32api.SetCursorPos((client_rect[0] + px, client_rect[1] + py))
             if self.driver:
                 self.driver.mouse_move(px, py)
             else:
@@ -466,6 +475,9 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
             
         self.last_x = rx
         self.last_y = end_y
+        
+        if is_active and client_rect:
+            win32api.SetCursorPos((client_rect[0] + rx, client_rect[1] + end_y))
         self.mouse_up(rx, end_y)
 
         if move_back and current_mouse_position:
@@ -485,6 +497,13 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
             current_mouse_position = self.get_mouse_position()
         self.set_active()
         rx, ry = self._randomize_coords(x, y)
+        
+        is_active = screen.handle.isActive
+        client_rect = screen.handle.rect() if is_active else None
+
+        if is_active and client_rect:
+            win32api.SetCursorPos((client_rect[0] + rx, client_rect[1] + ry))
+            
         self._post_bezier_move(rx, ry)
         self.mouse_down(rx, ry)
 
@@ -493,6 +512,8 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         hwnd = screen.handle.hwnd
         step_time = drag_time / max(1, len(path))
         for px, py in path:
+            if is_active and client_rect:
+                win32api.SetCursorPos((client_rect[0] + px, client_rect[1] + py))
             if self.driver:
                 self.driver.mouse_move(px, py)
             else:
@@ -508,6 +529,9 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         self.last_y = end_y
         # 注入随机拖拽延迟
         sleep(humanised_delay(drag_time * 0.3 if drag_time * 0.3 > 0.2 else 0.2, "gaussian"))
+        
+        if is_active and client_rect:
+            win32api.SetCursorPos((client_rect[0] + end_x, client_rect[1] + end_y))
         self.mouse_up(end_x, end_y)
 
         if move_back and current_mouse_position:

@@ -54,6 +54,7 @@ def insert_swipe(p0, p3, speed=15, min_distance=10):
     # Generate cubic Bézier curve
     points = []
     prev = (-100, -100)
+    # ⚡ Bolt: Replace np.linalg.norm with squared Euclidean distance to avoid numpy allocation overhead
     min_dist_sq = min_distance ** 2
     for t in ts:
         point = (
@@ -64,6 +65,8 @@ def insert_swipe(p0, p3, speed=15, min_distance=10):
         )
         point = point.astype(int).tolist()
         # ⚡ Bolt: Replace np.linalg.norm with squared Euclidean distance to avoid numpy allocation overhead in tight loop
+        # ⚡ Bolt: Replace np.linalg.norm with squared distance for O(n) performance improvement avoiding numpy allocations
+        if (point[0] - prev[0]) ** 2 + (point[1] - prev[1]) ** 2 < min_dist_sq:
         if (point[0] - prev[0])**2 + (point[1] - prev[1])**2 < min_dist_sq:
             continue
 
@@ -79,6 +82,15 @@ def insert_swipe(p0, p3, speed=15, min_distance=10):
             if (p[0] - p0_list[0])**2 + (p[1] - p0_list[1])**2 >= min_dist_sq:
                 filtered_points.append(p)
         points = filtered_points
+    # ⚡ Bolt: Replace np.linalg.norm array operations with python loop over squared distance to avoid numpy object overhead
+    if len(points) > 1:
+        new_points = [points[0]]
+        p_start = points[0]
+        for p in points[1:]:
+            if (p[0] - p_start[0])**2 + (p[1] - p_start[1])**2 > min_dist_sq:
+                new_points.append(p)
+        points = new_points
+
         if len(points) <= 1:
             points = [p0.tolist(), p3.tolist()]
     else:
