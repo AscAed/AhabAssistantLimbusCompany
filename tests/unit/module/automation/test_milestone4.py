@@ -157,7 +157,7 @@ def test_identify_nodes_roi(mock_onnx, mock_blob, mock_cfg, mock_auto):
     # Center = (320, 320), size = (40, 40), conf of class 5 (shop) = 0.9
     mock_output = np.zeros((1, 11, 25200))
     mock_output[0, :4, 0] = [320, 320, 40, 40]
-    mock_output[0, 9, 0] = 0.9 # index 5 (shop) class score
+    mock_output[0, 9, 0] = 0.9 # index 5 (shop) class score. 4 (box) + 5 (class index) = 9.
     mock_session.run.return_value = [mock_output]
     mock_onnx.return_value = mock_session
     
