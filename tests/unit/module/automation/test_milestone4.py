@@ -106,6 +106,8 @@ def test_select_observe_ego_gift(mock_image_utils, mock_cfg, mock_auto, mock_tea
     
     # Verify click was made near (500, 380)
     mock_auto.mouse_click.assert_any_call(500, 380)
+    # Check that system tab is clicked directly
+    mock_auto.mouse_click.assert_any_call(310, 100)
 
 @patch("tasks.mirror.mirror.auto")
 @patch("tasks.mirror.mirror.cfg")
@@ -136,16 +138,9 @@ def test_select_observe_ego_gift_bleed_fallback(mock_image_utils, mock_cfg, mock
     # Verify click was made near (500, 380) for the gift selection
     mock_auto.mouse_click.assert_any_call(500, 380)
     
-    # And check that the system tabs are clicked correctly using the fallback benchmark point (200, 100)
+    # Check that the system tab is clicked directly using the fallback benchmark point (200, 100)
     # bleed index = 1 in observe_system
-    # system_index is determined by: [k for k, v in observe_system.items() if v == file_system][0]
-    # for 'bleed', it is index 1.
-    # So click positions should be:
-    # 1. benchmark_point[0] + 110 * (system_index + 1) * my_scale -> 200 + 110 * 2 = 420
-    # 2. benchmark_point[0] + 110 * (system_index - 1) * my_scale -> 200 + 110 * 0 = 200
-    # 3. benchmark_point[0] + 110 * system_index * my_scale -> 200 + 110 * 1 = 310
-    mock_auto.mouse_click.assert_any_call(420, 100)
-    mock_auto.mouse_click.assert_any_call(200, 100)
+    # So click position should be benchmark_point[0] + 110 * system_index * my_scale -> 200 + 110 * 1 = 310
     mock_auto.mouse_click.assert_any_call(310, 100)
 
 @patch("tasks.mirror.search_road.auto")
@@ -162,7 +157,7 @@ def test_identify_nodes_roi(mock_onnx, mock_blob, mock_cfg, mock_auto):
     # Center = (320, 320), size = (40, 40), conf of class 5 (shop) = 0.9
     mock_output = np.zeros((1, 11, 25200))
     mock_output[0, :4, 0] = [320, 320, 40, 40]
-    mock_output[0, 9, 0] = 0.9 # index 5 (shop) class score
+    mock_output[0, 9, 0] = 0.9 # index 5 (shop) class score. 4 (box) + 5 (class index) = 9.
     mock_session.run.return_value = [mock_output]
     mock_onnx.return_value = mock_session
     
