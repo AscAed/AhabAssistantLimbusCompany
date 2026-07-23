@@ -66,8 +66,8 @@ class MNTInstaller(object):
             # adbutils 会自动处理流传输
             device.sync.push(local_path, remote_path)
 
-            # 授权 (chmod 777)
-            device.shell(["chmod", "777", remote_path])
+            # 授权 (chmod 755 - Principle of Least Privilege to prevent over-permissive file access vulnerabilities)
+            device.shell(["chmod", "755", remote_path])
 
     def get_abi(self):
         # 1. 获取设备对象
@@ -120,9 +120,7 @@ class MNTServer(object):
 
         # make sure it's up
         time.sleep(1)
-        assert (
-            self.heartbeat()
-        ), "minitouch did not work. see https://github.com/williamfzc/pyminitouch/issues/11"
+        assert self.heartbeat(), "minitouch did not work. see https://github.com/williamfzc/pyminitouch/issues/11"
 
     def stop(self):
         """停止服务并清理资源"""
@@ -226,9 +224,7 @@ class MNTConnection(object):
 
         log.debug("在端口上运行的 Minitouch：{}，PID：{}".format(self.port, self.pid))
         log.debug(
-            "max_contact: {}; max_x: {}; max_y: {}; max_pressure: {}".format(
-                max_contacts, max_x, max_y, max_pressure
-            )
+            "max_contact: {}; max_x: {}; max_y: {}; max_pressure: {}".format(max_contacts, max_x, max_y, max_pressure)
         )
 
     def disconnect(self):
