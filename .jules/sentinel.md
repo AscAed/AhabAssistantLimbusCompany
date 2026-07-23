@@ -18,3 +18,7 @@
 **Vulnerability:** External requests in automation scripts (e.g. `requests.get` in `pyminitouch/utils.py`) lack a configured `timeout` parameter, which can cause the process to hang indefinitely if the remote server fails to respond, leading to a Denial of Service.
 **Learning:** In utility functions dealing with downloading payloads/files, implicit infinite timeouts are a silent risk that can completely break long-running automation pipelines.
 **Prevention:** Always enforce a `timeout` argument on `requests.get`, `requests.post`, and similar networking functions.
+## 2025-02-21 - [Missing Timeout on urllib.request.urlopen]
+**Vulnerability:** Similar to `requests.get`, `urllib.request.urlopen()` calls without a `timeout` parameter will hang indefinitely if the remote server fails to respond, potentially causing the CI build process to deadlock.
+**Learning:** This vulnerability is easy to miss when auditing third-party libraries (like `requests`), as developers might fall back on built-in standard library tools like `urllib` without realizing they share the exact same default behavior of infinite timeouts.
+**Prevention:** Always explicitly define a `timeout` parameter (e.g., `timeout=10`) when using `urllib.request.urlopen` or any other built-in HTTP request function, in addition to third-party libraries.
