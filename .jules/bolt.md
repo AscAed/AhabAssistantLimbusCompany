@@ -23,3 +23,7 @@
 ## 2023-10-27 - [Scalar Distance Optimization]
 **Learning:** Python-to-C API calls (`np.subtract`, `np.linalg.norm`) on tiny 2-element lists inside a `for` loop have significant overhead compared to raw arithmetic.
 **Action:** Use scalar distance (`(x1-x2)**2 + (y1-y2)**2 < threshold**2`) in coordinate processing loops to bypass NumPy allocation overhead.
+
+## 2025-02-18 - [Vectorize Image Matching Filtering]
+**Learning:** In `match_template_with_multiple_targets`, extracting matching coordinates via `np.where(res >= threshold)`, immediately zipping into Python tuples, and sorting with `sorted(points, key=lambda x: res[x[1], x[0]])` is incredibly slow for large match counts. The overhead of looking up values in the `res` NumPy array from within a Python lambda function per-item causes severe performance bottlenecks.
+**Action:** Always use vectorized NumPy operations for filtering and sorting arrays before converting them to Python data structures. Use `y, x = (res >= threshold).nonzero()`, `scores = res[y, x]`, and `idx = np.argsort(scores)[::-1]` to sort coordinates directly in C, providing massive speedups for UI template matching.
