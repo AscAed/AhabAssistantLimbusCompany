@@ -19,3 +19,7 @@
 ## 2023-10-27 - [Scalar Distance Optimization]
 **Learning:** Python-to-C API calls (`np.subtract`, `np.linalg.norm`) on tiny 2-element lists inside a `for` loop have significant overhead compared to raw arithmetic.
 **Action:** Use scalar distance (`(x1-x2)**2 + (y1-y2)**2 < threshold**2`) in coordinate processing loops to bypass NumPy allocation overhead.
+
+## 2025-03-05 - Fast multi-target image point sorting
+**Learning:** Sorting an array of extracted tuples `sorted(points, key=lambda x: res[x[1], x[0]])` is very slow when there are many points, due to python lambda overhead and numpy single-element array lookup.
+**Action:** Use vectorized sorting: `scores = res[loc]; sort_idx = np.argsort(scores)[::-1]` and `.tolist()` on the arrays before zipping `list(zip(loc_x[sort_idx].tolist(), loc_y[sort_idx].tolist()))` for a ~4x speedup.
