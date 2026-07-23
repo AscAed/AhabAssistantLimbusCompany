@@ -7,3 +7,6 @@
 ## 2024-07-20 - [Affordance and Tooltips for Small Buttons in qfluentwidgets]
 **Learning:** When adding icon-only or small buttons (like `TransparentToolButton`) in PySide6 with `qfluentwidgets`, they do not get clear hover cursor affordance or nice accessible tooltips automatically just from `setToolTip`. Qt appends event filters, so they must be installed carefully.
 **Action:** Explicitly set `Qt.CursorShape.PointingHandCursor` for visual affordance, and install a `ToolTipFilter(btn, showDelay=0, position=ToolTipPosition.BOTTOM)` to render accessible, readable tooltips.
+## 2024-07-21 - [Icon-Only Button Affordance in team_setting_card.py]
+**Learning:** Icon-only hint buttons (like `preview_hint_button` using `ToolButton`) need a `PointingHandCursor` rather than an `ArrowCursor` to communicate to users that the element can be interacted with, especially since tooltips require hovering to discover.
+**Action:** Always verify that small hint/info tool buttons have `Qt.CursorShape.PointingHandCursor` set explicitly when built using qfluentwidgets or PySide6 components.

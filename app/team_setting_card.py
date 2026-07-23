@@ -1317,6 +1317,7 @@ class ObserveEgoGiftModule(QFrame):
 
         self.preview_hint_button = ToolButton(FIF.INFO, self.selected_preview_widget)
         self.preview_hint_button.setFixedSize(32, 32)
+        self.preview_hint_button.setCursor(Qt.PointingHandCursor)
         self.preview_hint_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.preview_hint_button.setToolTip(self._preview_hint_tooltip())
         self.preview_hint_button.installEventFilter(
