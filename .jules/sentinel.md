@@ -22,3 +22,8 @@
 **Vulnerability:** Similar to `requests.get`, `urllib.request.urlopen()` calls without a `timeout` parameter will hang indefinitely if the remote server fails to respond, potentially causing the CI build process to deadlock.
 **Learning:** This vulnerability is easy to miss when auditing third-party libraries (like `requests`), as developers might fall back on built-in standard library tools like `urllib` without realizing they share the exact same default behavior of infinite timeouts.
 **Prevention:** Always explicitly define a `timeout` parameter (e.g., `timeout=10`) when using `urllib.request.urlopen` or any other built-in HTTP request function, in addition to third-party libraries.
+
+## 2025-02-21 - [Over-permissive File Access via ADB Push]
+**Vulnerability:** Pushing executables (like `minitouch`) via ADB and granting them full `chmod 777` permissions creates a severe security risk by allowing any user or process on the Android device to read, write, and execute the file.
+**Learning:** Hardcoding `chmod 777` is a common shortcut for developers to ensure executables run smoothly on devices without dealing with permission complexities. However, it violates the Principle of Least Privilege and can lead to tampering or execution of malicious code by unauthorized processes.
+**Prevention:** Always enforce the Principle of Least Privilege by using `chmod 755` when granting execution permissions to files pushed to Android devices, limiting write access to the file owner.
