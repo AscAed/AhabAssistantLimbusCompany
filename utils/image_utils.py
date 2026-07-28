@@ -267,12 +267,12 @@ class ImageUtils:
         # 使用matchTemplate对图片进行模板匹配
         res = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
         # 遍历所有超过阈值的区域
-        loc = np.where(res >= threshold)
-        points = zip(*loc[::-1])
-        # 对匹配结果进行排序，根据匹配度得分从高到低
-        sorted_points = sorted(points, key=lambda x: res[x[1], x[0]], reverse=True)
-        # 遍历排序后的匹配位置
-        if sorted_points:
+        loc_y, loc_x = np.where(res >= threshold)
+        if len(loc_y) > 0:
+            # ⚡ Bolt: Use vectorized np.argsort instead of sorted() with lambda for O(n) array lookups
+            scores = res[loc_y, loc_x]
+            sorted_indices = np.argsort(scores)[::-1]
+            sorted_points = list(zip(loc_x[sorted_indices].tolist(), loc_y[sorted_indices].tolist()))
             min_dist_sq = min_dist ** 2
             for pt in sorted_points:
                 # 检查当前匹配点是否与已保留的匹配点太近

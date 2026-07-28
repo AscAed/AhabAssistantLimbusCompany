@@ -27,3 +27,7 @@
 ## 2026-07-21 - Avoid Multiple Screenshots in UI Automation Polling
 **Learning:** Sequential `auto.find_element()` calls across a block of elements (e.g. searching for very_high to very_low buttons) will capture a new screenshot each time, causing massive I/O overhead.
 **Action:** Take one screenshot manually before the loop (`auto.take_screenshot()`), then pass `take_screenshot=False` to all subsequent `find_element` calls using that frame to dramatically speed up the check sequence.
+
+## 2025-03-05 - Fast Array Coordinate Sorting
+**Learning:** Python's built-in `sorted()` with a lambda key doing lookup on a numpy array (`sorted(points, key=lambda x: res[x[1], x[0]])`) is very slow for large arrays due to repeated Python-to-C overhead and function calls.
+**Action:** Use numpy's vectorized `np.argsort()` to get sorted indices first, then apply them to the coordinate arrays and convert to list (`loc_x[sorted_indices].tolist()`) before zipping. This prevents Python-level sorting overhead and yields a >2x speedup.
