@@ -1,5 +1,6 @@
 import random
 
+
 def generate_bezier_path(
     start: tuple[int, int],
     end: tuple[int, int],
