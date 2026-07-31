@@ -1,6 +1,5 @@
 import os  # 导入os模块以便操作文件路径
 import re
-import shutil
 import subprocess
 from enum import Enum
 from threading import Thread
@@ -17,7 +16,7 @@ from app.card.messagebox_custom import BaseInfoBar, MessageBoxUpdate
 from module.config import cfg
 from module.decorator.decorator import begin_and_finish_time_log
 from module.logger import log
-from utils.utils import decrypt_string
+from utils.utils import decrypt_string, safe_unpack_archive
 
 md_renderer = MarkdownIt("gfm-like", {"html": True})
 
@@ -500,7 +499,7 @@ def update(assets_url):
                         check=True,
                     )
                 else:
-                    shutil.unpack_archive(download_file_path, destination)
+                    safe_unpack_archive(download_file_path, destination)
                 log.info("OCR解压完成，请重启AALC")
                 return True
             except Exception:

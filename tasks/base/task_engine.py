@@ -1,15 +1,10 @@
 from enum import Enum
-import time
-from time import sleep
 
-from PySide6.QtCore import QObject
-
-from app import mediator
 from module.automation import auto
 from module.automation.automation import GameState, PageStateDispatcher
-from module.config import cfg
 from module.logger import log
 from module.my_error.my_error import userStopError
+
 
 class TaskStatus(Enum):
     PENDING = "PENDING"

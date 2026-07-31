@@ -13,6 +13,8 @@ from qfluentwidgets import (
     PrimaryPushButton,
     ScrollArea,
     SpinBox,
+    ToolTipFilter,
+    ToolTipPosition,
 )
 from qfluentwidgets.common.icon import FluentIconBase
 from qfluentwidgets.components.widgets.info_bar import InfoBarIcon, InfoBarPosition
@@ -41,9 +43,7 @@ class MessageBoxHtml(MessageBox):
         self.scrollArea = ScrollArea(self.widget)
         self.scrollArea.setWidgetResizable(True)  # 允许内容扩展
         self.scrollArea.enableTransparentBackground()
-        self.scrollArea.setHorizontalScrollBarPolicy(
-            Qt.ScrollBarAlwaysOff
-        )  # 隐藏水平滚动条
+        self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # 隐藏水平滚动条
         self.scrollArea.setWidget(self.contentLabel)  # 将内容标签放入滚动区域
         # 设置 ScrollArea 的最小高度
         self.scrollArea.setMinimumHeight(300)
@@ -55,10 +55,13 @@ class MessageBoxHtml(MessageBox):
         self.jumpButton.setAttribute(Qt.WA_LayoutUsesWidgetRect)
         self.jumpButton.setFocus()
         # self.jumpButton = QPushButton('跳转', parent)
+        self.jumpButton.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.jumpButton.setToolTip(self.tr("跳转到发布页面"))
+        self.jumpButton.installEventFilter(
+            ToolTipFilter(self.jumpButton, showDelay=300, position=ToolTipPosition.BOTTOM)
+        )
         self.jumpButton.clicked.connect(
-            lambda: self.open_url(
-                "https://github.com/KIYI671/AhabAssistantLimbusCompany/releases"
-            )
+            lambda: self.open_url("https://github.com/KIYI671/AhabAssistantLimbusCompany/releases")
         )
 
         # 调整按钮组的大小策略（关键！）
@@ -182,9 +185,7 @@ class BaseInfoBar(InfoBar):
             title = title.format(**title_kwargs)
         if content_kwargs is not None:
             content = content.format(**content_kwargs)
-        super().__init__(
-            icon, title, content, orient, isClosable, duration, position, parent
-        )
+        super().__init__(icon, title, content, orient, isClosable, duration, position, parent)
 
     @classmethod
     def new(
@@ -345,20 +346,14 @@ class BetterDateTimeEdit(DateTimeEdit):
         date = self.date()
 
         # 处理分钟溢出和下溢
-        if (
-            self.currentSection() == QDateTimeEdit.Section.MinuteSection
-            and time.minute() == self.last_min
-        ):
+        if self.currentSection() == QDateTimeEdit.Section.MinuteSection and time.minute() == self.last_min:
             if plus and time.minute() >= 59:
                 time.setHMS(time.hour() + 1, 0, time.second())
             if not plus and time.minute() <= 0:
                 time.setHMS(time.hour() - 1, 59, time.second())
 
         # 处理小时溢出和下溢
-        if (
-            self.currentSection() == QDateTimeEdit.Section.HourSection
-            and time.hour() == self.last_hour
-        ):
+        if self.currentSection() == QDateTimeEdit.Section.HourSection and time.hour() == self.last_hour:
             if plus and time.hour() >= 23:
                 time.setHMS(0, time.minute(), time.second())
                 date = date.addDays(1)
@@ -367,10 +362,7 @@ class BetterDateTimeEdit(DateTimeEdit):
                 date = date.addDays(-1)
 
         # 处理天数溢出和下溢
-        if (
-            self.currentSection() == QDateTimeEdit.Section.DaySection
-            and date.day() == self.last_day
-        ):
+        if self.currentSection() == QDateTimeEdit.Section.DaySection and date.day() == self.last_day:
             days_in_month = date.daysInMonth()
             if plus and date.day() >= days_in_month:
                 date = date.addMonths(1)
@@ -381,10 +373,7 @@ class BetterDateTimeEdit(DateTimeEdit):
                 date = date.addDays(days_in_prev_month - 1)
 
         # 处理月份溢出和下溢
-        if (
-            self.currentSection() == QDateTimeEdit.Section.MonthSection
-            and date.month() == self.last_month
-        ):
+        if self.currentSection() == QDateTimeEdit.Section.MonthSection and date.month() == self.last_month:
             if plus and date.month() >= 12:
                 date = date.addYears(1)
                 date = date.addMonths(-date.month() + 1)

@@ -203,8 +203,8 @@ class Mirror:
         Check if the game process is crashed or disconnected.
         If a crash or disconnection is detected, restart the process and recover the state.
         """
-        from utils.utils import check_game_running
         from tasks.base.retry import kill_game, restart_game
+        from utils.utils import check_game_running
         # Check if game window handle is invalid or process not running
         if not check_game_running():
             log.warning("Game crash detected! Attempting process restart and state recovery.")
