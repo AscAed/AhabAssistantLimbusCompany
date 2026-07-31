@@ -364,7 +364,13 @@ def script_task(thread=None) -> None | int:
         get_reward = battle.fight()
 
     # 使用 STCE 引擎执行任务
-    from tasks.base.task_engine import TaskEngine, DailyLuxcavationTask, GetRewardTask, BuyEnkephalinTask, MirrorDungeonTask
+    from tasks.base.task_engine import (
+        BuyEnkephalinTask,
+        DailyLuxcavationTask,
+        GetRewardTask,
+        MirrorDungeonTask,
+        TaskEngine,
+    )
     engine = TaskEngine(thread=thread)
     engine.get_reward_context = get_reward
 

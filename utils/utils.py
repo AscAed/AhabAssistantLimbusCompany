@@ -313,3 +313,35 @@ def run_as_user(command: list[str], timeout: int = 30):
                 log.debug(f"任务: {command} 尝试删除临时脚本失败: {e}")
 
     return True
+
+
+def safe_unpack_archive(archive_path: str, extract_dir: str, format=None) -> None:
+    """
+    安全解压归档文件，防止 Zip Slip (路径穿越) 漏洞。
+    """
+    import os
+    import shutil
+    import tarfile
+    import zipfile
+
+    extract_dir = os.path.abspath(extract_dir)
+
+    if archive_path.endswith('.zip') or format == 'zip':
+        with zipfile.ZipFile(archive_path, 'r') as zf:
+            for member in zf.namelist():
+                member_path = os.path.abspath(os.path.join(extract_dir, member))
+                if not member_path.startswith(extract_dir):
+                    raise ValueError(f"检测到 Zip Slip 漏洞，非法路径: {member}")
+            zf.extractall(extract_dir)
+    elif archive_path.endswith(('.tar', '.tar.gz', '.tgz', '.tar.bz2', '.tbz')) or format in ('tar', 'gztar', 'bztar', 'xztar'):
+        with tarfile.open(archive_path, 'r:*') as tf:
+            for member in tf.getmembers():
+                member_path = os.path.abspath(os.path.join(extract_dir, member.name))
+                if not member_path.startswith(extract_dir):
+                    raise ValueError(f"检测到 Zip Slip 漏洞，非法路径: {member.name}")
+            if hasattr(tarfile, 'data_filter'):
+                tf.extractall(extract_dir, filter='data')
+            else:
+                tf.extractall(extract_dir)
+    else:
+        shutil.unpack_archive(archive_path, extract_dir, format=format)
