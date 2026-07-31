@@ -1008,54 +1008,56 @@ class PageStateDispatcher:
         Detects the current game state / page based on screen content.
         Uses cached templates/anchors for quick page recognition.
         """
+        # ⚡ Bolt: Take exactly one screenshot at the start to prevent
+        # sequential find_element calls from capturing redundant frames
         if self.auto.screenshot is None:
             self.auto.take_screenshot()
 
-        # Priority order checks
-        if (self.auto.find_element("battle/more_information_assets.png") or
-            self.auto.find_element("battle/in_mirror_assets.png") or
-            self.auto.find_element("battle/win_rate_card.png") or
-            self.auto.find_element("battle/turn_assets.png")):
+        # Priority order checks (using take_screenshot=False to use the cached frame)
+        if (self.auto.find_element("battle/more_information_assets.png", take_screenshot=False) or
+            self.auto.find_element("battle/in_mirror_assets.png", take_screenshot=False) or
+            self.auto.find_element("battle/win_rate_card.png", take_screenshot=False) or
+            self.auto.find_element("battle/turn_assets.png", take_screenshot=False)):
             return GameState.BATTLE
 
-        if (self.auto.find_element("mirror/road_to_mir/select_team_stars_assets.png") or
-            self.auto.find_element("mirror/road_to_mir/select_team_confirm_assets.png")):
+        if (self.auto.find_element("mirror/road_to_mir/select_team_stars_assets.png", take_screenshot=False) or
+            self.auto.find_element("mirror/road_to_mir/select_team_confirm_assets.png", take_screenshot=False)):
             return GameState.MIRROR_TEAM_SELECT
 
-        if self.auto.find_element("teams/identify_assets.png"):
+        if self.auto.find_element("teams/identify_assets.png", take_screenshot=False):
             return GameState.BATTLE_FORMATION
 
-        if self.auto.find_element("mirror/shop/shop_coins_assets.png"):
+        if self.auto.find_element("mirror/shop/shop_coins_assets.png", take_screenshot=False):
             return GameState.SHOP
 
-        if (self.auto.find_element("mirror/road_in_mir/legend_assets.png") or
-                self.auto.find_element("mirror/road_in_mir/to_window_assets.png")):
+        if (self.auto.find_element("mirror/road_in_mir/legend_assets.png", take_screenshot=False) or
+                self.auto.find_element("mirror/road_in_mir/to_window_assets.png", take_screenshot=False)):
             return GameState.ROAD_MAP
 
-        if self.auto.find_element("mirror/theme_pack/feature_theme_pack_assets.png"):
+        if self.auto.find_element("mirror/theme_pack/feature_theme_pack_assets.png", take_screenshot=False):
             return GameState.THEME_PACK
 
-        if (self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_card.png") or
-            self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_box_assets.png") or
-            self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_refuse_assets.png")):
+        if (self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_card.png", take_screenshot=False) or
+            self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_box_assets.png", take_screenshot=False) or
+            self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_refuse_assets.png", take_screenshot=False)):
             return GameState.EGO_GIFT_SELECT
 
-        if (self.auto.find_element("mirror/claim_reward/battle_statistics_assets.png") or
-            self.auto.find_element("mirror/claim_reward/claim_rewards_assets.png") or
-            self.auto.find_element("mirror/claim_reward/complete_mirror_100%_assets.png") or
-            self.auto.find_element("mirror/claim_reward/use_enkephalin_assets.png")):
+        if (self.auto.find_element("mirror/claim_reward/battle_statistics_assets.png", take_screenshot=False) or
+            self.auto.find_element("mirror/claim_reward/claim_rewards_assets.png", take_screenshot=False) or
+            self.auto.find_element("mirror/claim_reward/complete_mirror_100%_assets.png", take_screenshot=False) or
+            self.auto.find_element("mirror/claim_reward/use_enkephalin_assets.png", take_screenshot=False)):
             return GameState.CLAIM_REWARD
 
-        if self.auto.find_element("event/skip_assets.png"):
+        if self.auto.find_element("event/skip_assets.png", take_screenshot=False):
             return GameState.EVENT
 
-        if (self.auto.find_element("mirror/road_to_mir/enter_assets.png") or
-            self.auto.find_element("mirror/road_to_mir/resume_assets.png") or
-            self.auto.find_element("mirror/road_to_mir/enter_mirror_assets.png")):
+        if (self.auto.find_element("mirror/road_to_mir/enter_assets.png", take_screenshot=False) or
+            self.auto.find_element("mirror/road_to_mir/resume_assets.png", take_screenshot=False) or
+            self.auto.find_element("mirror/road_to_mir/enter_mirror_assets.png", take_screenshot=False)):
             return GameState.MIRROR_ENTRANCE
 
-        if (self.auto.find_element("home/drive_assets.png") or
-            self.auto.find_element("home/window_assets.png")):
+        if (self.auto.find_element("home/drive_assets.png", take_screenshot=False) or
+            self.auto.find_element("home/window_assets.png", take_screenshot=False)):
             return GameState.MAIN_MENU
 
         return GameState.UNKNOWN
