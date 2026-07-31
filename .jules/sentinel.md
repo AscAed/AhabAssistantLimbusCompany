@@ -22,3 +22,8 @@
 **Vulnerability:** Similar to `requests.get`, `urllib.request.urlopen()` calls without a `timeout` parameter will hang indefinitely if the remote server fails to respond, potentially causing the CI build process to deadlock.
 **Learning:** This vulnerability is easy to miss when auditing third-party libraries (like `requests`), as developers might fall back on built-in standard library tools like `urllib` without realizing they share the exact same default behavior of infinite timeouts.
 **Prevention:** Always explicitly define a `timeout` parameter (e.g., `timeout=10`) when using `urllib.request.urlopen` or any other built-in HTTP request function, in addition to third-party libraries.
+
+## 2025-02-21 - [Prevent Zip Slip during Update Extraction]
+**Vulnerability:** The project was using `shutil.unpack_archive` to extract zip/tar update packages downloaded over the network. In older Python versions (and sometimes without strict filters), this is susceptible to path traversal (Zip Slip), where an attacker-crafted archive containing relative paths (e.g. `../../../../malicious.exe`) can write to arbitrary locations on the file system, leading to Remote Code Execution (RCE).
+**Learning:** Even built-in convenience functions like `shutil.unpack_archive` are not guaranteed to be secure against malicious payloads without appropriate filtering.
+**Prevention:** To prevent Zip Slip vulnerabilities, do not use `shutil.unpack_archive` directly for untrusted archives without safe filters. Instead, manually inspect and validate the members of `zipfile.ZipFile` and `tarfile.open` to ensure that their absolute paths start with the target extraction directory's absolute path before allowing extraction.
