@@ -13,3 +13,6 @@
 ## 2024-07-21 - [Icon-Only Button Affordance in team_setting_card.py]
 **Learning:** Icon-only hint buttons (like `preview_hint_button` using `ToolButton`) need a `PointingHandCursor` rather than an `ArrowCursor` to communicate to users that the element can be interacted with, especially since tooltips require hovering to discover.
 **Action:** Always verify that small hint/info tool buttons have `Qt.CursorShape.PointingHandCursor` set explicitly when built using qfluentwidgets or PySide6 components.
+## 2024-07-23 - [Action Button Affordance in qfluentwidgets]
+**Learning:** Standard `PushButton` and `PrimaryPushButton` widgets from `qfluentwidgets` do not inherit pointing hand cursors by default when used in standard layouts, which diminishes interaction affordance.
+**Action:** When working with PySide6 and qfluentwidgets, explicitly call `setCursor(Qt.CursorShape.PointingHandCursor)` on `PushButton` and `PrimaryPushButton` to ensure users receive expected hover feedback on clickable elements.
