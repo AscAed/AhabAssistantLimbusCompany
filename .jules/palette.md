@@ -1,0 +1,3 @@
+## 2024-07-29 - Missing affordance on custom PySide6 action buttons
+**Learning:** When adding custom buttons to standard PySide6 dialogs (like `MessageBox`), the framework does not always inherit expected affordances (like the pointing hand cursor or tooltips) that native web elements or predefined dialog actions might have. This leads to inconsistent UX where some buttons react to hover while others don't, which can be confusing for accessibility and general navigation.
+**Action:** Always explicitly set `Qt.CursorShape.PointingHandCursor` and install a `ToolTipFilter` for any custom action buttons added to PyQt/PySide6 message boxes or dialogs to ensure consistent interaction patterns.
