@@ -1,0 +1,3 @@
+## 2025-02-12 - Improve visual affordance with TransparentToolButton and FluentIcon
+**Learning:** Using `PushButton("-")` for removal actions lacks visual clarity and can feel inconsistent with modern UI practices in `qfluentwidgets`. Replacing it with `TransparentToolButton` paired with `FluentIcon.REMOVE` (`FIF.REMOVE`) significantly improves the button's visual affordance without cluttering the UI, making the negative action much clearer to the user while keeping the layout lightweight.
+**Action:** When encountering icon-only text buttons (like `"-"` or `"+"`), upgrade them to `TransparentToolButton` with the appropriate `FluentIcon` for better visual communication and a cleaner look.

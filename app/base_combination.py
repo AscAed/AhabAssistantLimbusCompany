@@ -29,6 +29,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from qfluentwidgets import (
+    FluentIcon as FIF,
+    TransparentToolButton,
     ComboBox,
     FlyoutViewBase,
     IndicatorPosition,
@@ -1645,7 +1647,10 @@ class ObserveGiftSelectionRow(QFrame):
         self.level_combo = ComboBox(self)
         self.row_combo = ComboBox(self)
         self.col_combo = ComboBox(self)
-        self.remove_button = PushButton("-", self)
+        self.remove_button = TransparentToolButton(FIF.REMOVE, self)
+        self.remove_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.remove_button.setToolTip(self.tr("移除或清空当前控件组"))
+        self.remove_button.installEventFilter(ToolTipFilter(self.remove_button, showDelay=0))
         self.system_group = QWidget(self)
         self.level_group = QWidget(self)
         self.row_group = QWidget(self)
@@ -1661,9 +1666,6 @@ class ObserveGiftSelectionRow(QFrame):
         self.row_combo.setFixedWidth(90)
         self.col_combo.setFixedWidth(90)
         self.remove_button.setFixedWidth(34)
-        self.remove_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.remove_button.setToolTip(self.tr("移除或清空当前控件组"))
-        self.remove_button.installEventFilter(ToolTipFilter(self.remove_button, showDelay=0))
 
         self._init_group_layout(self.system_group, self.system_label, self.system_combo)
         self._init_group_layout(self.level_group, self.level_label, self.level_combo)
