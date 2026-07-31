@@ -27,6 +27,9 @@
 ## 2026-07-21 - Avoid Multiple Screenshots in UI Automation Polling
 **Learning:** Sequential `auto.find_element()` calls across a block of elements (e.g. searching for very_high to very_low buttons) will capture a new screenshot each time, causing massive I/O overhead.
 **Action:** Take one screenshot manually before the loop (`auto.take_screenshot()`), then pass `take_screenshot=False` to all subsequent `find_element` calls using that frame to dramatically speed up the check sequence.
+## 2024-07-26 - [Avoid lambda lookups over NumPy arrays]
+**Learning:** In computer vision tasks (like OpenCV template matching), using Python's built-in `sorted()` with a lambda function that accesses a 2D NumPy array element-by-element introduces massive interpreter overhead due to repeated boundary checks and object instantiations.
+**Action:** When sorting match coordinates by score, always use NumPy's vectorized `np.argsort()` directly on the score array and then use array indexing to reorder the coordinate lists before converting them back to Python types via `.tolist()`. This provides a significant (often 6x+) performance boost in multi-target matching logic.
 ## 2025-03-05 - Avoid multiple screenshots during state detection
 **Learning:** Sequential `auto.find_element()` calls inside state detection loops can implicitly trigger multiple full-screen captures if not explicitly prevented.
 **Action:** Take a screenshot once manually (`self.auto.take_screenshot()`) at the start of a detection block, and explicitly pass `take_screenshot=False` to all subsequent `find_element` calls to reuse the cached frame and avoid I/O overhead.

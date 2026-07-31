@@ -262,6 +262,14 @@ class ImageUtils:
         res = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
         # 遍历所有超过阈值的区域
         loc_y, loc_x = np.where(res >= threshold)
+        if len(loc_y) == 0:
+            log.debug(f"未找到匹配项，最高匹配度为：{np.max(res)}")
+            return []
+
+        # 使用向量化 argsort 替代 Python 的 sorted 和 lambda，大幅提升多目标匹配的性能
+        scores = res[loc_y, loc_x]
+        sort_idx = np.argsort(scores)[::-1]
+        sorted_points = list(zip(loc_x[sort_idx].tolist(), loc_y[sort_idx].tolist()))
         if len(loc_y) > 0:
             # ⚡ Bolt: Use vectorized np.argsort instead of sorted() with lambda for O(n) array lookups
             scores = res[loc_y, loc_x]
@@ -279,7 +287,7 @@ class ImageUtils:
 
         # 遍历排序后的匹配位置
         if sorted_points:
-            min_dist_sq = min_dist ** 2
+            min_dist_sq = min_dist**2
             for pt in sorted_points:
                 # 检查当前匹配点是否与已保留的匹配点太近
                 # 使用简单的标量算术（平方欧氏距离）和 early break 来代替 np.linalg.norm 的 O(n^2) 内存分配，提升性能。
@@ -294,7 +302,6 @@ class ImageUtils:
             # 计算每个匹配点的中心坐标
             center_points = [(int(pt[0] + w / 2), int(pt[1] + h / 2)) for pt in center_points]
             return center_points
-        log.debug(f"未找到匹配项，最高匹配度为：{np.max(res)}")
         return []
 
     @staticmethod
