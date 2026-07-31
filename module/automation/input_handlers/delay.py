@@ -1,5 +1,7 @@
 import random
+
 import numpy as np
+
 
 def humanised_delay(
     base_duration: float,

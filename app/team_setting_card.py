@@ -276,13 +276,17 @@ class TeamSettingCard(QFrame):
         )
 
         self.export_button = PrimaryPushButton(self.tr("导出设置"))
+        self.export_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.export_button.clicked.connect(self.on_export_settings)
         self.import_button = PushButton(self.tr("导入设置"))
+        self.import_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.import_button.clicked.connect(self.on_import_settings)
 
         self.cancel_button = PushButton(self.tr("取消"))
+        self.cancel_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.cancel_button.clicked.connect(self.cancel_team_setting)
         self.confirm_button = PrimaryPushButton(self.tr("保存"))
+        self.confirm_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.confirm_button.clicked.connect(self.save_team_setting)
 
     def __init_layout(self):
@@ -850,6 +854,7 @@ class CustomizeSettingsModule(QFrame):
         self.starlight_clear_button = PushButton(
             QT_TRANSLATE_NOOP("CustomizeSettingsModule", "清空")
         )
+        self.starlight_clear_button.setCursor(Qt.CursorShape.PointingHandCursor)
 
         self.starlight_clear_button_wrapper = QWidget(self)
         clear_btn_layout = QVBoxLayout(self.starlight_clear_button_wrapper)
@@ -967,6 +972,7 @@ class CustomizeSettingsModule(QFrame):
             QT_TRANSLATE_NOOP("BaseCheckBox", "使用自定义主题包权重"),
         )
         self.select_theme_pack_weight_button = PushButton(self.tr("权重选择"))
+        self.select_theme_pack_weight_button.setCursor(Qt.CursorShape.PointingHandCursor)
 
         self.use_team_code = BaseCheckBox(
             "use_team_code",
@@ -1660,8 +1666,10 @@ class CustomizeInfoModule(QFrame):
         )
 
         self.refesh_button = PushButton(self.tr("刷新数据"))
+        self.refesh_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.refesh_button.clicked.connect(self.fresh_data)
         self.clear_data_button = PrimaryPushButton(self.tr("清除历史统计数据"))
+        self.clear_data_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.clear_data_button.clicked.connect(self.clear_data)
 
     def __init_layout(self):
