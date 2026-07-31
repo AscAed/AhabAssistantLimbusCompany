@@ -1,4 +1,4 @@
-from PySide6.QtCore import QCoreApplication, QPoint, Signal
+from PySide6.QtCore import QCoreApplication, QPoint, Qt, Signal
 from PySide6.QtWidgets import QFrame, QPushButton, QVBoxLayout, QWidget
 
 
@@ -32,6 +32,7 @@ class SettingNav(QFrame):
             btn.setCheckable(True)
             btn.setFlat(True)
             btn.setMinimumHeight(32)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.clicked.connect(self.__make_nav_click_handler(key))
             self.nav_layout.addWidget(btn)
             self.nav_buttons[key] = btn

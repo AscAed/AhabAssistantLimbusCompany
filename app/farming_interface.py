@@ -133,7 +133,9 @@ class AfterCompletionActionEditor(FlyoutViewBase):
 
         self.button_row = QHBoxLayout()
         self.button_apply = PushButton(self._button_apply_once, self)
+        self.button_apply.setCursor(Qt.CursorShape.PointingHandCursor)
         self.button_save = PrimaryPushButton(self._button_save_default, self)
+        self.button_save.setCursor(Qt.CursorShape.PointingHandCursor)
         self.button_row.addWidget(self.button_apply)
         self.button_row.addWidget(self.button_save)
         self.vbox.addLayout(self.button_row)
@@ -230,6 +232,7 @@ class AfterCompletionSelector(QFrame):
         self.summary = BodyLabel("", self)
         self.summary.setWordWrap(True)
         self.edit_button = PushButton(self._edit_button_text, self)
+        self.edit_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.edit_button.setFixedWidth(72)
 
         self.hbox.addWidget(self.summary, stretch=1)

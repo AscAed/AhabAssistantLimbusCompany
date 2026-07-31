@@ -26,3 +26,16 @@
 **Vulnerability:** Executing `chmod 777` on pushed executables (`minitouch`) grants global read, write, and execute permissions to all users on the device, violating the Principle of Least Privilege and opening the binary to tampering by other processes.
 **Learning:** Hardcoding `777` permissions during deployment (like ADB pushes) is a common but dangerous shortcut. It should be replaced with `755` (owner read/write/execute, others read/execute) to prevent unauthorized modifications while retaining operability.
 **Prevention:** Always use `chmod 755` rather than `chmod 777` when granting execute permissions to binaries pushed to environments.
+
+## 2025-02-21 - [Over-permissive File Access via ADB Push]
+**Vulnerability:** Pushing executables (like `minitouch`) via ADB and granting them full `chmod 777` permissions creates a severe security risk by allowing any user or process on the Android device to read, write, and execute the file.
+**Learning:** Hardcoding `chmod 777` is a common shortcut for developers to ensure executables run smoothly on devices without dealing with permission complexities. However, it violates the Principle of Least Privilege and can lead to tampering or execution of malicious code by unauthorized processes.
+**Prevention:** Always enforce the Principle of Least Privilege by using `chmod 755` when granting execution permissions to files pushed to Android devices, limiting write access to the file owner.
+## 2025-02-21 - [Prevent Zip Slip during Update Extraction]
+**Vulnerability:** The project was using `shutil.unpack_archive` to extract zip/tar update packages downloaded over the network. In older Python versions (and sometimes without strict filters), this is susceptible to path traversal (Zip Slip), where an attacker-crafted archive containing relative paths (e.g. `../../../../malicious.exe`) can write to arbitrary locations on the file system, leading to Remote Code Execution (RCE).
+**Learning:** Even built-in convenience functions like `shutil.unpack_archive` are not guaranteed to be secure against malicious payloads without appropriate filtering.
+**Prevention:** To prevent Zip Slip vulnerabilities, do not use `shutil.unpack_archive` directly for untrusted archives without safe filters. Instead, manually inspect and validate the members of `zipfile.ZipFile` and `tarfile.open` to ensure that their absolute paths start with the target extraction directory's absolute path before allowing extraction.
+## 2025-02-21 - [Avoid Over-Permissive chmod 777]
+**Vulnerability:** Setting file permissions to `777` (read, write, execute for everyone) via `chmod` creates an over-permissive environment on Android devices. This allows any process or user on the device to tamper with or execute the pushed binaries, posing a significant security risk.
+**Learning:** When pushing executables to a device using tools like ADB, it's common for developers to lazily use `chmod 777` to guarantee execution. This violates the Principle of Least Privilege and introduces a security flaw where malware could modify the executable. The issue was observed in `pyminitouch/connection.py`.
+**Prevention:** Enforce the Principle of Least Privilege by using `chmod 755` (read/execute for all, write only for owner) instead of `chmod 777` when setting file permissions for executables pushed to external devices.
