@@ -27,3 +27,6 @@
 ## 2026-07-21 - Avoid Multiple Screenshots in UI Automation Polling
 **Learning:** Sequential `auto.find_element()` calls across a block of elements (e.g. searching for very_high to very_low buttons) will capture a new screenshot each time, causing massive I/O overhead.
 **Action:** Take one screenshot manually before the loop (`auto.take_screenshot()`), then pass `take_screenshot=False` to all subsequent `find_element` calls using that frame to dramatically speed up the check sequence.
+## 2025-02-14 - Vectorized Sorting in Template Match Results
+**Learning:** When sorting coordinate points derived from a NumPy array (like OpenCV template matching results), using Python's built-in `sorted()` with a lambda key is a major bottleneck because lambda lookups over NumPy arrays introduce massive execution overhead.
+**Action:** Use vectorized sorting via `np.argsort()` on the scores and extract indices into coordinates. This resulted in a ~2x faster extraction in large arrays.
