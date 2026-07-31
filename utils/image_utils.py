@@ -262,6 +262,11 @@ class ImageUtils:
         res = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
         # 遍历所有超过阈值的区域
         loc_y, loc_x = np.where(res >= threshold)
+        if len(loc_y) > 0:
+            # ⚡ Bolt: Use vectorized np.argsort instead of sorted() with lambda for O(n) array lookups
+            scores = res[loc_y, loc_x]
+            sorted_indices = np.argsort(scores)[::-1]
+            sorted_points = list(zip(loc_x[sorted_indices].tolist(), loc_y[sorted_indices].tolist()))
 
         # ⚡ Bolt: Fast vectorized sorting (~4.3x speedup)
         # Avoid lambda-based sorting `sorted(points, key=lambda x: res[x[1], x[0]])`
