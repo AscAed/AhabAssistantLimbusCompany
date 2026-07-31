@@ -1663,6 +1663,7 @@ class ObserveGiftSelectionRow(QFrame):
         self.remove_button.setFixedWidth(34)
         self.remove_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.remove_button.setToolTip(self.tr("移除或清空当前控件组"))
+        self.remove_button.setAccessibleName(self.tr("移除或清空当前控件组"))
         self.remove_button.installEventFilter(ToolTipFilter(self.remove_button, showDelay=0))
 
         self._init_group_layout(self.system_group, self.system_label, self.system_combo)

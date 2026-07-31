@@ -1,0 +1,3 @@
+## 2024-07-28 - PySide6 Icon-Only Button Accessibility
+**Learning:** PySide6/Qt doesn't natively expose `setToolTip()` content to screen readers as button labels like ARIA labels do in web HTML. Icon-only buttons (like `ToolButton`, `TransparentToolButton`, or `PushButton` with just an icon) require explicitly calling `setAccessibleName()` so that screen readers can announce what the button does instead of remaining silent or reading 'unlabeled button'.
+**Action:** When adding icon-only buttons or buttons that rely purely on tooltips for visual explanation in PySide6 with `qfluentwidgets`, always explicitly set `setAccessibleName(self.tr("..."))` to provide an accessible label for screen readers.
