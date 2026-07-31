@@ -22,6 +22,11 @@
 **Vulnerability:** Similar to `requests.get`, `urllib.request.urlopen()` calls without a `timeout` parameter will hang indefinitely if the remote server fails to respond, potentially causing the CI build process to deadlock.
 **Learning:** This vulnerability is easy to miss when auditing third-party libraries (like `requests`), as developers might fall back on built-in standard library tools like `urllib` without realizing they share the exact same default behavior of infinite timeouts.
 **Prevention:** Always explicitly define a `timeout` parameter (e.g., `timeout=10`) when using `urllib.request.urlopen` or any other built-in HTTP request function, in addition to third-party libraries.
+
+## 2025-02-21 - [Over-permissive Executable Rights (chmod 777)]
+**Vulnerability:** The script deployed the `minitouch` binary to connected Android devices and blindly granted it full `777` (read, write, execute for all users) permissions via `chmod 777`.
+**Learning:** Any file pushed to an external device with `chmod 777` creates a serious escalation vector if the device is compromised or accessed by other unprivileged applications.
+**Prevention:** Always follow the Principle of Least Privilege. For executables that only the script needs to run, use `chmod 755` (read/execute for group/others, full access for owner) to prevent unauthorized modifications to the executable payload.
 ## 2025-02-21 - [Over-permissive Executable Permissions (chmod 777)]
 **Vulnerability:** Executing `chmod 777` on pushed executables (`minitouch`) grants global read, write, and execute permissions to all users on the device, violating the Principle of Least Privilege and opening the binary to tampering by other processes.
 **Learning:** Hardcoding `777` permissions during deployment (like ADB pushes) is a common but dangerous shortcut. It should be replaced with `755` (owner read/write/execute, others read/execute) to prevent unauthorized modifications while retaining operability.
