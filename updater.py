@@ -8,6 +8,35 @@ from pathlib import PurePosixPath
 import psutil
 
 
+def safe_unpack_archive(archive_path, extract_dir, format=None):
+    """安全解压归档文件，防止 Zip Slip (路径穿越) 漏洞。"""
+    import os
+    import shutil
+    import tarfile
+    import zipfile
+
+    extract_dir = os.path.abspath(extract_dir)
+
+    if archive_path.endswith('.zip') or format == 'zip':
+        with zipfile.ZipFile(archive_path, 'r') as zf:
+            for member in zf.namelist():
+                member_path = os.path.abspath(os.path.join(extract_dir, member))
+                if not member_path.startswith(extract_dir):
+                    raise ValueError(f"检测到 Zip Slip 漏洞，非法路径: {member}")
+            zf.extractall(extract_dir)
+    elif archive_path.endswith(('.tar', '.tar.gz', '.tgz', '.tar.bz2', '.tbz')) or format in ('tar', 'gztar', 'bztar', 'xztar'):
+        with tarfile.open(archive_path, 'r:*') as tf:
+            for member in tf.getmembers():
+                member_path = os.path.abspath(os.path.join(extract_dir, member.name))
+                if not member_path.startswith(extract_dir):
+                    raise ValueError(f"检测到 Zip Slip 漏洞，非法路径: {member.name}")
+            if hasattr(tarfile, 'data_filter'):
+                tf.extractall(extract_dir, filter='data')
+            else:
+                tf.extractall(extract_dir)
+    else:
+        shutil.unpack_archive(archive_path, extract_dir, format=format)
+
 class Updater:
     """应用程序更新器，负责检查、下载、解压和安装最新版本的应用程序。"""
 
@@ -53,7 +82,7 @@ class Updater:
                         check=True,
                     )
                 else:
-                    shutil.unpack_archive(self.download_file_path, self.temp_path)
+                    safe_unpack_archive(self.download_file_path, self.temp_path)
                 print("解压完成")
                 return True
             except Exception:
