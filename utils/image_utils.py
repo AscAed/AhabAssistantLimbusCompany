@@ -1,4 +1,5 @@
 import os
+from collections import OrderedDict
 
 import cv2
 import numpy as np
@@ -10,7 +11,27 @@ from module.logger import log
 from utils.path_manager import path_manager
 
 
+class LRUCache:
+    def __init__(self, capacity: int):
+        self.cache = OrderedDict()
+        self.capacity = capacity
+
+    def get(self, key):
+        if key not in self.cache:
+            return None
+        self.cache.move_to_end(key)
+        return self.cache[key]
+
+    def put(self, key, value):
+        self.cache[key] = value
+        self.cache.move_to_end(key)
+        if len(self.cache) > self.capacity:
+            self.cache.popitem(last=False)
+
+
 class ImageUtils:
+    _template_cache = LRUCache(128)
+
     @staticmethod
     def load_image(image_path, resize=True, return_path=False):
         """
@@ -20,6 +41,16 @@ class ImageUtils:
         :param return_path: 是否返回实际加载到的路径名。
         :return: 图片数组；若 return_path=True，则返回 (图片数组, 路径名)。
         """
+        cache_key = (
+            image_path,
+            resize,
+            return_path,
+            cfg.set_win_size if resize else None,
+            path_manager.current_language,
+        )
+        if cache_key in ImageUtils._template_cache:
+            return ImageUtils._template_cache[cache_key]
+
         try:
             img_path = None
             selected_path = None
@@ -34,9 +65,9 @@ class ImageUtils:
             # 使用上下文管理器打开图片文件，确保文件对象及时关闭
             with Image.open(img_path) as img:
                 image = ImageUtils._prepare_loaded_image(np.array(img), resize)
-                if return_path:
-                    return image, selected_path
-                return image
+                result = (image, selected_path) if return_path else image
+                ImageUtils._template_cache.put(cache_key, result)
+                return result
         except FileNotFoundError:
             log.error(f"未找到图片： {image_path} ")
             return (None, None) if return_path else None

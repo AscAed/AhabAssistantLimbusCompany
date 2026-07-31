@@ -43,3 +43,6 @@
 ## 2025-02-14 - Vectorized Sorting in Template Match Results
 **Learning:** When sorting coordinate points derived from a NumPy array (like OpenCV template matching results), using Python's built-in `sorted()` with a lambda key is a major bottleneck because lambda lookups over NumPy arrays introduce massive execution overhead.
 **Action:** Use vectorized sorting via `np.argsort()` on the scores and extract indices into coordinates. This resulted in a ~2x faster extraction in large arrays.
+## 2025-03-10 - Cache File I/O for Image Template Loads
+**Learning:** Sequential calls to `auto.find_element()` (or similar CV wrapper functions) often repeatedly load the exact same template image files from disk via `Image.open`, creating massive underlying I/O overhead.
+**Action:** Implement an in-memory dictionary or LRU cache for image asset loading (e.g., in `ImageUtils.load_image`), keyed by the path, resize parameters, and window size, to return the cached Numpy arrays instead of reading from disk on every template match call.
