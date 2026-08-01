@@ -43,3 +43,6 @@
 ## 2025-02-14 - Vectorized Sorting in Template Match Results
 **Learning:** When sorting coordinate points derived from a NumPy array (like OpenCV template matching results), using Python's built-in `sorted()` with a lambda key is a major bottleneck because lambda lookups over NumPy arrays introduce massive execution overhead.
 **Action:** Use vectorized sorting via `np.argsort()` on the scores and extract indices into coordinates. This resulted in a ~2x faster extraction in large arrays.
+## 2024-08-01 - [Cache Corruption via Mutable Data Structures]
+**Learning:** Caching results of computationally expensive loads (like reading images into numpy arrays with `cv2` or `PIL`) using `@functools.lru_cache` can introduce subtle state corruption bugs if the cached objects are mutable (`np.ndarray`). If any calling code edits the returned object in-place, the cached instance is mutated for all future calls.
+**Action:** Always return a `.copy()` of the object when exposing a cached mutable instance. Encapsulate the cache in an internal function (e.g., `_load_image_cached`) and handle copying in the public wrapper function (e.g., `load_image`). Also, monitor the memory footprint of cached objects and keep `maxsize` conservative.
