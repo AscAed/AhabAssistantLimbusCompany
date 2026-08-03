@@ -378,6 +378,7 @@ class ThemePackCard(QFrame):
         self.reset_btn = TransparentToolButton(FIF.SYNC, self)
         self.reset_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.reset_btn.setToolTip(self.tr("撤销覆盖"))
+        self.reset_btn.setAccessibleName(self.tr("撤销覆盖"))
         self.reset_btn.installEventFilter(
             ToolTipFilter(
                 self.reset_btn, showDelay=300, position=ToolTipPosition.BOTTOM

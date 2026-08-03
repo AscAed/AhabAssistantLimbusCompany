@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 
+
 class InputDriver(ABC):
     """Interface for driver-level or hardware simulation inputs."""
 
