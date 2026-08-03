@@ -129,9 +129,7 @@ class BaseCheckBox(BaseLayout):
         self.tips = tips
         self.check_box = RightClickCheckBox(title, self)
         self.check_box.installEventFilter(
-            ToolTipFilter(
-                self.check_box, showDelay=0, position=ToolTipPosition.BOTTOM_LEFT
-            )
+            ToolTipFilter(self.check_box, showDelay=0, position=ToolTipPosition.BOTTOM_LEFT)
         )
 
         self.hBoxLayout.addWidget(self.check_box, 0, Qt.AlignLeft)
@@ -247,11 +245,7 @@ class ToSettingButton(BaseButton):
         self.button.setCursor(Qt.PointingHandCursor)
         self.button.setToolTip("设置")
         self.button.setAccessibleName("设置")
-        self.button.installEventFilter(
-            ToolTipFilter(
-                self.button, showDelay=300, position=ToolTipPosition.BOTTOM
-            )
-        )
+        self.button.installEventFilter(ToolTipFilter(self.button, showDelay=300, position=ToolTipPosition.BOTTOM))
 
         self.menu = RoundMenu(parent=self)
         self.edit_name = Action(FIF.EDIT, "命名")
@@ -303,11 +297,7 @@ class ChangePageButton(BaseButton):
         self.button.setCursor(Qt.PointingHandCursor)
         self.button.setToolTip("切换页面")
         self.button.setAccessibleName("切换页面")
-        self.button.installEventFilter(
-            ToolTipFilter(
-                self.button, showDelay=300, position=ToolTipPosition.BOTTOM
-            )
-        )
+        self.button.installEventFilter(ToolTipFilter(self.button, showDelay=300, position=ToolTipPosition.BOTTOM))
         toggle_button_group[config_name] = self.button
         self.button.clicked.connect(self.on_click)
 
@@ -345,11 +335,7 @@ class SettingTeamsButton(BaseButton):
         self.button.setCursor(Qt.PointingHandCursor)
         self.button.setToolTip("设置队伍")
         self.button.setAccessibleName("设置队伍")
-        self.button.installEventFilter(
-            ToolTipFilter(
-                self.button, showDelay=300, position=ToolTipPosition.BOTTOM
-            )
-        )
+        self.button.installEventFilter(ToolTipFilter(self.button, showDelay=300, position=ToolTipPosition.BOTTOM))
         self.button.clicked.connect(self.on_click)
 
         self.hBoxLayout.addWidget(self.button)
@@ -435,11 +421,7 @@ class BaseComboBox(BaseLayout):
         self.combo_box = RightClickComboBox(self)
         self.hBoxLayout.addWidget(self.combo_box, stretch=1)
         self.setFixedHeight(30)
-        self.installEventFilter(
-            ToolTipFilter(
-                self, showDelay=tool_tip_delay, position=ToolTipPosition.BOTTOM_LEFT
-            )
-        )
+        self.installEventFilter(ToolTipFilter(self, showDelay=tool_tip_delay, position=ToolTipPosition.BOTTOM_LEFT))
         if combo_box_width and isinstance(combo_box_width, int):
             self.combo_box.setFixedWidth(combo_box_width)
 
