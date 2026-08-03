@@ -1,3 +1,4 @@
+import functools
 import os
 
 import functools
@@ -17,32 +18,54 @@ class ImageUtils:
     @functools.lru_cache(maxsize=32)
     def _load_image_cached(image_path, resize=True, return_path=False):
         """内部缓存的图片加载方法，返回只读/共享数据。"""
+    @functools.lru_cache(maxsize=128)
+    def _cached_load_image(image_path, resize, active_paths_tuple, win_size):
         try:
             img_path = None
             selected_path = None
-            for path in path_manager.pic_path:
+            for path in active_paths_tuple:
                 img_path = os.path.join(f"./assets/images/{path}/{image_path}")
                 if os.path.exists(img_path):
                     selected_path = path
                     break
             if img_path is None or not os.path.exists(img_path):
                 log.error(f"未找到图片： {image_path} ")
-                return (None, None) if return_path else None
+                return None, None
             # 使用上下文管理器打开图片文件，确保文件对象及时关闭
             with Image.open(img_path) as img:
                 image = ImageUtils._prepare_loaded_image(np.array(img), resize)
-                if return_path:
-                    return image, selected_path
-                return image
+                return image, selected_path
         except FileNotFoundError:
             log.error(f"未找到图片： {image_path} ")
-            return (None, None) if return_path else None
+            return None, None
         except IOError:
             log.error(f"无法读取图片： {image_path}")
-            return (None, None) if return_path else None
+            return None, None
         except Exception as e:
             log.error(f"加载图片时发生错误： {e}")
+            return None, None
+
+    @staticmethod
+    def load_image(image_path, resize=True, return_path=False):
+        """
+        加载图片，并根据指定区域裁剪图片。
+        :param image_path: 图片文件路径。
+        :param resize: 是否根据窗口大小调整图片尺寸。
+        :param return_path: 是否返回实际加载到的路径名。
+        :return: 图片数组；若 return_path=True，则返回 (图片数组, 路径名)。
+        """
+        active_paths_tuple = tuple(path_manager.pic_path)
+        win_size = cfg.set_win_size
+        image, selected_path = ImageUtils._cached_load_image(image_path, resize, active_paths_tuple, win_size)
+
+        if image is None:
             return (None, None) if return_path else None
+
+        # ⚡ Bolt: Return a copy of the cached image array so mutations don't corrupt the cache
+        image_copy = image.copy()
+        if return_path:
+            return image_copy, selected_path
+        return image_copy
 
     @staticmethod
     def load_image(image_path, resize=True, return_path=False):
