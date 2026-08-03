@@ -24,6 +24,9 @@
 **Learning:** Python-to-C API calls (`np.subtract`, `np.linalg.norm`) on tiny 2-element lists inside a `for` loop have significant overhead compared to raw arithmetic.
 **Action:** Use scalar distance (`(x1-x2)**2 + (y1-y2)**2 < threshold**2`) in coordinate processing loops to bypass NumPy allocation overhead.
 
+## 2025-02-18 - [Vectorize Image Matching Filtering]
+**Learning:** In `match_template_with_multiple_targets`, extracting matching coordinates via `np.where(res >= threshold)`, immediately zipping into Python tuples, and sorting with `sorted(points, key=lambda x: res[x[1], x[0]])` is incredibly slow for large match counts. The overhead of looking up values in the `res` NumPy array from within a Python lambda function per-item causes severe performance bottlenecks.
+**Action:** Always use vectorized NumPy operations for filtering and sorting arrays before converting them to Python data structures. Use `y, x = (res >= threshold).nonzero()`, `scores = res[y, x]`, and `idx = np.argsort(scores)[::-1]` to sort coordinates directly in C, providing massive speedups for UI template matching.
 ## 2026-07-21 - Avoid Multiple Screenshots in UI Automation Polling
 **Learning:** Sequential `auto.find_element()` calls across a block of elements (e.g. searching for very_high to very_low buttons) will capture a new screenshot each time, causing massive I/O overhead.
 **Action:** Take one screenshot manually before the loop (`auto.take_screenshot()`), then pass `take_screenshot=False` to all subsequent `find_element` calls using that frame to dramatically speed up the check sequence.

@@ -336,10 +336,25 @@ class ImageUtils:
     def match_template_with_multiple_targets(screenshot, template, threshold, min_dist=10):
         # 获取模板的宽度和高度
         w, h = ImageUtils.get_image_info(template)
-        # 存储所有匹配位置的中心点
-        center_points = []
         # 使用matchTemplate对图片进行模板匹配
         res = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
+
+        # 使用 NumPy 向量化操作提取符合阈值的坐标（大幅降低 Python 对象创建开销）
+        y, x = (res >= threshold).nonzero()
+
+        if len(y) > 0:
+            # 根据匹配得分从高到低对坐标进行排序
+            scores = res[y, x]
+            idx = np.argsort(scores)[::-1]
+            x_sorted, y_sorted = x[idx], y[idx]
+
+            center_points = []
+            min_dist_sq = min_dist**2
+
+            # 遍历排序后的匹配位置执行非极大值抑制（NMS）
+            for i in range(len(x_sorted)):
+                pt_x, pt_y = x_sorted[i], y_sorted[i]
+
         # 遍历所有超过阈值的区域
         loc = np.where(res >= threshold)
 
@@ -396,15 +411,19 @@ class ImageUtils:
                 # 使用简单的标量算术（平方欧氏距离）和 early break 来代替 np.linalg.norm 的 O(n^2) 内存分配，提升性能。
                 keep = True
                 for kept_pt in center_points:
+                    if (pt_x - kept_pt[0]) ** 2 + (pt_y - kept_pt[1]) ** 2 <= min_dist_sq:
                     if (pt[0] - kept_pt[0]) ** 2 + (pt[1] - kept_pt[1]) ** 2 <= min_dist_sq:
                         keep = False
                         break
                 if keep:
                     # 如果没有太近的匹配点，保留当前匹配点
-                    center_points.append(pt)
+                    center_points.append((pt_x, pt_y))
+
             # 计算每个匹配点的中心坐标
             center_points = [(int(pt[0] + w / 2), int(pt[1] + h / 2)) for pt in center_points]
             return center_points
+
+        log.debug(f"未找到匹配项，最高匹配度为：{np.max(res)}")
         return []
 
     @staticmethod
