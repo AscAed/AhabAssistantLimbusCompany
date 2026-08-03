@@ -3,8 +3,8 @@ from time import sleep
 from module.automation import auto
 from module.config import cfg
 from module.decorator.decorator import begin_and_finish_time_log
-from module.logger import log
 from module.game_and_screen import screen
+from module.logger import log
 
 
 # 清队
