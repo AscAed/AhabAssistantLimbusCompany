@@ -44,3 +44,7 @@
 **Vulnerability:** Setting file permissions to `777` (read, write, execute for everyone) via `chmod` creates an over-permissive environment on Android devices. This allows any process or user on the device to tamper with or execute the pushed binaries, posing a significant security risk.
 **Learning:** When pushing executables to a device using tools like ADB, it's common for developers to lazily use `chmod 777` to guarantee execution. This violates the Principle of Least Privilege and introduces a security flaw where malware could modify the executable. The issue was observed in `pyminitouch/connection.py`.
 **Prevention:** Enforce the Principle of Least Privilege by using `chmod 755` (read/execute for all, write only for owner) instead of `chmod 777` when setting file permissions for executables pushed to external devices.
+## 2024-05-28 - [Zip Slip bypass due to prefix matching]
+**Vulnerability:** The Zip Slip fix in `safe_unpack_archive` used `member_path.startswith(extract_dir)`. This check is vulnerable because a path like `/app/data_malicious/file.txt` matches the prefix `/app/data` if `/app/data` is the `extract_dir`, bypassing the validation and allowing path traversal.
+**Learning:** `startswith` checks on strings are not secure for path boundary validation.
+**Prevention:** Always use path-aware functions like `os.path.commonpath([extract_dir, member_path]) == extract_dir` to ensure the resolved member path strictly resides inside the extraction directory.
