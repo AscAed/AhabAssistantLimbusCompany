@@ -208,6 +208,7 @@ class NormalTextButton(BaseButton):
 
         self.text = button_text
         self.button = PushButton(button_text, self)
+        self.button.setCursor(Qt.CursorShape.PointingHandCursor)
         if tactics == 1:
             self.button.setSizePolicy(
                 QSizePolicy.Expanding,  # 水平方向自动扩展
