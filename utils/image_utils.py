@@ -343,6 +343,15 @@ class ImageUtils:
         # 遍历所有超过阈值的区域
         loc = np.where(res >= threshold)
 
+        # 性能优化：使用 NumPy 的 argsort 进行向量化排序
+        # 避免 Python 内置的 sorted() 在处理大数组和使用 lambda 时的巨大开销
+        y_loc, x_loc = loc
+        if len(y_loc) > 0:
+            scores = res[y_loc, x_loc]
+            sort_idx = np.argsort(scores)[::-1]
+            sorted_points = list(zip(x_loc[sort_idx].tolist(), y_loc[sort_idx].tolist()))
+        else:
+            sorted_points = []
         # 对匹配结果进行排序，根据匹配度得分从高到低
         # 优化：使用 numpy 向量化排序 (np.argsort) 替代 Python 内置的 sorted() 和 lambda 表达式，避免昂贵的 Python 循环和查找开销
         scores = res[loc]

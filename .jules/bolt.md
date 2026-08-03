@@ -27,6 +27,9 @@
 ## 2026-07-21 - Avoid Multiple Screenshots in UI Automation Polling
 **Learning:** Sequential `auto.find_element()` calls across a block of elements (e.g. searching for very_high to very_low buttons) will capture a new screenshot each time, causing massive I/O overhead.
 **Action:** Take one screenshot manually before the loop (`auto.take_screenshot()`), then pass `take_screenshot=False` to all subsequent `find_element` calls using that frame to dramatically speed up the check sequence.
+## 2025-02-12 - Prevent environment pollution in tests
+**Learning:** Adding a root-level `conftest.py` with heavy global mocks for Windows libraries (like `pywintypes`, `win32gui`, `ctypes`) in a shared environment can aggressively pollute the entire test suite, breaking tests that legitimately rely on OS-specific behavior in actual production.
+**Action:** Always clean up temporary or root-level mock files (e.g. `conftest.py`, benchmark scripts) created for sandbox testing before committing to ensure the remote test suite is not degraded.
 
 ## 2025-03-05 - Avoid sorted() with lambda for numpy array results
 **Learning:** Using Python's built-in `sorted()` with a lambda key that performs numpy array indexing (like `key=lambda x: res[x[1], x[0]]`) on a large number of coordinates is extremely slow due to the overhead of lambda calls and numpy item lookups inside a python loop.
