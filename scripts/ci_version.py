@@ -175,7 +175,7 @@ def fetch_json(url: str, token: str | None) -> dict[str, Any] | list[Any]:
         headers["Authorization"] = f"Bearer {token}"
 
     request = Request(url, headers=headers)
-    with urlopen(request) as response:
+    with urlopen(request, timeout=10) as response:
         return json.load(response)
 
 

@@ -41,3 +41,4 @@ __main_dev_temp__.py
 .venv2/
 isolated_test_env/
 test_env/
+test_env/

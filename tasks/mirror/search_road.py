@@ -519,9 +519,10 @@ def identify_nodes(bus_x):
     for i in range(rows):
         # 提取类别置信度
         classes_scores = outputs[0][i][4:]
-        minScore, maxScore, minClassLoc, (x, maxClassIndex) = cv2.minMaxLoc(
+        minScore, maxScore, minClassLoc, maxClassLoc = cv2.minMaxLoc(
             classes_scores
         )
+        maxClassIndex = maxClassLoc[0]
 
         # 若最大置信度超过阈值（0.25），则保留该检测结果
         if maxScore >= 0.25:

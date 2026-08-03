@@ -378,10 +378,10 @@ class ThemePackCard(QFrame):
         self.reset_btn = TransparentToolButton(FIF.SYNC, self)
         self.reset_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.reset_btn.setToolTip(self.tr("撤销覆盖"))
-        self.reset_btn.installEventFilter(ToolTipFilter(self.reset_btn, showDelay=300, position=ToolTipPosition.BOTTOM))
+        self.reset_btn.setAccessibleName(self.tr("撤销覆盖"))
         self.reset_btn.installEventFilter(
             ToolTipFilter(
-                self.reset_btn, showDelay=0, position=ToolTipPosition.BOTTOM
+                self.reset_btn, showDelay=300, position=ToolTipPosition.BOTTOM
             )
         )
         self.reset_btn.setVisible(False)
@@ -667,6 +667,7 @@ class ThemePackSettingDialog(FramelessDialog):
         # 批量操作下拉菜单按钮
         self.batch_menu_button = DropDownPushButton(self.tr("批量操作"), self)
         self.batch_menu_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.batch_menu_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.batch_menu = RoundMenu(parent=self)
 
         self.reset_action = Action(FIF.SYNC, self.tr("重置为默认"))
@@ -705,32 +706,38 @@ class ThemePackSettingDialog(FramelessDialog):
         # 导入导出按钮（仅队伍特定配置显示）
         self.export_button = PushButton(FIF.UP, self.tr("导出"))
         self.export_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.export_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.export_button.clicked.connect(self.on_export_settings)
         self.export_button.setVisible(self.is_team_specific)
 
         self.import_button = PushButton(FIF.DOWN, self.tr("导入"))
         self.import_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.import_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.import_button.clicked.connect(self.on_import_settings)
         self.import_button.setVisible(self.is_team_specific)
 
         # 配置码导入导出按钮
         self.copy_code_button = PushButton(FIF.SHARE, self.tr("导出配置码"))
         self.copy_code_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.copy_code_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.copy_code_button.clicked.connect(self.on_export_code)
         self.copy_code_button.setVisible(self.is_team_specific)
 
         self.paste_code_button = PushButton(FIF.EDIT, self.tr("导入配置码"))
         self.paste_code_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.paste_code_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.paste_code_button.clicked.connect(self.on_import_code)
         self.paste_code_button.setVisible(self.is_team_specific)
 
         # 主要操作按钮
         self.save_button = PrimaryPushButton(self.tr("保存并关闭"), self)
         self.save_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.save_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.save_button.clicked.connect(self.save_and_close)
 
         self.close_button = PushButton(self.tr("关闭"), self)
         self.close_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.close_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.close_button.clicked.connect(self.close)
 
         self.button_layout.addWidget(self.batch_menu_button)
@@ -1064,6 +1071,22 @@ class ThemePackSettingDialog(FramelessDialog):
             default_cfg = theme_list.load_config(theme_list.theme_pack_list_path)
             self.config_data = copy.deepcopy(default_cfg)
         else:
+            normal_default = example_config.get("theme_pack_list", {})
+            hard_default = example_config.get("theme_pack_list_hard", {})
+
+        self.preferred_threshold_spinbox.spin_box.setValue(int(example_config.get("preferred_thresholds", 0)))
+
+        # 重置普通模式显示
+        for pack_key, weight in normal_default.items():
+            if pack_key in self.normal_cards:
+                self.normal_cards[pack_key].update_weight(weight)
+
+        # 重置困难模式显示
+        for pack_key, weight in hard_default.items():
+            if pack_key in self.hard_cards:
+                self.hard_cards[pack_key].update_weight(weight)
+
+        # 标记有未保存的修改
             # Reset specific floor overrides
             if "floors" in self.config_data:
                 self.config_data["floors"].pop(f"floor_{self.current_floor}", None)
