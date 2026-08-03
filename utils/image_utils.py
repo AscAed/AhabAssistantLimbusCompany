@@ -1,6 +1,8 @@
 import functools
 import os
 
+import functools
+
 import cv2
 import numpy as np
 from cv2 import createCLAHE
@@ -13,6 +15,9 @@ from utils.path_manager import path_manager
 
 class ImageUtils:
     @staticmethod
+    @functools.lru_cache(maxsize=32)
+    def _load_image_cached(image_path, resize=True, return_path=False):
+        """内部缓存的图片加载方法，返回只读/共享数据。"""
     @functools.lru_cache(maxsize=128)
     def _cached_load_image(image_path, resize, active_paths_tuple, win_size):
         try:
@@ -61,6 +66,30 @@ class ImageUtils:
         if return_path:
             return image_copy, selected_path
         return image_copy
+
+    @staticmethod
+    def load_image(image_path, resize=True, return_path=False):
+        """
+        加载图片，并根据指定区域裁剪图片。
+        :param image_path: 图片文件路径。
+        :param resize: 是否根据窗口大小调整图片尺寸。
+        :param return_path: 是否返回实际加载到的路径名。
+        :return: 图片数组；若 return_path=True，则返回 (图片数组, 路径名)。
+        """
+        result = ImageUtils._load_image_cached(image_path, resize, return_path)
+        if result is None:
+            return None
+
+        # Safe mutable caching: always return a copy to prevent state corruption
+        if return_path:
+            image_data, path_data = result
+            if image_data is not None:
+                return image_data.copy(), path_data
+            return result
+        else:
+            if result is not None:
+                return result.copy()
+            return result
 
     @staticmethod
     def check_default_path_exists(image_path):
