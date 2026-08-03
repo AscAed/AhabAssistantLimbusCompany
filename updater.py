@@ -8,6 +8,41 @@ from pathlib import PurePosixPath
 import psutil
 
 
+def safe_unpack_archive(archive_path, extract_dir, format=None):
+    """安全解压归档文件，防止 Zip Slip (路径穿越) 漏洞。"""
+    import os
+    import shutil
+    import tarfile
+    import zipfile
+
+    extract_dir = os.path.abspath(extract_dir)
+
+    if archive_path.endswith(".zip") or format == "zip":
+        with zipfile.ZipFile(archive_path, "r") as zf:
+            for member in zf.namelist():
+                member_path = os.path.abspath(os.path.join(extract_dir, member))
+                if os.path.commonpath([extract_dir, member_path]) != extract_dir:
+                    raise ValueError(f"检测到 Zip Slip 漏洞，非法路径: {member}")
+            zf.extractall(extract_dir)
+    elif archive_path.endswith((".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz")) or format in (
+        "tar",
+        "gztar",
+        "bztar",
+        "xztar",
+    ):
+        with tarfile.open(archive_path, "r:*") as tf:
+            for member in tf.getmembers():
+                member_path = os.path.abspath(os.path.join(extract_dir, member.name))
+                if os.path.commonpath([extract_dir, member_path]) != extract_dir:
+                    raise ValueError(f"检测到 Zip Slip 漏洞，非法路径: {member.name}")
+            if hasattr(tarfile, "data_filter"):
+                tf.extractall(extract_dir, filter="data")
+            else:
+                tf.extractall(extract_dir)
+    else:
+        shutil.unpack_archive(archive_path, extract_dir, format=format)
+
+
 class Updater:
     """应用程序更新器，负责检查、下载、解压和安装最新版本的应用程序。"""
 
@@ -32,9 +67,7 @@ class Updater:
             self.extract_folder_path = self.temp_path
         else:
             self.download_file_path = os.path.join(self.temp_path, self.file_name)
-            self.extract_folder_path = os.path.join(
-                self.temp_path, self.file_name.rsplit(".", 1)[0]
-            )
+            self.extract_folder_path = os.path.join(self.temp_path, self.file_name.rsplit(".", 1)[0])
 
     def extract_file(self):
         """解压下载的文件。"""
@@ -53,7 +86,7 @@ class Updater:
                         check=True,
                     )
                 else:
-                    shutil.unpack_archive(self.download_file_path, self.temp_path)
+                    safe_unpack_archive(self.download_file_path, self.temp_path)
                 print("解压完成")
                 return True
             except Exception:
@@ -152,11 +185,7 @@ class Updater:
 
     def _normalize_manifest_path(self, relative_path):
         """兼容带归档根目录前缀与普通相对路径的增量清单。"""
-        parts = [
-            part
-            for part in PurePosixPath(relative_path.replace("\\", "/")).parts
-            if part not in ("", ".")
-        ]
+        parts = [part for part in PurePosixPath(relative_path.replace("\\", "/")).parts if part not in ("", ".")]
         if not parts:
             return None
 
@@ -215,9 +244,7 @@ class Updater:
         """终止相关进程以准备更新。"""
         print("开始终止进程...")
         for proc in psutil.process_iter(attrs=["pid", "name"]):
-            if proc.info["name"] in self.process_names or any(
-                name in proc.info["name"] for name in self.process_names
-            ):
+            if proc.info["name"] in self.process_names or any(name in proc.info["name"] for name in self.process_names):
                 try:
                     proc.terminate()
                     try:
@@ -269,9 +296,7 @@ class Updater:
         self.terminate_processes()
         self.cover_folder()
         self.cleanup()
-        input(
-            "已完成更新，按回车键退出并打开软件\nThe update is complete, press enter to exit and open the software"
-        )
+        input("已完成更新，按回车键退出并打开软件\nThe update is complete, press enter to exit and open the software")
         if subprocess.run(["cmd", "/c", "start", '""', os.path.abspath("./AALC.exe")], check=False).returncode != 0:
             subprocess.Popen(os.path.abspath("./AALC.exe"))
 
