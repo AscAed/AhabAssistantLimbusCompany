@@ -14,26 +14,18 @@ class EventHandling:
         self.times = 0
 
     def decision_event_handling(self):
-        if best_option := auto.find_element("event/very_high.png"):
-            auto.mouse_action_with_pos(best_option)
-            self.change_mode = self.MAX_CHANGE
-        elif best_option := auto.find_element("event/high.png"):
-            auto.mouse_action_with_pos(best_option)
-            self.change_mode = self.MAX_CHANGE
-        elif best_option := auto.find_element("event/normal.png"):
-            auto.mouse_action_with_pos(best_option)
-            self.change_mode = self.MAX_CHANGE
-        elif best_option := auto.find_element("event/low.png"):
-            auto.mouse_action_with_pos(best_option)
-            self.change_mode = self.MAX_CHANGE
-        elif best_option := auto.find_element("event/very_low.png"):
-            auto.mouse_action_with_pos(best_option)
-            self.change_mode = self.MAX_CHANGE
+        # ⚡ Bolt: Cache a single screenshot for all find_element calls to avoid taking 5 sequential screenshots
+        auto.take_screenshot()
+        for level in ["very_high", "high", "normal", "low", "very_low"]:
+            if best_option := auto.find_element(f"event/{level}.png", take_screenshot=False):
+                auto.mouse_action_with_pos(best_option)
+                self.change_mode = self.MAX_CHANGE
+                return
+
+        if self.change_mode >= 0:
+            self.change_mode -= 1
         else:
-            if self.change_mode >= 0:
-                self.change_mode -= 1
-            else:
-                self.decision_event_handling_ocr()
+            self.decision_event_handling_ocr()
 
     def decision_event_handling_ocr(self):
         now_time = time.time()
@@ -47,16 +39,16 @@ class EventHandling:
             ocr_result = extract_levels(ocr_data)
             try:
                 order = ocr_result.index("very high")
-            except:
+            except Exception:
                 try:
                     order = ocr_result.index("high")
-                except:
+                except Exception:
                     try:
                         order = ocr_result.index("normal")
-                    except:
+                    except Exception:
                         try:
                             order = ocr_result.index("low")
-                        except:
+                        except Exception:
                             order = ocr_result.index("very low")
             scale = cfg.set_win_size / 1440
             first_sinner = [150 * scale, 1300 * scale]

@@ -4,6 +4,21 @@
 ## 2024-03-24 - Qt Event Filters in Refresh Loops
 **Learning:** Avoid installing event filters (like `ToolTipFilter` in `qfluentwidgets`) inside dynamic UI update loops (e.g., `_refresh_preview`). Qt appends rather than overwrites event filters, leading to memory leaks and duplicated events on the same widget.
 **Action:** Always install event filters once during widget initialization (`__init__`) and only update properties (like `setToolTip()`) during dynamic refreshes.
+## 2024-07-22 - Pointer Cursor Affordance on Action Buttons
+**Learning:** PySide6 action buttons (like PushButton and DropDownPushButton) in standard QWidget layouts do not default to `Qt.CursorShape.PointingHandCursor`, which reduces interactivity affordance. Manually overriding `setCursor` on UI buttons significantly improves accessibility and intuitive use.
+**Action:** Always verify small action buttons and icon buttons explicitly have pointing hand cursors when implementing new UI components in PySide6 with `qfluentwidgets`.
 ## 2024-07-20 - [Affordance and Tooltips for Small Buttons in qfluentwidgets]
 **Learning:** When adding icon-only or small buttons (like `TransparentToolButton`) in PySide6 with `qfluentwidgets`, they do not get clear hover cursor affordance or nice accessible tooltips automatically just from `setToolTip`. Qt appends event filters, so they must be installed carefully.
 **Action:** Explicitly set `Qt.CursorShape.PointingHandCursor` for visual affordance, and install a `ToolTipFilter(btn, showDelay=0, position=ToolTipPosition.BOTTOM)` to render accessible, readable tooltips.
+## 2024-07-21 - [Icon-Only Button Affordance in team_setting_card.py]
+**Learning:** Icon-only hint buttons (like `preview_hint_button` using `ToolButton`) need a `PointingHandCursor` rather than an `ArrowCursor` to communicate to users that the element can be interacted with, especially since tooltips require hovering to discover.
+**Action:** Always verify that small hint/info tool buttons have `Qt.CursorShape.PointingHandCursor` set explicitly when built using qfluentwidgets or PySide6 components.
+## 2024-07-23 - [Action Button Affordance for PySide6 Layouts]
+**Learning:** Action buttons from `qfluentwidgets` (like `PushButton`, `PrimaryPushButton`) do not default to a pointing hand cursor in standard QWidget layouts.
+**Action:** Explicitly call `setCursor(Qt.CursorShape.PointingHandCursor)` on them for proper UX and visual affordance.
+## 2024-07-23 - [Action Button Affordance in qfluentwidgets]
+**Learning:** Standard `PushButton` and `PrimaryPushButton` widgets from `qfluentwidgets` do not inherit pointing hand cursors by default when used in standard layouts, which diminishes interaction affordance.
+**Action:** When working with PySide6 and qfluentwidgets, explicitly call `setCursor(Qt.CursorShape.PointingHandCursor)` on `PushButton` and `PrimaryPushButton` to ensure users receive expected hover feedback on clickable elements.
+## 2024-05-18 - [Missing Interactive Cursors on Custom Components]
+**Learning:** In PySide6 with `qfluentwidgets`, custom buttons extending `PushButton` or `PrimaryPushButton` (like those in `BasePushSettingCard` or `app/farming_interface.py`) do not inherit `Qt.CursorShape.PointingHandCursor` automatically. This leads to a lack of interactive affordance when users hover over primary action buttons.
+**Action:** Always explicitly set `self.button.setCursor(Qt.CursorShape.PointingHandCursor)` when instantiating or customizing generic `PushButton`s and `PrimaryPushButton`s to ensure users visually recognize them as clickable elements.

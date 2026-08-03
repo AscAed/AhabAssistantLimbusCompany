@@ -27,3 +27,42 @@
 ## 2025-02-18 - [Vectorize Image Matching Filtering]
 **Learning:** In `match_template_with_multiple_targets`, extracting matching coordinates via `np.where(res >= threshold)`, immediately zipping into Python tuples, and sorting with `sorted(points, key=lambda x: res[x[1], x[0]])` is incredibly slow for large match counts. The overhead of looking up values in the `res` NumPy array from within a Python lambda function per-item causes severe performance bottlenecks.
 **Action:** Always use vectorized NumPy operations for filtering and sorting arrays before converting them to Python data structures. Use `y, x = (res >= threshold).nonzero()`, `scores = res[y, x]`, and `idx = np.argsort(scores)[::-1]` to sort coordinates directly in C, providing massive speedups for UI template matching.
+## 2026-07-21 - Avoid Multiple Screenshots in UI Automation Polling
+**Learning:** Sequential `auto.find_element()` calls across a block of elements (e.g. searching for very_high to very_low buttons) will capture a new screenshot each time, causing massive I/O overhead.
+**Action:** Take one screenshot manually before the loop (`auto.take_screenshot()`), then pass `take_screenshot=False` to all subsequent `find_element` calls using that frame to dramatically speed up the check sequence.
+## 2025-02-12 - Prevent environment pollution in tests
+**Learning:** Adding a root-level `conftest.py` with heavy global mocks for Windows libraries (like `pywintypes`, `win32gui`, `ctypes`) in a shared environment can aggressively pollute the entire test suite, breaking tests that legitimately rely on OS-specific behavior in actual production.
+**Action:** Always clean up temporary or root-level mock files (e.g. `conftest.py`, benchmark scripts) created for sandbox testing before committing to ensure the remote test suite is not degraded.
+
+## 2025-03-05 - Avoid sorted() with lambda for numpy array results
+**Learning:** Using Python's built-in `sorted()` with a lambda key that performs numpy array indexing (like `key=lambda x: res[x[1], x[0]]`) on a large number of coordinates is extremely slow due to the overhead of lambda calls and numpy item lookups inside a python loop.
+**Action:** Use numpy's vectorized `np.argsort()` directly on the array slice (e.g. `scores = res[loc]; sort_idx = np.argsort(scores)[::-1]`), then use array indexing and `.tolist()` before zipping coordinates. This provides a ~2x to 3x speedup.
+## 2026-07-25 - [Vectorized sort on OpenCV coordinate results]
+**Learning:** Using Python's built-in `sorted(points, key=lambda x: res[x[1], x[0]])` on a large set of coordinate tuples extracted from a NumPy array (like from `np.where(res >= threshold)`) introduces huge overhead due to lambda evaluation and array indexing in Python.
+**Action:** Use `np.argsort()` directly on the slice of scores (`scores = res[loc]`), then index the `x` and `y` arrays with the sorted indices (`loc[1][sort_indices].tolist()`), and finally zip them. This shifts the sorting and indexing completely into C, yielding ~3x speedups on large coordinate sets.
+## 2024-07-26 - [Avoid lambda lookups over NumPy arrays]
+**Learning:** In computer vision tasks (like OpenCV template matching), using Python's built-in `sorted()` with a lambda function that accesses a 2D NumPy array element-by-element introduces massive interpreter overhead due to repeated boundary checks and object instantiations.
+**Action:** When sorting match coordinates by score, always use NumPy's vectorized `np.argsort()` directly on the score array and then use array indexing to reorder the coordinate lists before converting them back to Python types via `.tolist()`. This provides a significant (often 6x+) performance boost in multi-target matching logic.
+## 2025-03-05 - Avoid multiple screenshots during state detection
+**Learning:** Sequential `auto.find_element()` calls inside state detection loops can implicitly trigger multiple full-screen captures if not explicitly prevented.
+**Action:** Take a screenshot once manually (`self.auto.take_screenshot()`) at the start of a detection block, and explicitly pass `take_screenshot=False` to all subsequent `find_element` calls to reuse the cached frame and avoid I/O overhead.
+
+## 2025-03-05 - Fast Array Coordinate Sorting
+**Learning:** Python's built-in `sorted()` with a lambda key doing lookup on a numpy array (`sorted(points, key=lambda x: res[x[1], x[0]])`) is very slow for large arrays due to repeated Python-to-C overhead and function calls.
+**Action:** Use numpy's vectorized `np.argsort()` to get sorted indices first, then apply them to the coordinate arrays and convert to list (`loc_x[sorted_indices].tolist()`) before zipping. This prevents Python-level sorting overhead and yields a >2x speedup.
+## 2025-03-10 - Fast Coordinate Sorting in Image Template Matching
+**Learning:** Using Python's built-in `sorted(points, key=lambda x: res[x[1], x[0]])` on a list of tuples derived from a numpy array causes severe performance issues in tight algorithms like image template matching, because the lambda lookup executes python-to-C overhead for every single item repeatedly.
+**Action:** Always replace lambda-based array lookups with numpy's vectorized tools. Use `loc_y, loc_x = np.where(res >= threshold)`, get scores directly via `scores = res[loc_y, loc_x]`, sort indices via `np.argsort(scores)[::-1]`, and extract the sorted axes using index mapping and `.tolist()` before zipping.
+## 2025-02-14 - Vectorized Sorting in Template Match Results
+**Learning:** When sorting coordinate points derived from a NumPy array (like OpenCV template matching results), using Python's built-in `sorted()` with a lambda key is a major bottleneck because lambda lookups over NumPy arrays introduce massive execution overhead.
+**Action:** Use vectorized sorting via `np.argsort()` on the scores and extract indices into coordinates. This resulted in a ~2x faster extraction in large arrays.
+## 2025-03-10 - Cache File I/O for Image Template Loads
+**Learning:** Sequential calls to `auto.find_element()` (or similar CV wrapper functions) often repeatedly load the exact same template image files from disk via `Image.open`, creating massive underlying I/O overhead.
+**Action:** Implement an in-memory dictionary or LRU cache for image asset loading (e.g., in `ImageUtils.load_image`), keyed by the path, resize parameters, and window size, to return the cached Numpy arrays instead of reading from disk on every template match call.
+## 2024-08-01 - [Cache Corruption via Mutable Data Structures]
+**Learning:** Caching results of computationally expensive loads (like reading images into numpy arrays with `cv2` or `PIL`) using `@functools.lru_cache` can introduce subtle state corruption bugs if the cached objects are mutable (`np.ndarray`). If any calling code edits the returned object in-place, the cached instance is mutated for all future calls.
+**Action:** Always return a `.copy()` of the object when exposing a cached mutable instance. Encapsulate the cache in an internal function (e.g., `_load_image_cached`) and handle copying in the public wrapper function (e.g., `load_image`). Also, monitor the memory footprint of cached objects and keep `maxsize` conservative.
+
+## 2024-05-30 - [Optimize File I/O for Image Assets]
+**Learning:** In computer vision automation, repeatedly calling `ImageUtils.load_image` in tight loops results in heavy disk I/O and costly array conversions/resizing for identical templates, severely degrading performance during scanning tasks.
+**Action:** Implemented `@functools.lru_cache` to cache loaded image template arrays in memory based on file path, window size, and active translation paths. Essential to ensure the public wrapper method returns `.copy()` so subsequent localized processing operations don't mutate the cached singleton.

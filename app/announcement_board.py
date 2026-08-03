@@ -205,6 +205,7 @@ class AnnouncementBoard(FramelessDialog):
 
         # 确认按钮
         self.yesButton = PrimaryPushButton(self.tr("确认"))
+        self.yesButton.setCursor(Qt.CursorShape.PointingHandCursor)
         self.yesButton.setFixedWidth(100)
         self.yesButton.setAttribute(Qt.WA_LayoutUsesWidgetRect)
         self.yesButton.clicked.connect(self.accept)
