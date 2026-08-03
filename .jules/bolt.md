@@ -46,3 +46,10 @@
 ## 2025-03-10 - Cache File I/O for Image Template Loads
 **Learning:** Sequential calls to `auto.find_element()` (or similar CV wrapper functions) often repeatedly load the exact same template image files from disk via `Image.open`, creating massive underlying I/O overhead.
 **Action:** Implement an in-memory dictionary or LRU cache for image asset loading (e.g., in `ImageUtils.load_image`), keyed by the path, resize parameters, and window size, to return the cached Numpy arrays instead of reading from disk on every template match call.
+## 2024-08-01 - [Cache Corruption via Mutable Data Structures]
+**Learning:** Caching results of computationally expensive loads (like reading images into numpy arrays with `cv2` or `PIL`) using `@functools.lru_cache` can introduce subtle state corruption bugs if the cached objects are mutable (`np.ndarray`). If any calling code edits the returned object in-place, the cached instance is mutated for all future calls.
+**Action:** Always return a `.copy()` of the object when exposing a cached mutable instance. Encapsulate the cache in an internal function (e.g., `_load_image_cached`) and handle copying in the public wrapper function (e.g., `load_image`). Also, monitor the memory footprint of cached objects and keep `maxsize` conservative.
+
+## 2024-05-30 - [Optimize File I/O for Image Assets]
+**Learning:** In computer vision automation, repeatedly calling `ImageUtils.load_image` in tight loops results in heavy disk I/O and costly array conversions/resizing for identical templates, severely degrading performance during scanning tasks.
+**Action:** Implemented `@functools.lru_cache` to cache loaded image template arrays in memory based on file path, window size, and active translation paths. Essential to ensure the public wrapper method returns `.copy()` so subsequent localized processing operations don't mutate the cached singleton.
