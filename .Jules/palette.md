@@ -13,3 +13,12 @@
 ## 2024-07-21 - [Icon-Only Button Affordance in team_setting_card.py]
 **Learning:** Icon-only hint buttons (like `preview_hint_button` using `ToolButton`) need a `PointingHandCursor` rather than an `ArrowCursor` to communicate to users that the element can be interacted with, especially since tooltips require hovering to discover.
 **Action:** Always verify that small hint/info tool buttons have `Qt.CursorShape.PointingHandCursor` set explicitly when built using qfluentwidgets or PySide6 components.
+## 2024-07-23 - [Action Button Affordance for PySide6 Layouts]
+**Learning:** Action buttons from `qfluentwidgets` (like `PushButton`, `PrimaryPushButton`) do not default to a pointing hand cursor in standard QWidget layouts.
+**Action:** Explicitly call `setCursor(Qt.CursorShape.PointingHandCursor)` on them for proper UX and visual affordance.
+## 2024-07-23 - [Action Button Affordance in qfluentwidgets]
+**Learning:** Standard `PushButton` and `PrimaryPushButton` widgets from `qfluentwidgets` do not inherit pointing hand cursors by default when used in standard layouts, which diminishes interaction affordance.
+**Action:** When working with PySide6 and qfluentwidgets, explicitly call `setCursor(Qt.CursorShape.PointingHandCursor)` on `PushButton` and `PrimaryPushButton` to ensure users receive expected hover feedback on clickable elements.
+## 2024-05-18 - [Missing Interactive Cursors on Custom Components]
+**Learning:** In PySide6 with `qfluentwidgets`, custom buttons extending `PushButton` or `PrimaryPushButton` (like those in `BasePushSettingCard` or `app/farming_interface.py`) do not inherit `Qt.CursorShape.PointingHandCursor` automatically. This leads to a lack of interactive affordance when users hover over primary action buttons.
+**Action:** Always explicitly set `self.button.setCursor(Qt.CursorShape.PointingHandCursor)` when instantiating or customizing generic `PushButton`s and `PrimaryPushButton`s to ensure users visually recognize them as clickable elements.
