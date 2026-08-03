@@ -22,6 +22,10 @@
 **Vulnerability:** Similar to `requests.get`, `urllib.request.urlopen()` calls without a `timeout` parameter will hang indefinitely if the remote server fails to respond, potentially causing the CI build process to deadlock.
 **Learning:** This vulnerability is easy to miss when auditing third-party libraries (like `requests`), as developers might fall back on built-in standard library tools like `urllib` without realizing they share the exact same default behavior of infinite timeouts.
 **Prevention:** Always explicitly define a `timeout` parameter (e.g., `timeout=10`) when using `urllib.request.urlopen` or any other built-in HTTP request function, in addition to third-party libraries.
+## 2026-07-23 - [Overly Permissive File Access in Executable Pushing]
+**Vulnerability:** The automation module pushed the `minitouch` executable to Android devices via ADB and explicitly set its permissions to `777` (world-writable).
+**Learning:** Using `chmod 777` grants write access to any user on the system, which allows malicious actors or other compromised processes to overwrite the executable and execute arbitrary code with elevated privileges when the script is run. This was an attempt to ensure execution but violated the Principle of Least Privilege.
+**Prevention:** Always use `chmod 755` when setting permissions for executables that need to be run, granting execute permissions without opening the file to modification by unauthorized users.
 ## 2025-02-23 - [Overly Permissive File Permissions on Executables]
 **Vulnerability:** Executing `chmod 777` when pushing binaries to an Android device (e.g., `minitouch`) grants read, write, and execute permissions to all users (owner, group, and others). This over-permissive setting violates the Principle of Least Privilege and can allow local attackers or other applications on the device to modify or hijack the executable payload.
 **Learning:** Utilities that deploy agents or binaries onto remote systems often fall back to `chmod 777` as a "catch-all" to ensure it runs, ignoring the security implications of granting world-write access.
