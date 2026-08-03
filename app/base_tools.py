@@ -246,6 +246,7 @@ class ToSettingButton(BaseButton):
         self.button = SplitToolButton(icon, self)
         self.button.setCursor(Qt.PointingHandCursor)
         self.button.setToolTip("设置")
+        self.button.setAccessibleName("设置")
         self.button.installEventFilter(
             ToolTipFilter(
                 self.button, showDelay=300, position=ToolTipPosition.BOTTOM
@@ -279,6 +280,7 @@ class ToSettingButton(BaseButton):
 
     def retranslateUi(self):
         self.button.setToolTip(self.tr("设置"))
+        self.button.setAccessibleName(self.tr("设置"))
         self.edit_name.setText(self.tr("命名"))
         self.del_action.setText(self.tr("删除"))
         self.copy_settings.setText(self.tr("复制"))
@@ -300,6 +302,7 @@ class ChangePageButton(BaseButton):
         self.button = ToggleToolButton(icon, self)
         self.button.setCursor(Qt.PointingHandCursor)
         self.button.setToolTip("切换页面")
+        self.button.setAccessibleName("切换页面")
         self.button.installEventFilter(
             ToolTipFilter(
                 self.button, showDelay=300, position=ToolTipPosition.BOTTOM
@@ -323,6 +326,7 @@ class ChangePageButton(BaseButton):
 
     def retranslateUi(self):
         self.button.setToolTip(self.tr("切换页面"))
+        self.button.setAccessibleName(self.tr("切换页面"))
 
 
 class SettingTeamsButton(BaseButton):
@@ -340,6 +344,7 @@ class SettingTeamsButton(BaseButton):
         self.button = ToolButton(icon, self)
         self.button.setCursor(Qt.PointingHandCursor)
         self.button.setToolTip("设置队伍")
+        self.button.setAccessibleName("设置队伍")
         self.button.installEventFilter(
             ToolTipFilter(
                 self.button, showDelay=300, position=ToolTipPosition.BOTTOM
@@ -354,6 +359,7 @@ class SettingTeamsButton(BaseButton):
 
     def retranslateUi(self):
         self.button.setToolTip(self.tr("设置队伍"))
+        self.button.setAccessibleName(self.tr("设置队伍"))
 
 
 class BaseLabel(BaseLayout):
