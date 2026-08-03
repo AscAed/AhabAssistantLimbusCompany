@@ -1,10 +1,9 @@
 import random
-import numpy as np
-from time import sleep, time
+from time import sleep
 from typing import overload
 
+import numpy as np
 import pyautogui
-import pyperclip
 import win32api
 import win32con
 import win32gui

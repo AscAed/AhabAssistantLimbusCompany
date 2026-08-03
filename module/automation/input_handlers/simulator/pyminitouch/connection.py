@@ -67,6 +67,10 @@ class MNTInstaller(object):
             device.sync.push(local_path, remote_path)
 
             # 授权 (chmod 755 - Principle of Least Privilege to prevent over-permissive file access vulnerabilities)
+            # 授权 (chmod 755)
+            # 授权 (chmod 755) - 🛡️ Sentinel: Enforce Principle of Least Privilege
+            # 授权 (chmod 755)
+            # 🛡️ Sentinel: Enforce Principle of Least Privilege
             device.shell(["chmod", "755", remote_path])
 
     def get_abi(self):
