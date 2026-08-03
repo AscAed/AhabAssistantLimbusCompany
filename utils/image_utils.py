@@ -342,6 +342,14 @@ class ImageUtils:
         res = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
         # 遍历所有超过阈值的区域
         loc = np.where(res >= threshold)
+
+        # 对匹配结果进行排序，根据匹配度得分从高到低
+        # 优化：使用 numpy 向量化排序 (np.argsort) 替代 Python 内置的 sorted() 和 lambda 表达式，避免昂贵的 Python 循环和查找开销
+        scores = res[loc]
+        sort_idx = np.argsort(scores)[::-1]
+        y_coords = loc[0][sort_idx].tolist()
+        x_coords = loc[1][sort_idx].tolist()
+        sorted_points = list(zip(x_coords, y_coords))
         # ⚡ Bolt: Replace Python lambda sorting with vectorized NumPy sorting for ~3x performance improvement
         scores = res[loc]
         sort_indices = np.argsort(scores)[::-1]
