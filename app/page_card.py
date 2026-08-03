@@ -438,6 +438,7 @@ class PageMirror(PageCard):
         self.add_team_button.setMinimumWidth(200)
         self.add_team_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.add_team_button.setToolTip(self.tr("添加队伍"))
+        self.add_team_button.setAccessibleName(self.tr("添加队伍"))
         self.add_team_button.installEventFilter(
             ToolTipFilter(
                 self.add_team_button, showDelay=0, position=ToolTipPosition.BOTTOM
