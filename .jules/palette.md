@@ -7,3 +7,7 @@
 ## 2024-07-29 - Missing affordance on custom PySide6 action buttons
 **Learning:** When adding custom buttons to standard PySide6 dialogs (like `MessageBox`), the framework does not always inherit expected affordances (like the pointing hand cursor or tooltips) that native web elements or predefined dialog actions might have. This leads to inconsistent UX where some buttons react to hover while others don't, which can be confusing for accessibility and general navigation.
 **Action:** Always explicitly set `Qt.CursorShape.PointingHandCursor` and install a `ToolTipFilter` for any custom action buttons added to PyQt/PySide6 message boxes or dialogs to ensure consistent interaction patterns.
+
+## 2025-02-12 - MessageBoxEdit UX Auto-Select & Clear Button
+**Learning:** When using `MessageBoxEdit` to prompt users for text input, the default text is not auto-selected and there is no clear button, making it tedious for users to replace or clear the default value (which is the most common action). PySide6 `qfluentwidgets.LineEdit` supports both auto-selection via `selectAll()` and a clear button via `setClearButtonEnabled(True)`.
+**Action:** Whenever implementing a dialog with pre-filled text input (like `MessageBoxEdit`), always call `self.lineEdit.selectAll()` and `self.lineEdit.setClearButtonEnabled(True)` to allow users to immediately overwrite or easily clear the default value, matching native desktop UX expectations.
