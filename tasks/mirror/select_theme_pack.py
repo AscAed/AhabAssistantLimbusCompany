@@ -67,9 +67,7 @@ def select_theme_pack(
                     None, my_crop=difficulty_bbox, only_text=True
                 )
                 if not isinstance(ocr_result, str):
-                    if auto.find_element(
-                        "mirror/road_in_mir/legend_assets.png", take_screenshot=True
-                    ):
+                    if auto.find_element("mirror/road_in_mir/legend_assets.png"):
                         return
                     continue
                 if "normal" in ocr_result:
@@ -122,7 +120,6 @@ def select_theme_pack(
             if all_theme_pack := auto.find_element(
                 "mirror/theme_pack/theme_pack_features.png",
                 find_type="image_with_multiple_targets",
-                take_screenshot=True,
             ):
                 if floor == 4 and cfg.skip_event_pack:
                     all_theme_pack.sort(key=lambda pos: (pos[0], pos[1]))

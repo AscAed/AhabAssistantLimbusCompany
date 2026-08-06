@@ -69,3 +69,7 @@
 ## 2024-05-30 - [Optimize File I/O for Image Assets]
 **Learning:** In computer vision automation, repeatedly calling `ImageUtils.load_image` in tight loops results in heavy disk I/O and costly array conversions/resizing for identical templates, severely degrading performance during scanning tasks.
 **Action:** Implemented `@functools.lru_cache` to cache loaded image template arrays in memory based on file path, window size, and active translation paths. Essential to ensure the public wrapper method returns `.copy()` so subsequent localized processing operations don't mutate the cached singleton.
+
+## 2026-07-26 - [Avoid redundant screenshots in UI polling loops]
+**Learning:** In polling loops for UI automation, sequential calls to `find_element(..., take_screenshot=True)` will force a fresh screenshot on every check. When a single frame is valid for multiple conditional checks, this introduces massive unnecessary I/O and processing overhead.
+**Action:** Take a screenshot once at the start of the loop (`auto.take_screenshot()`), and remove `take_screenshot=True` from subsequent `find_element` calls within that iteration to reuse the cached frame.
