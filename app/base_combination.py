@@ -29,6 +29,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from qfluentwidgets import (
+    FluentIcon as FIF,
+    TransparentToolButton,
     ComboBox,
     FlyoutViewBase,
     IndicatorPosition,
@@ -799,11 +801,13 @@ class PushSettingCardMirrorchyan(SettingCard):
 
         self.button2 = QPushButton("获取 CDK", self)
         self.button2.setObjectName("primaryButton")
+        self.button2.setCursor(Qt.CursorShape.PointingHandCursor)
         self.hBoxLayout.addWidget(self.button2, 0, Qt.AlignRight)
         self.hBoxLayout.addSpacing(10)
         self.button2.clicked.connect(self.__onclicked2)
 
         self.button = QPushButton(text, self)
+        self.button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.hBoxLayout.addWidget(self.button, 0, Qt.AlignRight)
         self.hBoxLayout.addSpacing(16)
         self.button.clicked.connect(self.__onclicked)
@@ -1010,6 +1014,7 @@ class AutoDailyView(FlyoutViewBase):
 
         self.save_button_text = QT_TRANSLATE_NOOP("AutoDailyView", "保存")
         self.save_button = PrimaryPushButton(self.save_button_text)
+        self.save_button.setCursor(Qt.CursorShape.PointingHandCursor)
 
         self.line_3.addWidget(self.save_button)
 
@@ -1147,6 +1152,7 @@ class DailySettingCard(SwitchSettingCard):
             autodaily_qtime = QTime(0, 0)
         self.autodaily_timepicker.setTime(autodaily_qtime)
         self.button = PushButton(self.button_text, self)
+        self.button.setCursor(Qt.CursorShape.PointingHandCursor)
         current_count = self.hBoxLayout.count()
         self.hBoxLayout.insertWidget(current_count - 2, self.autodaily_timepicker)
         self.hBoxLayout.insertSpacing(current_count - 1, 20)
@@ -1383,6 +1389,7 @@ class HotketInputCard(MessageBox):
         self.key_name: str = cfg.get_value(key_config)
         self.yesButton.setText(self.tr("保存"))
         self.resetButton = PushButton(self.tr("重置"))
+        self.resetButton.setCursor(Qt.CursorShape.PointingHandCursor)
         self.buttonLayout.insertWidget(1, self.resetButton, 1, Qt.AlignVCenter)
         self.cancelButton.setText(self.tr("取消"))
         self.contentLabel.setText(self.tr("按下键盘以设置快捷键, 部分特殊按键可能无法使用"))
@@ -1592,6 +1599,9 @@ class ObserveGiftSelectionRow(QFrame):
         self.row_combo = ComboBox(self)
         self.col_combo = ComboBox(self)
         self.remove_button = TransparentToolButton(FIF.REMOVE, self)
+        self.remove_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.remove_button.setToolTip(self.tr("移除或清空当前控件组"))
+        self.remove_button.installEventFilter(ToolTipFilter(self.remove_button, showDelay=0))
         self.system_group = QWidget(self)
         self.level_group = QWidget(self)
         self.row_group = QWidget(self)
