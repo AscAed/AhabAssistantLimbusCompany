@@ -1,22 +1,10 @@
-import numpy as np
+import re
 
+with open('module/automation/input_handlers/simulator/__init__.py', 'r', encoding='utf-8') as f:
+    content = f.read()
 
-def random_normal_distribution(a, b, n=5):
-    output = np.mean(np.random.uniform(a, b, size=n))
-    return output
-
-
-def random_theta():
-    theta = np.random.uniform(0, 2 * np.pi)
-    return np.array([np.sin(theta), np.cos(theta)])
-
-
-def random_rho(dis):
-    return random_normal_distribution(-dis, dis)
-
-
-def insert_swipe(p0, p3, speed=15, min_distance=10):
-    """
+new_func = """def insert_swipe(p0, p3, speed=15, min_distance=10):
+    \"\"\"
     从起点到终点插入路径点。
     首先生成三次贝塞尔曲线
 
@@ -33,7 +21,7 @@ def insert_swipe(p0, p3, speed=15, min_distance=10):
         > insert_swipe（（400， 400）， （600， 600）， 20）
         [[400, 400], [406, 406], [416, 415], [429, 428], [444, 442], [462, 459], [481, 478], [504, 500], [527, 522],
         [545, 540], [560, 557], [573, 570], [584, 582], [592, 590], [597, 596], [600, 600]]
-    """
+    \"\"\"
     p0 = np.array(p0)
     p3 = np.array(p3)
 
@@ -85,3 +73,15 @@ def insert_swipe(p0, p3, speed=15, min_distance=10):
     else:
         points = [p0.tolist(), p3.tolist()]
     return points
+"""
+
+lines = content.split('\n')
+start_idx = -1
+for i, line in enumerate(lines):
+    if line.startswith('def insert_swipe'):
+        start_idx = i
+        break
+
+if start_idx != -1:
+    with open('module/automation/input_handlers/simulator/__init__.py', 'w', encoding='utf-8') as f:
+        f.write('\n'.join(lines[:start_idx]) + '\n' + new_func)
