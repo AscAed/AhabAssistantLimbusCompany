@@ -204,7 +204,10 @@ class MNTConnection(object):
 
         # build connection
         client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # 🛡️ Sentinel: Enforce timeout to prevent indefinite hang on connection (DoS risk)
+        client.settimeout(10.0)
         client.connect((self._DEFAULT_HOST, self.port))
+        client.settimeout(None) # Reset to blocking mode after connection is established
         self.client = client
 
         # get minitouch server info

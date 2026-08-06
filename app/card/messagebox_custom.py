@@ -141,6 +141,8 @@ class MessageBoxEdit(MessageBox):
 
         self.lineEdit = LineEdit(self)
         self.lineEdit.setText(self.content)
+        self.lineEdit.selectAll()
+        self.lineEdit.setClearButtonEnabled(True)
         self.lineEdit.returnPressed.connect(self.yesButton.click)
 
         self.textLayout.addWidget(self.lineEdit, 0, Qt.AlignTop)
