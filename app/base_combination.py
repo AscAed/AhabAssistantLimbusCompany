@@ -1601,6 +1601,7 @@ class ObserveGiftSelectionRow(QFrame):
         self.remove_button = TransparentToolButton(FIF.REMOVE, self)
         self.remove_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.remove_button.setToolTip(self.tr("移除或清空当前控件组"))
+        self.remove_button.setAccessibleName(self.tr("移除或清空当前控件组"))
         self.remove_button.installEventFilter(ToolTipFilter(self.remove_button, showDelay=0))
         self.system_group = QWidget(self)
         self.level_group = QWidget(self)
