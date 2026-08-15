@@ -1,8 +1,5 @@
-import functools
 import os
 from collections import OrderedDict
-
-import functools
 
 import cv2
 import numpy as np
@@ -57,7 +54,7 @@ class ImageUtils:
         try:
             img_path = None
             selected_path = None
-            for path in active_paths_tuple:
+            for path in tuple(path_manager.pic_path):
                 img_path = os.path.join(f"./assets/images/{path}/{image_path}")
                 if os.path.exists(img_path):
                     selected_path = path
@@ -80,52 +77,6 @@ class ImageUtils:
         except Exception as e:
             log.error(f"加载图片时发生错误： {e}")
             return None, None
-
-    @staticmethod
-    def load_image(image_path, resize=True, return_path=False):
-        """
-        加载图片，并根据指定区域裁剪图片。
-        :param image_path: 图片文件路径。
-        :param resize: 是否根据窗口大小调整图片尺寸。
-        :param return_path: 是否返回实际加载到的路径名。
-        :return: 图片数组；若 return_path=True，则返回 (图片数组, 路径名)。
-        """
-        active_paths_tuple = tuple(path_manager.pic_path)
-        win_size = cfg.set_win_size
-        image, selected_path = ImageUtils._cached_load_image(image_path, resize, active_paths_tuple, win_size)
-
-        if image is None:
-            return (None, None) if return_path else None
-
-        # ⚡ Bolt: Return a copy of the cached image array so mutations don't corrupt the cache
-        image_copy = image.copy()
-        if return_path:
-            return image_copy, selected_path
-        return image_copy
-
-    @staticmethod
-    def load_image(image_path, resize=True, return_path=False):
-        """
-        加载图片，并根据指定区域裁剪图片。
-        :param image_path: 图片文件路径。
-        :param resize: 是否根据窗口大小调整图片尺寸。
-        :param return_path: 是否返回实际加载到的路径名。
-        :return: 图片数组；若 return_path=True，则返回 (图片数组, 路径名)。
-        """
-        result = ImageUtils._load_image_cached(image_path, resize, return_path)
-        if result is None:
-            return None
-
-        # Safe mutable caching: always return a copy to prevent state corruption
-        if return_path:
-            image_data, path_data = result
-            if image_data is not None:
-                return image_data.copy(), path_data
-            return result
-        else:
-            if result is not None:
-                return result.copy()
-            return result
 
     @staticmethod
     def check_default_path_exists(image_path):
@@ -339,98 +290,41 @@ class ImageUtils:
         # 使用matchTemplate对图片进行模板匹配
         res = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
 
-        # 使用 NumPy 向量化操作提取符合阈值的坐标（大幅降低 Python 对象创建开销）
+        # ⚡ Bolt: 使用 NumPy 向量化操作提取符合阈值的坐标（大幅降低 Python 对象创建开销）
         y, x = (res >= threshold).nonzero()
 
-        if len(y) > 0:
-            # 根据匹配得分从高到低对坐标进行排序
-            scores = res[y, x]
-            idx = np.argsort(scores)[::-1]
-            x_sorted, y_sorted = x[idx], y[idx]
-
-            center_points = []
-            min_dist_sq = min_dist**2
-
-            # 遍历排序后的匹配位置执行非极大值抑制（NMS）
-            for i in range(len(x_sorted)):
-                pt_x, pt_y = x_sorted[i], y_sorted[i]
-
-        # 遍历所有超过阈值的区域
-        loc = np.where(res >= threshold)
-        # 对匹配结果进行排序，根据匹配度得分从高到低
-        # ⚡ Bolt: Vectorize numpy sorting and avoid python lambda overhead for ~3.5x speedup
-        loc_y, loc_x = loc
-        scores = res[loc_y, loc_x]
-        sort_idx = np.argsort(scores)[::-1]
-        sorted_points = list(zip(loc_x[sort_idx].tolist(), loc_y[sort_idx].tolist()))
-
-        # 性能优化：使用 NumPy 的 argsort 进行向量化排序
-        # 避免 Python 内置的 sorted() 在处理大数组和使用 lambda 时的巨大开销
-        y_loc, x_loc = loc
-        if len(y_loc) > 0:
-            scores = res[y_loc, x_loc]
-            sort_idx = np.argsort(scores)[::-1]
-            sorted_points = list(zip(x_loc[sort_idx].tolist(), y_loc[sort_idx].tolist()))
-        else:
-            sorted_points = []
-        # 对匹配结果进行排序，根据匹配度得分从高到低
-        # 优化：使用 numpy 向量化排序 (np.argsort) 替代 Python 内置的 sorted() 和 lambda 表达式，避免昂贵的 Python 循环和查找开销
-        scores = res[loc]
-        sort_idx = np.argsort(scores)[::-1]
-        y_coords = loc[0][sort_idx].tolist()
-        x_coords = loc[1][sort_idx].tolist()
-        sorted_points = list(zip(x_coords, y_coords))
-        # ⚡ Bolt: Replace Python lambda sorting with vectorized NumPy sorting for ~3x performance improvement
-        scores = res[loc]
-        sort_indices = np.argsort(scores)[::-1]
-        sorted_x = loc[1][sort_indices].tolist()
-        sorted_y = loc[0][sort_indices].tolist()
-        loc_y, loc_x = np.where(res >= threshold)
-        if len(loc_y) == 0:
+        if len(y) == 0:
             log.debug(f"未找到匹配项，最高匹配度为：{np.max(res)}")
             return []
-
-        # 使用向量化 argsort 替代 Python 的 sorted 和 lambda，大幅提升多目标匹配的性能
-        scores = res[loc_y, loc_x]
-        sort_idx = np.argsort(scores)[::-1]
-        sorted_points = list(zip(loc_x[sort_idx].tolist(), loc_y[sort_idx].tolist()))
-        if len(loc_y) > 0:
-            # ⚡ Bolt: Use vectorized np.argsort instead of sorted() with lambda for O(n) array lookups
-            scores = res[loc_y, loc_x]
-            sorted_indices = np.argsort(scores)[::-1]
-            sorted_points = list(zip(loc_x[sorted_indices].tolist(), loc_y[sorted_indices].tolist()))
 
         # ⚡ Bolt: Fast vectorized sorting (~4.3x speedup)
         # Avoid lambda-based sorting `sorted(points, key=lambda x: res[x[1], x[0]])`
         # which evaluates python-to-C lookup for every array element.
-        scores = res[loc_y, loc_x]
-        sort_indices = np.argsort(scores)[::-1]
-        sorted_x = loc_x[sort_indices].tolist()
-        sorted_y = loc_y[sort_indices].tolist()
-        sorted_points = list(zip(sorted_x, sorted_y))
+        scores = res[y, x]
+        idx = np.argsort(scores)[::-1]
+        x_sorted, y_sorted = x[idx], y[idx]
 
-        # 遍历排序后的匹配位置
-        if sorted_points:
-            min_dist_sq = min_dist**2
-            for pt in sorted_points:
-                # 检查当前匹配点是否与已保留的匹配点太近
-                # 使用简单的标量算术（平方欧氏距离）和 early break 来代替 np.linalg.norm 的 O(n^2) 内存分配，提升性能。
-                keep = True
-                for kept_pt in center_points:
-                    if (pt_x - kept_pt[0]) ** 2 + (pt_y - kept_pt[1]) ** 2 <= min_dist_sq:
-                    if (pt[0] - kept_pt[0]) ** 2 + (pt[1] - kept_pt[1]) ** 2 <= min_dist_sq:
-                        keep = False
-                        break
-                if keep:
-                    # 如果没有太近的匹配点，保留当前匹配点
-                    center_points.append((pt_x, pt_y))
+        center_points = []
+        min_dist_sq = min_dist**2
 
-            # 计算每个匹配点的中心坐标
-            center_points = [(int(pt[0] + w / 2), int(pt[1] + h / 2)) for pt in center_points]
-            return center_points
+        # 遍历排序后的匹配位置执行非极大值抑制（NMS）
+        for i in range(len(x_sorted)):
+            pt_x, pt_y = x_sorted[i], y_sorted[i]
 
-        log.debug(f"未找到匹配项，最高匹配度为：{np.max(res)}")
-        return []
+            # 检查当前匹配点是否与已保留的匹配点太近
+            # ⚡ Bolt: 使用简单的标量算术（平方欧氏距离）和 early break 来代替 np.linalg.norm 的 O(n^2) 内存分配，提升性能。
+            keep = True
+            for kept_pt in center_points:
+                if (pt_x - kept_pt[0]) ** 2 + (pt_y - kept_pt[1]) ** 2 <= min_dist_sq:
+                    keep = False
+                    break
+            if keep:
+                # 如果没有太近的匹配点，保留当前匹配点
+                center_points.append((pt_x, pt_y))
+
+        # 计算每个匹配点的中心坐标
+        center_points = [(int(pt_x + w / 2), int(pt_y + h / 2)) for pt_x, pt_y in center_points]
+        return center_points
 
     @staticmethod
     def get_image_info(image_array):
