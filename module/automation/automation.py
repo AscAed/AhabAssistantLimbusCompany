@@ -671,9 +671,11 @@ class Automation(metaclass=SingletonMeta):
             else:
                 screenshot_gray = screenshot
 
-            scales = [0.85, 1.0, 1.15]
+            scales = [1.0, 0.85, 1.15]
             best_match_val = -1
             best_center = None
+            threshold = 0.70
+            matched = False
 
             for scale in scales:
                 if scale == 1.0:
@@ -699,8 +701,10 @@ class Automation(metaclass=SingletonMeta):
                         int(max_loc[1]) + h_st // 2 + crop_offset[1]
                     )
 
-            threshold = 0.70
-            matched = best_match_val >= threshold
+                # ⚡ Bolt: Fast-path early exit if we found a strong match immediately at 1.0 scale
+                if best_match_val >= threshold:
+                    matched = True
+                    break
             
             if not matched:
                 try:
@@ -733,6 +737,10 @@ class Automation(metaclass=SingletonMeta):
                                 int(max_loc[0]) + w_st // 2 + crop_offset[0],
                                 int(max_loc[1]) + h_st // 2 + crop_offset[1]
                             )
+
+                        # ⚡ Bolt: Fast-path early exit for Canny edge matching too
+                        if best_edge_match_val >= 0.30:
+                            break
                     
                     if best_edge_match_val >= 0.30:
                         log.debug(
