@@ -139,6 +139,10 @@ class TaskEngine:
                     else:
                         task.status = TaskStatus.SUCCESS
                         log.info(f"==> 任务引擎：任务 [{task.name}] 执行完成")
+                except userStopError as e:
+                    task.status = TaskStatus.FAILED
+                    task.error = e
+                    raise e
                 except Exception as e:
                     task.status = TaskStatus.FAILED
                     task.error = e
