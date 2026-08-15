@@ -192,3 +192,154 @@ def test_window_move_input_randomized_click(mock_cfg, mock_screen):
     actual_y = driver.downs[0][1]
     assert target_x - radius <= actual_x <= target_x + radius
     assert target_y - radius <= actual_y <= target_y + radius
+
+
+# 8. Test BackgroundInput.mouse_scroll uses descendant hwnd when found window is a child of game hwnd
+@patch("module.automation.input_handlers.input.screen")
+@patch("module.automation.input_handlers.input.cfg")
+def test_background_scroll_uses_descendant_hwnd(mock_cfg, mock_screen):
+    """When WindowFromPoint returns a direct child of the game hwnd, the scroll message should
+    be posted to that child (not the parent), so Unity's render sub-window receives the event.
+    Also verifies WM_SETFOCUS is sent before WM_MOUSEWHEEL so Unity's input system is active."""
+    import win32con
+
+    game_hwnd = 1000
+    child_hwnd = 1001
+
+    mock_cfg.config.use_post_message = True
+    mock_cfg.set_win_size = 1080
+    mock_screen.handle.hwnd = game_hwnd
+    mock_screen.handle.isMinimized = False
+
+    bg_input = BackgroundInput()
+
+    with patch("win32gui.ClientToScreen", return_value=(960, 540)), \
+         patch("win32api.MAKELONG", return_value=0), \
+         patch.object(bg_input, "_mouse_move_to"), \
+         patch("win32gui.WindowFromPoint", return_value=child_hwnd), \
+         patch("win32gui.GetParent", return_value=game_hwnd), \
+         patch("win32gui.SetForegroundWindow"), \
+         patch("win32api.PostMessage") as mock_post:
+        result = bg_input.mouse_scroll(-3)
+
+    assert result is True
+    calls = mock_post.call_args_list
+    # Expect at least: WM_ACTIVATE (from set_active), WM_SETFOCUS, WM_MOUSEWHEEL
+    messages = [c[0][1] for c in calls]
+    assert win32con.WM_SETFOCUS in messages, "WM_SETFOCUS not posted"
+    assert win32con.WM_MOUSEWHEEL in messages, "WM_MOUSEWHEEL not posted"
+    # WM_SETFOCUS must come before WM_MOUSEWHEEL
+    assert messages.index(win32con.WM_SETFOCUS) < messages.index(win32con.WM_MOUSEWHEEL), \
+        "WM_SETFOCUS must be posted before WM_MOUSEWHEEL"
+    # The final WM_MOUSEWHEEL must target the child hwnd
+    wheel_call = next(c for c in reversed(calls) if c[0][1] == win32con.WM_MOUSEWHEEL)
+    assert wheel_call[0][0] == child_hwnd, f"Expected child hwnd {child_hwnd}, got {wheel_call[0][0]}"
+    # wparam for scroll-down (-3 * 120 = -360) must be negative (no 0xFFFFFFFF mask)
+    wheel_wparam = wheel_call[0][2]
+    assert wheel_wparam < 0, f"wparam should be negative for scroll-down, got {wheel_wparam}"
+
+
+# 9. Test BackgroundInput.mouse_scroll resolves child hwnd via EnumChildWindows when found window is foreign
+@patch("module.automation.input_handlers.input.screen")
+@patch("module.automation.input_handlers.input.cfg")
+def test_background_scroll_resolves_child_for_foreign_hwnd(mock_cfg, mock_screen):
+    """When WindowFromPoint returns a window that is NOT a descendant of the game hwnd (e.g. the
+    script console is in front), the scroll message must resolve the game's child window via EnumChildWindows."""
+    import win32con
+
+    game_hwnd = 1000
+    foreign_hwnd = 9999  # belongs to a completely different process
+    resolved_child = 2002  # game's child window resolved programmatically
+
+    mock_cfg.config.use_post_message = True
+    mock_cfg.set_win_size = 1080
+    mock_screen.handle.hwnd = game_hwnd
+    mock_screen.handle.isMinimized = False
+
+    bg_input = BackgroundInput()
+
+    def fake_get_parent(hwnd):
+        return 0  # foreign window has no parent
+
+    def fake_enum_child(hwnd, callback, param):
+        callback(resolved_child, param)
+
+    with patch("win32gui.ClientToScreen", return_value=(960, 540)), \
+         patch("win32api.MAKELONG", return_value=0), \
+         patch.object(bg_input, "_mouse_move_to"), \
+         patch("win32gui.WindowFromPoint", return_value=foreign_hwnd), \
+         patch("win32gui.GetParent", side_effect=fake_get_parent), \
+         patch("win32gui.EnumChildWindows", side_effect=fake_enum_child), \
+         patch("win32gui.SetForegroundWindow"), \
+         patch("win32api.PostMessage") as mock_post:
+        result = bg_input.mouse_scroll(-3)
+
+    assert result is True
+    calls = mock_post.call_args_list
+    messages = [c[0][1] for c in calls]
+    assert win32con.WM_SETFOCUS in messages, "WM_SETFOCUS not posted"
+    assert win32con.WM_MOUSEWHEEL in messages, "WM_MOUSEWHEEL not posted"
+    # WM_MOUSEWHEEL must target the resolved child window (2002)
+    wheel_call = next(c for c in reversed(calls) if c[0][1] == win32con.WM_MOUSEWHEEL)
+    assert wheel_call[0][0] == resolved_child, f"Expected resolved child handle {resolved_child}, got {wheel_call[0][0]}"
+
+
+# 10. Test BackgroundInput.mouse_scroll falls back to root game hwnd if EnumChildWindows finds no children
+@patch("module.automation.input_handlers.input.screen")
+@patch("module.automation.input_handlers.input.cfg")
+def test_background_scroll_falls_back_to_root_if_no_children(mock_cfg, mock_screen):
+    """When WindowFromPoint returns a foreign window and EnumChildWindows finds no children, it should fall back to root game hwnd."""
+    import win32con
+
+    game_hwnd = 1000
+    foreign_hwnd = 9999
+
+    mock_cfg.config.use_post_message = True
+    mock_cfg.set_win_size = 1080
+    mock_screen.handle.hwnd = game_hwnd
+    mock_screen.handle.isMinimized = False
+
+    bg_input = BackgroundInput()
+
+    with patch("win32gui.ClientToScreen", return_value=(960, 540)), \
+         patch("win32api.MAKELONG", return_value=0), \
+         patch.object(bg_input, "_mouse_move_to"), \
+         patch("win32gui.WindowFromPoint", return_value=foreign_hwnd), \
+         patch("win32gui.GetParent", return_value=0), \
+         patch("win32gui.EnumChildWindows"), \
+         patch("win32gui.SetForegroundWindow"), \
+         patch("win32api.PostMessage") as mock_post:
+        result = bg_input.mouse_scroll(-3)
+
+    assert result is True
+    calls = mock_post.call_args_list
+    wheel_call = next(c for c in reversed(calls) if c[0][1] == win32con.WM_MOUSEWHEEL)
+    assert wheel_call[0][0] == game_hwnd, f"Expected root game hwnd {game_hwnd}, got {wheel_call[0][0]}"
+
+
+# 11. Test BackgroundInput.mouse_scroll with specific coordinates
+@patch("module.automation.input_handlers.input.screen")
+@patch("module.automation.input_handlers.input.cfg")
+def test_background_scroll_with_coordinates(mock_cfg, mock_screen):
+    """When coordinates are specified to mouse_scroll, ClientToScreen must be called with those coordinates."""
+    game_hwnd = 1000
+    mock_cfg.config.use_post_message = True
+    mock_cfg.set_win_size = 1080
+    mock_screen.handle.hwnd = game_hwnd
+    mock_screen.handle.isMinimized = False
+
+    bg_input = BackgroundInput()
+
+    with patch("win32gui.ClientToScreen", return_value=(200, 300)) as mock_client_to_screen, \
+         patch("win32api.MAKELONG", return_value=0), \
+         patch.object(bg_input, "_mouse_move_to"), \
+         patch("win32gui.WindowFromPoint", return_value=game_hwnd), \
+         patch("win32gui.SetForegroundWindow"), \
+         patch("win32api.PostMessage"):
+        result = bg_input.mouse_scroll(-3, x=192, y=864)
+
+    assert result is True
+    mock_client_to_screen.assert_called_once_with(game_hwnd, (192, 864))
+
+
+

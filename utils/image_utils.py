@@ -257,6 +257,15 @@ class ImageUtils:
     @staticmethod
     def match_template(screenshot, template, bbox, model="clam"):
         try:
+            # 统一通道数以防止 OpenCV matchTemplate 报错 (scn is 1 vs template channels)
+            if len(screenshot.shape) != len(template.shape):
+                if len(screenshot.shape) == 2:
+                    if len(template.shape) == 3:
+                        template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+                elif len(template.shape) == 2:
+                    if len(screenshot.shape) == 3:
+                        screenshot = cv2.cvtColor(screenshot, cv2.COLOR_BGR2GRAY)
+
             if screenshot.shape[0] < template.shape[0] or screenshot.shape[1] < template.shape[1]:
                 return None, 0.0
             shape = screenshot.shape
@@ -297,6 +306,7 @@ class ImageUtils:
                 return center, max_val
         except Exception as e:
             log.error(f"图片识别出现错误：{e}")
+            return None, 0.0
 
     @staticmethod
     def match_template_with_multiple_targets(screenshot, template, threshold, min_dist=10):

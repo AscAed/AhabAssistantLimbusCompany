@@ -14,3 +14,10 @@
 ## 2024-08-12 - MessageBox Accessibility Enhancement
 **Learning:** In standard PySide6 dialogs like `MessageBox` (and especially custom subclasses using `qfluentwidgets`), when manually creating icon-only or generic UI buttons (like the update notification `jumpButton`), `setAccessibleName` must be explicitly defined alongside `setToolTip` because screen readers do not automatically fall back to tooltips for interactive elements, resulting in a silent or uninformative tab stop.
 **Action:** Always call `btn.setAccessibleName(btn.tr("..."))` concurrently with `setToolTip()` for any non-standard or text-less interactive element injected into dialog layouts.
+## 2025-02-12 - Ensure Temporary Files are Deleted
+**Learning:** When creating temporary mock files (like `tests/conftest.py`) to mock dependencies during isolated local Linux testing, failing to delete them before committing will introduce global mocks into the repository, breaking the test suite on native platforms (like Windows) that actually need those modules.
+**Action:** Always run `rm` on any temporary mock files (e.g. `tests/conftest.py`) generated for local testing before submitting code to ensure the remote test environment is not compromised.
+
+## 2025-02-12 - Missing Accessible Name on ObserveGiftSelectionRow ToolButton
+**Learning:** In PySide6, creating icon-only tool buttons requires an explicit `setAccessibleName` for screen readers to interpret the button's action. The `ObserveGiftSelectionRow` in `app/base_combination.py` had a remove button with a tooltip but lacked an accessible name, making it invisible to screen readers.
+**Action:** Always ensure that icon-only `TransparentToolButton` widgets have `setAccessibleName` called on them with a descriptive translation string.
