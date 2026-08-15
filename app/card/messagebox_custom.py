@@ -57,6 +57,7 @@ class MessageBoxHtml(MessageBox):
         # self.jumpButton = QPushButton('跳转', parent)
         self.jumpButton.setCursor(Qt.CursorShape.PointingHandCursor)
         self.jumpButton.setToolTip(self.tr("跳转到发布页面"))
+        self.jumpButton.setAccessibleName(self.tr("跳转到发布页面"))
         self.jumpButton.installEventFilter(
             ToolTipFilter(self.jumpButton, showDelay=300, position=ToolTipPosition.BOTTOM)
         )

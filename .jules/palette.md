@@ -11,6 +11,9 @@
 ## 2025-02-12 - MessageBoxEdit UX Auto-Select & Clear Button
 **Learning:** When using `MessageBoxEdit` to prompt users for text input, the default text is not auto-selected and there is no clear button, making it tedious for users to replace or clear the default value (which is the most common action). PySide6 `qfluentwidgets.LineEdit` supports both auto-selection via `selectAll()` and a clear button via `setClearButtonEnabled(True)`.
 **Action:** Whenever implementing a dialog with pre-filled text input (like `MessageBoxEdit`), always call `self.lineEdit.selectAll()` and `self.lineEdit.setClearButtonEnabled(True)` to allow users to immediately overwrite or easily clear the default value, matching native desktop UX expectations.
+## 2024-08-12 - MessageBox Accessibility Enhancement
+**Learning:** In standard PySide6 dialogs like `MessageBox` (and especially custom subclasses using `qfluentwidgets`), when manually creating icon-only or generic UI buttons (like the update notification `jumpButton`), `setAccessibleName` must be explicitly defined alongside `setToolTip` because screen readers do not automatically fall back to tooltips for interactive elements, resulting in a silent or uninformative tab stop.
+**Action:** Always call `btn.setAccessibleName(btn.tr("..."))` concurrently with `setToolTip()` for any non-standard or text-less interactive element injected into dialog layouts.
 ## 2025-02-12 - Ensure Temporary Files are Deleted
 **Learning:** When creating temporary mock files (like `tests/conftest.py`) to mock dependencies during isolated local Linux testing, failing to delete them before committing will introduce global mocks into the repository, breaking the test suite on native platforms (like Windows) that actually need those modules.
 **Action:** Always run `rm` on any temporary mock files (e.g. `tests/conftest.py`) generated for local testing before submitting code to ensure the remote test environment is not compromised.
