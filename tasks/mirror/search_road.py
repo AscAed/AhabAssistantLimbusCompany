@@ -29,9 +29,7 @@ class MirrorMap:
             re_identify = True
 
         if re_identify is True:
-            self.floor_map, self.floor_nodes = search_road_from_road_map(
-                hard_mode=self.hard_mode
-            )
+            self.floor_map, self.floor_nodes = search_road_from_road_map(hard_mode=self.hard_mode)
             if self.floor_map is True and self.floor_nodes is True:
                 return True
             if not isinstance(self.floor_map, list):
@@ -61,26 +59,18 @@ class MirrorMap:
             # 发送进入确认按键 (Enter)
             auto.key_press("enter")
             sleep(1.25)
-            if auto.click_element(
-                "mirror/road_in_mir/enter_assets.png", take_screenshot=True
-            ):
+            if auto.click_element("mirror/road_in_mir/enter_assets.png", take_screenshot=True):
                 return True
             return True
 
         if next_position := self._get_next_position(next_step):
             auto.mouse_click(next_position[0], next_position[1])
             sleep(1.25)
-            if auto.click_element(
-                "mirror/road_in_mir/enter_assets.png", take_screenshot=True
-            ):
+            if auto.click_element("mirror/road_in_mir/enter_assets.png", take_screenshot=True):
                 return True
-        if auto.click_element(
-            "mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=True
-        ):
+        if auto.click_element("mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=True):
             sleep(1.25)
-            if auto.click_element(
-                "mirror/road_in_mir/enter_assets.png", take_screenshot=True
-            ):
+            if auto.click_element("mirror/road_in_mir/enter_assets.png", take_screenshot=True):
                 return True
         return False
 
@@ -124,22 +114,15 @@ def get_node_weight(x, y):
         x + 125 * scale,
         y + 125 * scale,
     )
-    if auto.find_feature_element("mirror/road_in_mir/shop.png", road_node_bbox, 50):
+    if auto.find_element("mirror/road_in_mir/shop.png", take_screenshot=False, roi=road_node_bbox):
         return 3
-    elif auto.find_feature_element("mirror/road_in_mir/event.png", road_node_bbox):
+    elif auto.find_element("mirror/road_in_mir/event.png", take_screenshot=False, roi=road_node_bbox):
         return 3
-    elif auto.find_feature_element(
-        "mirror/road_in_mir/battle.png",
-        road_node_bbox,
-    ):
+    elif auto.find_element("mirror/road_in_mir/battle.png", take_screenshot=False, roi=road_node_bbox):
         return 2
-    elif auto.find_feature_element(
-        "mirror/road_in_mir/hard_battle.png", road_node_bbox
-    ):
+    elif auto.find_element("mirror/road_in_mir/hard_battle.png", take_screenshot=False, roi=road_node_bbox):
         return 1
-    elif auto.find_feature_element(
-        "mirror/road_in_mir/hard_battle2.png", road_node_bbox
-    ):
+    elif auto.find_element("mirror/road_in_mir/hard_battle2.png", take_screenshot=False, roi=road_node_bbox):
         return 0
     return -5
 
@@ -161,9 +144,7 @@ def search_road_default_distance():
         return False
     # 判断中、下两个节点是否有权重3的节点，有的话直接选择进入
     node_weight = {}
-    if bus_position := auto.find_element(
-        "mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=False
-    ):
+    if bus_position := auto.find_element("mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=False):
         for road in three_roads[:2]:
             node_x = bus_position[0] + road[0]
             node_y = bus_position[1] + road[1]
@@ -173,15 +154,10 @@ def search_road_default_distance():
         if max_weight == 3:
             road_list = sorted(node_weight, key=node_weight.get, reverse=True)
             road = road_list[0]
-            if (
-                0 < road[0] < cfg.set_win_size * 16 / 9
-                and 0 < road[1] < cfg.set_win_size
-            ):
+            if 0 < road[0] < cfg.set_win_size * 16 / 9 and 0 < road[1] < cfg.set_win_size:
                 auto.mouse_click(road[0], road[1])
                 sleep(0.75)
-                if auto.click_element(
-                    "mirror/road_in_mir/enter_assets.png", take_screenshot=True
-                ):
+                if auto.click_element("mirror/road_in_mir/enter_assets.png", take_screenshot=True):
                     return True
     # 如果中、下两个节点没有权重3的节点，查看所有节点的权重，选择权重最大的节点进入
     if bus_position:
@@ -198,15 +174,11 @@ def search_road_default_distance():
             if 600 * scale < bus_position[1] < 700 * scale:
                 break
             dy = 650 * scale - bus_position[1]
-            auto.mouse_drag(
-                bus_position[0], bus_position[1], drag_time=1.5, dx=0, dy=dy
-            )
+            auto.mouse_drag(bus_position[0], bus_position[1], drag_time=1.5, dx=0, dy=dy)
             sleep(1)
             auto.mouse_to_blank()
 
-            bus_position = auto.find_element(
-                "mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=True
-            )
+            bus_position = auto.find_element("mirror/mybus_default_distance.png", threshold=0.7, take_screenshot=True)
             if bus_position is None:
                 break
 
@@ -227,15 +199,10 @@ def search_road_default_distance():
         # 根据all_node_weight，按照各个键的值，从大到小以生成只有键的新的列表
         road_list = sorted(all_node_weight, key=all_node_weight.get, reverse=True)
         for road in road_list:
-            if (
-                0 < road[0] < cfg.set_win_size * 16 / 9
-                and 0 < road[1] < cfg.set_win_size
-            ):
+            if 0 < road[0] < cfg.set_win_size * 16 / 9 and 0 < road[1] < cfg.set_win_size:
                 auto.mouse_click(road[0], road[1])
                 sleep(0.75)
-                if auto.click_element(
-                    "mirror/road_in_mir/enter_assets.png", take_screenshot=True
-                ):
+                if auto.click_element("mirror/road_in_mir/enter_assets.png", take_screenshot=True):
                     return True
     return False
 
@@ -259,28 +226,22 @@ def search_road_farthest_distance():
         for road in three_roads:
             road[0] += bus_position[0]
             road[1] += bus_position[1]
-            if (
-                0 < road[0] < cfg.set_win_size * 16 / 9
-                and 0 < road[1] < cfg.set_win_size
-            ):
+            if 0 < road[0] < cfg.set_win_size * 16 / 9 and 0 < road[1] < cfg.set_win_size:
                 auto.mouse_click(road[0], road[1])
                 sleep(0.75)
-                if auto.click_element(
-                    "mirror/road_in_mir/enter_assets.png", take_screenshot=True
-                ):
+                if auto.click_element("mirror/road_in_mir/enter_assets.png", take_screenshot=True):
                     return True
         auto.mouse_click(bus_position[0], bus_position[1])
-        if auto.click_element(
-            "mirror/road_in_mir/enter_assets.png", take_screenshot=True
-        ):
+        if auto.click_element("mirror/road_in_mir/enter_assets.png", take_screenshot=True):
             return True
     return False
 
 
 def search_road_from_road_map(hard_mode=False):
     import numpy as np
+
     scale = cfg.set_win_size / 1440
-    
+
     # 1. 自动缩小重试与扫描机制
     if not hard_mode:
         log.info("普通难度启动：开始尝试鼠标滚轮缩小地图以获得完整视野...")
@@ -288,7 +249,7 @@ def search_road_from_road_map(hard_mode=False):
         for i in range(2):
             auto.mouse_scroll(-3)
             sleep(0.5)
-            
+
     # 2. 地图定位与图像拼接（普通难度全局）/ 寻找身前一格（困难难度单步）
     bus_position = None
     for attempt in range(3):
@@ -299,13 +260,13 @@ def search_road_from_road_map(hard_mode=False):
         if bus_position is not None:
             break
         sleep(0.5)
-        
+
     if bus_position is None:
         log.warning("无法定位当前玩家（巴士）位置，寻路失败")
         return False, []
-        
+
     bus_x, bus_y = bus_position[0], bus_position[1]
-    
+
     # 困难难度 (有迷雾)：只做单步最优决策，无需滚动拼接
     if hard_mode:
         log.info("困难难度启动：仅进行身前一格节点单步最优决策...")
@@ -313,27 +274,27 @@ def search_road_from_road_map(hard_mode=False):
         if not all_nodes:
             log.warning("未检测到前方任何节点")
             return ["M"], ["unknown"]
-            
+
         next_layer_nodes = []
         for class_name, (nx, ny) in all_nodes:
             if bus_x + 80 * scale <= nx <= bus_x + 350 * scale:
                 next_layer_nodes.append((class_name, (nx, ny)))
-                
+
         if not next_layer_nodes:
             all_nodes.sort(key=lambda n: n[1][0])
             next_layer_nodes = [all_nodes[0]]
-            
+
         next_layer_nodes.sort(key=lambda n: all_node_weight.get(n[0], DEFAULT_WEIGHT))
         best_node = next_layer_nodes[0]
         best_class, (best_x, best_y) = best_node
-        
+
         if best_y < bus_y - 80 * scale:
             direction = "U"
         elif best_y > bus_y + 80 * scale:
             direction = "D"
         else:
             direction = "M"
-            
+
         log.info(f"困难难度单步最优决策：选择 {best_class} 节点，方向为 {direction}")
         return [direction], [best_class]
 
@@ -341,7 +302,7 @@ def search_road_from_road_map(hard_mode=False):
     log.info("普通难度：开始平移扫描与地图拼接...")
     all_screens_nodes = []
     all_screens_roads = []
-    
+
     for scan_idx in range(3):
         if scan_idx > 0:
             if cfg.mirror_keyboard_navigation:
@@ -355,22 +316,22 @@ def search_road_from_road_map(hard_mode=False):
                 auto.mouse_drag(int(900 * scale), int(540 * scale), drag_time=1.0, dx=int(-300 * scale), dy=0)
                 sleep(0.5)
                 auto.mouse_to_blank()
-                
+
         auto.take_screenshot()
         nodes = identify_nodes(bus_x if scan_idx == 0 else 0)
         roads = identify_road(bus_x if scan_idx == 0 else 0)
-        
+
         if nodes:
             all_screens_nodes.append(nodes)
         if roads:
             all_screens_roads.append(roads)
-            
+
     merged_nodes = []
     merged_roads = []
-    
+
     if len(all_screens_nodes) > 0:
         merged_nodes = list(all_screens_nodes[0])
-        
+
     dx = 0
     for scan_idx in range(1, len(all_screens_nodes)):
         curr_nodes = all_screens_nodes[scan_idx]
@@ -379,9 +340,9 @@ def search_road_from_road_map(hard_mode=False):
             for m_class, (mx, my) in merged_nodes:
                 if c_class == m_class and abs(cy - my) < 20 * scale:
                     dx_list.append(mx - cx)
-                    
+
         dx = np.median(dx_list) if len(dx_list) > 0 else (300 * scale * scan_idx)
-        
+
         for c_class, (cx, cy) in curr_nodes:
             shifted_x = cx + dx
             duplicate = False
@@ -391,10 +352,10 @@ def search_road_from_road_map(hard_mode=False):
                     break
             if not duplicate:
                 merged_nodes.append((c_class, (shifted_x, cy)))
-                
+
     if len(all_screens_roads) > 0:
         merged_roads = list(all_screens_roads[0])
-        
+
     for scan_idx in range(1, len(all_screens_roads)):
         curr_roads = all_screens_roads[scan_idx]
         for c_dir, (cx, cy) in curr_roads:
@@ -419,35 +380,34 @@ def search_road_from_road_map(hard_mode=False):
         sleep(0.5)
         auto.mouse_to_blank()
 
-    log.info(f"全局路网扫描完成。合并后共有节点 {len(merged_nodes)} 个，连线 {len(merged_roads)} 条。开始 Dijkstra 规划...")
-    
+    log.info(
+        f"全局路网扫描完成。合并后共有节点 {len(merged_nodes)} 个，连线 {len(merged_roads)} 条。开始 Dijkstra 规划..."
+    )
+
     initial_bus_pos = Position.MID
     if bus_y < 540 * scale - 100 * scale:
         initial_bus_pos = Position.TOP
     elif bus_y > 540 * scale + 100 * scale:
         initial_bus_pos = Position.BOTTOM
-        
+
     y_area = divide_the_area_by_y(merged_nodes)
     all_layers_nodes = divide_the_area_by_x(merged_nodes)
     all_layers_nodes.sort(key=lambda layer: layer[0][1][0])
-    
-    graph = RouteGraph(
-        all_layers_nodes,
-        initial_bus_pos=initial_bus_pos,
-        mid_line=540,
-        hard_mode=False
-    )
+
+    graph = RouteGraph(all_layers_nodes, initial_bus_pos=initial_bus_pos, mid_line=540, hard_mode=False)
     graph.init_road(divide_the_area_by_x(merged_roads), bus_x, bus_y)
-    
+
     min_weight, best_path = graph.find_min_weight_route()
     if not best_path or min_weight == float("inf"):
         log.warning("无法利用拼合地图规划到终点路径，尝试采用单步备用决策")
         return ["M"], ["unknown"]
-        
+
     directions, classes = graph.get_path_directions(best_path)
     log.info(f"Dijkstra 规划成功！路径节点：{[n.node_class for n in best_path]}，方向序列：{directions}")
-    
+
     return directions, classes
+
+
 def identify_nodes(bus_x):
     import numpy as np
     import onnxruntime as ort
@@ -498,14 +458,10 @@ def identify_nodes(bus_x):
     scale = length / 640
 
     # 将图像转换为模型所需的输入格式（blob）
-    blob = cv2.dnn.blobFromImage(
-        image, scalefactor=1 / 255, size=(640, 640), swapRB=True
-    )
+    blob = cv2.dnn.blobFromImage(image, scalefactor=1 / 255, size=(640, 640), swapRB=True)
 
     # 执行模型推理（输入为 blob）
-    outputs = session.run(
-        None, {session.get_inputs()[0].name: blob}
-    )  # 输出为模型预测结果
+    outputs = session.run(None, {session.get_inputs()[0].name: blob})  # 输出为模型预测结果
 
     outputs = outputs[0]  # 提取第一个输出
     outputs = np.array([cv2.transpose(outputs[0])])  # 转置维度
@@ -519,9 +475,7 @@ def identify_nodes(bus_x):
     for i in range(rows):
         # 提取类别置信度
         classes_scores = outputs[0][i][4:]
-        minScore, maxScore, minClassLoc, maxClassLoc = cv2.minMaxLoc(
-            classes_scores
-        )
+        minScore, maxScore, minClassLoc, maxClassLoc = cv2.minMaxLoc(classes_scores)
         maxClassIndex = maxClassLoc[0]
 
         # 若最大置信度超过阈值（0.25），则保留该检测结果
@@ -544,9 +498,7 @@ def identify_nodes(bus_x):
 
     if len(result_boxes) > 0:  # 若有有效检测结果
         for i in range(len(result_boxes)):
-            index = result_boxes[
-                i
-            ]  # 获取当前框在原始列表中的索引（NMS 输出为二维数组）
+            index = result_boxes[i]  # 获取当前框在原始列表中的索引（NMS 输出为二维数组）
             box = boxes[index]  # 获取对应的边界框
 
             # 构造检测结果字典（包含类别、置信度、边界框等信息）
@@ -584,9 +536,7 @@ def identify_nodes(bus_x):
             continue
 
         # 组成子列表并添加到节点总列表
-        node_list.append(
-            [class_name, (center_x, center_y)]
-        )  # 中心点用元组存储，也可改为列表
+        node_list.append([class_name, (center_x, center_y)])  # 中心点用元组存储，也可改为列表
 
     return node_list
 
@@ -637,9 +587,7 @@ def identify_road(bus_x, min_length=160, merge_distance=230):
     for line_info in raw_lines:
         try:
             # 提取线段坐标（不同算法返回格式可能不同，统一为[x1,y1,x2,y2]）
-            coords = (
-                line_info[0] if hasattr(line_info, "__len__") else line_info
-            )  # 处理数组或元组
+            coords = line_info[0] if hasattr(line_info, "__len__") else line_info  # 处理数组或元组
             x1, y1, x2, y2 = map(float, coords[:4])  # 转换为浮点数（保留精度）
             x1 += x_min
             y1 += y_min
@@ -653,12 +601,8 @@ def identify_road(bus_x, min_length=160, merge_distance=230):
 
             # 计算斜率和角度（角度范围0-180度，避免重复）
             dx, dy = x2 - x1, y2 - y1  # 坐标差
-            slope = (
-                dy / dx if dx != 0 else float("inf")
-            )  # 斜率（dx=0时为无穷大，即垂直线）
-            angle = (
-                math.degrees(math.atan2(dy, dx)) % 180
-            )  # 角度（弧度转角度，取模180消除方向歧义）
+            slope = dy / dx if dx != 0 else float("inf")  # 斜率（dx=0时为无穷大，即垂直线）
+            angle = math.degrees(math.atan2(dy, dx)) % 180  # 角度（弧度转角度，取模180消除方向歧义）
 
             # 存储为字典（结构化数据，方便后续处理）
             segments_data.append(
@@ -676,14 +620,10 @@ def identify_road(bus_x, min_length=160, merge_distance=230):
             continue  # 跳过格式错误的线段（异常处理）
 
     # 筛选长度大于min_length的线段
-    diagonal_candidates = [
-        s for s in segments_data if min_length <= s["length"] < 1000
-    ]  # 初始长度范围
+    diagonal_candidates = [s for s in segments_data if min_length <= s["length"] < 1000]  # 初始长度范围
 
     if not diagonal_candidates:  # 若初始筛选无结果，放宽长度下限
-        diagonal_candidates = [
-            s for s in segments_data if 50 <= s["length"] < 1000
-        ]  # 放宽到50px
+        diagonal_candidates = [s for s in segments_data if 50 <= s["length"] < 1000]  # 放宽到50px
         if not diagonal_candidates:  # 若仍无结果，返回空
             return []
 
@@ -695,11 +635,7 @@ def identify_road(bus_x, min_length=160, merge_distance=230):
         # 定义方向对应的角度范围（45度对应30-60度，135度对应120-150度，覆盖误差）
         angle_limits = (30, 60) if direction_name == "45°" else (120, 150)
         # 筛选当前方向的候选线段（角度在范围内的线段）
-        group = [
-            s
-            for s in diagonal_candidates
-            if angle_limits[0] <= s["angle"] <= angle_limits[1]
-        ]
+        group = [s for s in diagonal_candidates if angle_limits[0] <= s["angle"] <= angle_limits[1]]
 
         if not group:  # 当前方向无线段，跳过
             continue
@@ -721,18 +657,13 @@ def identify_road(bus_x, min_length=160, merge_distance=230):
                     continue
 
                 # 条件1：斜率差异检查（允许±8度误差，垂直线特殊处理）
-                slope_diff = (
-                    abs(base_slope - other["slope"])
-                    if base_slope != float("inf")
-                    else 0
-                )
+                slope_diff = abs(base_slope - other["slope"]) if base_slope != float("inf") else 0
                 if slope_diff > 8 and base_slope != float("inf"):
                     continue  # 斜率差异过大，不合并
 
                 # 条件2：中心点距离检查（不超过merge_distance）
                 distance = math.sqrt(
-                    (base_center[0] - other["center"][0]) ** 2
-                    + (base_center[1] - other["center"][1]) ** 2
+                    (base_center[0] - other["center"][0]) ** 2 + (base_center[1] - other["center"][1]) ** 2
                 )
                 if distance <= merge_distance:
                     cluster.append(other)  # 加入合并组
@@ -740,17 +671,11 @@ def identify_road(bus_x, min_length=160, merge_distance=230):
 
             # 合并组内线段，生成新的代表线段（基于所有点的最小二乘拟合）
             # 提取组内所有线段的端点坐标（用于拟合）
-            all_x = [
-                pt[0] for info in cluster for pt in (info["line"][:2], info["line"][2:])
-            ]  # 所有点的x坐标
-            all_y = [
-                pt[1] for info in cluster for pt in (info["line"][:2], info["line"][2:])
-            ]  # 所有点的y坐标
+            all_x = [pt[0] for info in cluster for pt in (info["line"][:2], info["line"][2:])]  # 所有点的x坐标
+            all_y = [pt[1] for info in cluster for pt in (info["line"][:2], info["line"][2:])]  # 所有点的y坐标
 
             if len(set(all_x)) > 1:  # 非垂直线（x坐标有变化），用线性拟合
-                slope, intercept = np.polyfit(
-                    all_x, all_y, 1
-                )  # 最小二乘拟合直线（y = slope*x + intercept）
+                slope, intercept = np.polyfit(all_x, all_y, 1)  # 最小二乘拟合直线（y = slope*x + intercept）
                 min_x, max_x = (
                     int(min(all_x)),
                     int(max(all_x)),
@@ -769,22 +694,14 @@ def identify_road(bus_x, min_length=160, merge_distance=230):
                 new_slope = cluster[0]["slope"]
 
             # 仅保留长度≥min_length的合并结果（避免合并后线段过短）
-            if (
-                math.sqrt(
-                    (new_line[2] - new_line[0]) ** 2 + (new_line[3] - new_line[1]) ** 2
-                )
-                >= min_length
-            ):
+            if math.sqrt((new_line[2] - new_line[0]) ** 2 + (new_line[3] - new_line[1]) ** 2) >= min_length:
                 merged_records.append(
                     {
                         "line": new_line,  # 合并后的线段端点
                         "center": new_center,  # 合并后的中心点
                         "slope": new_slope,  # 合并后的斜率
                         "direction": direction_name,  # 方向（45°或135°）
-                        "length": math.sqrt(
-                            (new_line[2] - new_line[0]) ** 2
-                            + (new_line[3] - new_line[1]) ** 2
-                        ),
+                        "length": math.sqrt((new_line[2] - new_line[0]) ** 2 + (new_line[3] - new_line[1]) ** 2),
                         # 合并后的长度
                         "merged_from": len(cluster),  # 合并的原始线段数量
                     }
@@ -813,9 +730,7 @@ def identify_road(bus_x, min_length=160, merge_distance=230):
 
 def divide_the_area_by_y(data):
     # 步骤1：按y坐标从小到大排序（确保相近的y相邻）
-    sorted_by_y = sorted(
-        data, key=lambda item: item[1][1]
-    )  # item[1]是坐标元组，item[1][1]是y值
+    sorted_by_y = sorted(data, key=lambda item: item[1][1])  # item[1]是坐标元组，item[1][1]是y值
 
     # 步骤2：分组（y相近的归为一组，阈值可根据需求调整）
     tolerance = 20  # y差值小于等于20视为相近（可根据实际数据调整）
@@ -945,15 +860,9 @@ class RouteGraph:
             self._add_new_layer()
             for node_entry in layer_data:
                 vertical_pos = Position.MID
-                if (
-                    node_entry[1][1]
-                    < mid_line - MID_LINE_THRESHOLD * cfg.set_win_size / 1440
-                ):
+                if node_entry[1][1] < mid_line - MID_LINE_THRESHOLD * cfg.set_win_size / 1440:
                     vertical_pos = Position.TOP
-                elif (
-                    node_entry[1][1]
-                    > mid_line + MID_LINE_THRESHOLD * cfg.set_win_size / 1440
-                ):
+                elif node_entry[1][1] > mid_line + MID_LINE_THRESHOLD * cfg.set_win_size / 1440:
                     vertical_pos = Position.BOTTOM
                 self._set_node(
                     self.layer_nums,
@@ -968,9 +877,7 @@ class RouteGraph:
                     self.layers[f"layer{i}"][j].weight != DEFAULT_WEIGHT
                     and self.layers[f"layer{i + 1}"][j].weight != DEFAULT_WEIGHT
                 ):
-                    self.layers[f"layer{i}"][j].add_next_node(
-                        self.layers[f"layer{i + 1}"][j]
-                    )
+                    self.layers[f"layer{i}"][j].add_next_node(self.layers[f"layer{i + 1}"][j])
 
         if self.hard_mode is False:
             exit_flag = False
@@ -1012,36 +919,24 @@ class RouteGraph:
                 continue
             for road in layer_road:
                 if road[0] == "UP":
-                    vertical_pos = (
-                        Position.MID if bus_y > road[1][1] else Position.BOTTOM
-                    )
+                    vertical_pos = Position.MID if bus_y > road[1][1] else Position.BOTTOM
                     if (
-                        self.layers[f"layer{road_layer}"][vertical_pos].weight
-                        != DEFAULT_WEIGHT
-                        and self.layers[f"layer{road_layer + 1}"][
-                            Position(vertical_pos.value + 1)
-                        ].weight
+                        self.layers[f"layer{road_layer}"][vertical_pos].weight != DEFAULT_WEIGHT
+                        and self.layers[f"layer{road_layer + 1}"][Position(vertical_pos.value + 1)].weight
                         != DEFAULT_WEIGHT
                     ):
                         self.layers[f"layer{road_layer}"][vertical_pos].add_next_node(
-                            self.layers[f"layer{road_layer + 1}"][
-                                Position(vertical_pos.value + 1)
-                            ]
+                            self.layers[f"layer{road_layer + 1}"][Position(vertical_pos.value + 1)]
                         )
                 elif road[0] == "DOWN":
                     vertical_pos = Position.TOP if bus_y > road[1][1] else Position.MID
                     if (
-                        self.layers[f"layer{road_layer}"][vertical_pos].weight
-                        != DEFAULT_WEIGHT
-                        and self.layers[f"layer{road_layer + 1}"][
-                            Position(vertical_pos.value - 1)
-                        ].weight
+                        self.layers[f"layer{road_layer}"][vertical_pos].weight != DEFAULT_WEIGHT
+                        and self.layers[f"layer{road_layer + 1}"][Position(vertical_pos.value - 1)].weight
                         != DEFAULT_WEIGHT
                     ):
                         self.layers[f"layer{road_layer}"][vertical_pos].add_next_node(
-                            self.layers[f"layer{road_layer + 1}"][
-                                Position(vertical_pos.value - 1)
-                            ]
+                            self.layers[f"layer{road_layer + 1}"][Position(vertical_pos.value - 1)]
                         )
             road_layer += 1
 
@@ -1095,9 +990,7 @@ class RouteGraph:
 
             # 优先队列：(当前总权重, 节点唯一标识（避免比较Node）, 当前节点, 路径列表)
             heap = []
-            heapq.heappush(
-                heap, (start_node.weight, id(start_node), start_node, [start_node])
-            )
+            heapq.heappush(heap, (start_node.weight, id(start_node), start_node, [start_node]))
 
             # 记录已处理的节点
             processed = set()
@@ -1130,39 +1023,26 @@ class RouteGraph:
                     # 如果找到更短路径，更新距离并加入队列
                     if new_total < distances[next_node]:
                         distances[next_node] = new_total
-                        heapq.heappush(
-                            heap, (new_total, id(next_node), next_node, new_path)
-                        )
+                        heapq.heappush(heap, (new_total, id(next_node), next_node, new_path))
 
             # 返回找到的最小路径，若没有则返回无穷大和空列表
-            return (
-                (min_total, min_path)
-                if min_total != float("inf")
-                else (float("inf"), [])
-            )
+            return (min_total, min_path) if min_total != float("inf") else (float("inf"), [])
 
         # 初始化距离字典，所有节点初始距离为无穷大，起点距离为自身权重
         distances = {
-            node: float("inf")
-            for layer in self.layers.values()
-            for pos_node in layer.values()
-            for node in (pos_node,)
+            node: float("inf") for layer in self.layers.values() for pos_node in layer.values() for node in (pos_node,)
         }
         distances[start_node] = start_node.weight
 
         # 优先队列：(当前总权重, 节点唯一标识（避免比较Node）, 当前节点, 路径列表)
         heap = []
-        heapq.heappush(
-            heap, (start_node.weight, id(start_node), start_node, [start_node])
-        )
+        heapq.heappush(heap, (start_node.weight, id(start_node), start_node, [start_node]))
 
         # 记录已处理的节点（优化：当节点第一次弹出时，已找到最短路径）
         processed = set()
 
         while heap:
-            current_total, _, current_node, current_path = heapq.heappop(
-                heap
-            )  # 忽略辅助标识
+            current_total, _, current_node, current_path = heapq.heappop(heap)  # 忽略辅助标识
 
             if current_node in processed:
                 continue
@@ -1184,9 +1064,7 @@ class RouteGraph:
                 if new_total < distances[next_node]:
                     distances[next_node] = new_total
                     # 添加辅助标识（id(next_node)）确保堆能正确排序
-                    heapq.heappush(
-                        heap, (new_total, id(next_node), next_node, new_path)
-                    )
+                    heapq.heappush(heap, (new_total, id(next_node), next_node, new_path))
 
         # 无可达路径
         return float("inf"), []
