@@ -266,12 +266,14 @@ class Input(WinAbstractInput, metaclass=SingletonMeta):
         if move_back and current_mouse_position:
             self.mouse_move(current_mouse_position)
 
-    def mouse_scroll(self, direction: int = -3) -> bool:
+    def mouse_scroll(self, direction: int = -3, x: int = None, y: int = None) -> bool:
         if direction <= 0:
             msg = "鼠标滚动滚轮，远离界面"
         else:
             msg = "鼠标滚动滚轮，拉近界面"
         log.debug(msg, stacklevel=2)
+        if x is not None and y is not None:
+            self.mouse_move((x, y))
         pyautogui.scroll(direction)
         return True
 
@@ -506,7 +508,7 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         self._post_bezier_move(rx, ry)
         self.mouse_down(rx, ry)
 
-        end_x, end_y = rx + dx, ry + dy
+        end_x, end_y = int(round(rx + dx)), int(round(ry + dy))
         path = generate_bezier_path((rx, ry), (end_x, end_y))
         hwnd = screen.handle.hwnd
         step_time = drag_time / max(1, len(path))
@@ -536,22 +538,68 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         if move_back and current_mouse_position:
             self.mouse_move(current_mouse_position)
 
-    def mouse_scroll(self, direction: int = -3) -> bool:
+    def mouse_scroll(self, direction: int = -3, x: int = None, y: int = None) -> bool:
         """
         在后台进行鼠标滚动操作
         Args:
             direction (int): 滚动方向，正值表示拉近，负值表示缩小
+            x (int): 滚动坐标 x，如果为 None 则默认居中
+            y (int): 滚动坐标 y，如果为 None 则默认居中
         Returns:
             bool (True) : 表示支持该操作
         """
         hwnd = screen.handle.hwnd
         if hwnd:
             delta = direction * 120
-            wparam = (delta << 16) & 0xFFFFFFFF
-            # 发送到窗口中央以防坐标错误
-            lparam = 0
-            win32api.PostMessage(hwnd, win32con.WM_MOUSEWHEEL, wparam, lparam)
-            sleep(0.5)
+            # 保留有符号整数，避免在 64 位系统下掩码截断导致负滚动量被错误解释为正值
+            wparam = delta << 16
+            
+            # 如果未指定坐标，发送到窗口中央以防坐标错误，并且确保游戏聚焦
+            if x is None or y is None:
+                h = cfg.set_win_size
+                w = int(h * 16 / 9)
+                cx, cy = w // 2, h // 2
+            else:
+                cx, cy = x, y
+
+            import win32gui
+            screen_x, screen_y = win32gui.ClientToScreen(hwnd, (cx, cy))
+            lparam = win32api.MAKELONG(screen_x, screen_y)
+            self._mouse_move_to(screen_x, screen_y)
+
+            # 动态寻找真正包含该坐标的子窗口（例如 Qt5QWindowIcon 或 QtRenderWindow），直接向其投递滚动消息。
+            # 必须验证找到的句柄是游戏窗口 hwnd 的子窗口，否则当游戏在后台时，坐标处可能是其他前台窗口（如控制台），
+            # 导致滚轮消息投递到错误目标。
+            found_hwnd = win32gui.WindowFromPoint((screen_x, screen_y))
+            target_hwnd = hwnd
+            is_valid_child = False
+            if found_hwnd and found_hwnd != hwnd:
+                temp = found_hwnd
+                while temp:
+                    parent = win32gui.GetParent(temp)
+                    if parent == hwnd:
+                        target_hwnd = found_hwnd
+                        is_valid_child = True
+                        break
+                    temp = parent
+
+            # 如果在后台模式下被前台窗口遮挡，WindowFromPoint 会返回外部窗口。
+            # 此时我们通过程序遍历寻找游戏窗口真正的渲染子窗口（EnumChildWindows），避免退化至 root hwnd 导致消息被 Unity 丢弃。
+            if not is_valid_child:
+                child_hwnds = []
+                def enum_child_callback(child_hwnd, param):
+                    child_hwnds.append(child_hwnd)
+                    return True
+                win32gui.EnumChildWindows(hwnd, enum_child_callback, None)
+                if child_hwnds:
+                    target_hwnd = child_hwnds[0]
+
+            # 激活窗口并发送焦点消息，确保 Unity 引擎处于可接收输入的状态，
+            # 否则后台模式下 WM_MOUSEWHEEL 会被 Unity 丢弃。
+            self.set_active()
+            win32api.PostMessage(target_hwnd, win32con.WM_SETFOCUS, 0, 0)
+            win32api.PostMessage(target_hwnd, win32con.WM_MOUSEWHEEL, wparam, lparam)
+            sleep(0.3)
             return True
         return False
 
@@ -839,7 +887,7 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
         # FIXME: 移动窗口来防止遮蔽不是一个好选择
         return
 
-    def mouse_scroll(self, direction: int = 120) -> bool:
+    def mouse_scroll(self, direction: int = 120, x: int = None, y: int = None) -> bool:
         return False
 
     def mouse_drag(self, x, y, drag_time=0.1, dx=0, dy=0, move_back=True) -> None:
