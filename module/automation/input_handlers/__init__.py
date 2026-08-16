@@ -107,7 +107,7 @@ class AbstractInput:
             f"未实现的输入方法 {self.__class__.__name__}.mouse_drag_link"
         )
 
-    def mouse_scroll(self, direction: int = -3) -> bool:
+    def mouse_scroll(self, direction: int = -3, x: int = None, y: int = None) -> bool:
         """
         进行鼠标滚动操作
         Args:
