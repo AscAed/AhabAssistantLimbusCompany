@@ -1109,7 +1109,7 @@ class MumuControl(AbstractInput):
 
         self.up()
 
-    def mouse_scroll(self, direction: int = -3) -> bool:
+    def mouse_scroll(self, direction: int = -3, x: int = None, y: int = None) -> bool:
         """占位"""
         return True
 
