@@ -11,3 +11,20 @@
 ## 2025-02-12 - MessageBoxEdit UX Auto-Select & Clear Button
 **Learning:** When using `MessageBoxEdit` to prompt users for text input, the default text is not auto-selected and there is no clear button, making it tedious for users to replace or clear the default value (which is the most common action). PySide6 `qfluentwidgets.LineEdit` supports both auto-selection via `selectAll()` and a clear button via `setClearButtonEnabled(True)`.
 **Action:** Whenever implementing a dialog with pre-filled text input (like `MessageBoxEdit`), always call `self.lineEdit.selectAll()` and `self.lineEdit.setClearButtonEnabled(True)` to allow users to immediately overwrite or easily clear the default value, matching native desktop UX expectations.
+
+## 2025-02-12 - Upgrading text buttons to icon-only buttons
+**Learning:** Upgrading standard text-based buttons (like `PushButton` with text "Clear") to icon-only buttons (like `TransparentToolButton(FIF.DELETE)`) improves visual clarity and modernizes the layout. However, it introduces a risk of accessibility regressions because the text label is removed.
+**Action:** When converting a text button to an icon-only button, always preserve the semantic meaning by explicitly adding `setToolTip(...)`, `setAccessibleName(...)`, and installing a `ToolTipFilter`, and ensure these properties are correctly updated during translation (e.g., in `retranslateUi`).
+## 2024-08-12 - MessageBox Accessibility Enhancement
+**Learning:** In standard PySide6 dialogs like `MessageBox` (and especially custom subclasses using `qfluentwidgets`), when manually creating icon-only or generic UI buttons (like the update notification `jumpButton`), `setAccessibleName` must be explicitly defined alongside `setToolTip` because screen readers do not automatically fall back to tooltips for interactive elements, resulting in a silent or uninformative tab stop.
+**Action:** Always call `btn.setAccessibleName(btn.tr("..."))` concurrently with `setToolTip()` for any non-standard or text-less interactive element injected into dialog layouts.
+## 2025-02-12 - Ensure Temporary Files are Deleted
+**Learning:** When creating temporary mock files (like `tests/conftest.py`) to mock dependencies during isolated local Linux testing, failing to delete them before committing will introduce global mocks into the repository, breaking the test suite on native platforms (like Windows) that actually need those modules.
+**Action:** Always run `rm` on any temporary mock files (e.g. `tests/conftest.py`) generated for local testing before submitting code to ensure the remote test environment is not compromised.
+
+## 2025-02-12 - Missing Accessible Name on ObserveGiftSelectionRow ToolButton
+**Learning:** In PySide6, creating icon-only tool buttons requires an explicit `setAccessibleName` for screen readers to interpret the button's action. The `ObserveGiftSelectionRow` in `app/base_combination.py` had a remove button with a tooltip but lacked an accessible name, making it invisible to screen readers.
+**Action:** Always ensure that icon-only `TransparentToolButton` widgets have `setAccessibleName` called on them with a descriptive translation string.
+## 2025-02-12 - MessageBox Default Buttons Affordance
+**Learning:** In `qfluentwidgets`, the default `yesButton` and `cancelButton` provided by the base `MessageBox` class do not automatically use a pointing hand cursor. When creating custom dialogs by subclassing `MessageBox`, failing to explicitly set the cursor for these buttons leads to inconsistent interaction cues compared to other UI elements.
+**Action:** Always explicitly set `self.yesButton.setCursor(Qt.CursorShape.PointingHandCursor)` and `self.cancelButton.setCursor(Qt.CursorShape.PointingHandCursor)` (if not hidden) in the `__init__` of any custom `MessageBox` subclass to ensure consistent visual affordance.

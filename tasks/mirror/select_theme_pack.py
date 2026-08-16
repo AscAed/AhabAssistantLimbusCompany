@@ -36,8 +36,12 @@ def select_theme_pack(
         )
     refresh_times = 3
     difficulty = None
-    if auto.find_element("mirror/road_in_mir/legend_assets.png", take_screenshot=True):
-        return
+    # 如果检测到卡包选择界面指示图，不执行因图例检测（兜底误匹配）而触发的提前返回
+    if not (auto.find_element("mirror/theme_pack/feature_theme_pack_assets.png", take_screenshot=True) or
+            auto.find_element("mirror/theme_pack/normal_assets.png") or
+            auto.find_element("mirror/theme_pack/hard_assets.png")):
+        if auto.find_element("mirror/road_in_mir/legend_assets.png"):
+            return
     while True:
         # 自动截图
         if auto.take_screenshot() is None:
