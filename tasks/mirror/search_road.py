@@ -241,6 +241,9 @@ def search_road_from_road_map(hard_mode=False):
     import numpy as np
 
     scale = cfg.set_win_size / 1440
+    h = cfg.set_win_size
+    w = int(h * 16 / 9)
+    cx, cy = int(w * 0.1), int(h * 0.8)
 
     # 1. 自动缩小重试与扫描机制
     if not hard_mode:
@@ -250,11 +253,24 @@ def search_road_from_road_map(hard_mode=False):
             auto.mouse_scroll(-3)
             sleep(0.5)
 
+        auto.mouse_click(cx, cy)
+        sleep(0.5)
+        for i in range(5):
+            auto.mouse_scroll(-3, cx, cy)
+            sleep(0.3)
+            
     # 2. 地图定位与图像拼接（普通难度全局）/ 寻找身前一格（困难难度单步）
     bus_position = None
-    for attempt in range(3):
-        auto.take_screenshot()
-        bus_position = auto.find_element("mirror/mybus_default_distance.png", threshold=0.65)
+    if hard_mode:
+        for attempt in range(3):
+            auto.take_screenshot(gray=False)
+            bus_position = auto.find_element("mirror/mybus_default_distance.png", threshold=0.65)
+            if bus_position is None:
+                bus_position = auto.find_element("mirror/mybus_maximum_distance.png", threshold=0.65)
+            if bus_position is not None:
+                break
+            sleep(0.5)
+            
         if bus_position is None:
             bus_position = auto.find_element("mirror/mybus_maximum_distance.png", threshold=0.65)
         if bus_position is not None:
@@ -269,6 +285,11 @@ def search_road_from_road_map(hard_mode=False):
 
     # 困难难度 (有迷雾)：只做单步最优决策，无需滚动拼接
     if hard_mode:
+            log.warning("无法定位当前玩家（巴士）位置，寻路失败")
+            return False, []
+            
+        bus_x, bus_y = bus_position[0], bus_position[1]
+        
         log.info("困难难度启动：仅进行身前一格节点单步最优决策...")
         all_nodes = identify_nodes(bus_x)
         if not all_nodes:
@@ -373,17 +394,58 @@ def search_road_from_road_map(hard_mode=False):
         for _ in range(12):
             auto.key_press("q")
             sleep(0.1)
+    # 普通难度：循环滚动缩小直到检测到完整地图（必须包含 boss_battle 或 shop 节点）
+    log.info("普通难度：对缩放后的完整地图进行识别...")
+    merged_nodes = []
+    merged_roads = []
+    
+    for attempt in range(5):
+        auto.take_screenshot(gray=False)
+        bus_position = auto.find_element("mirror/mybus_default_distance.png", threshold=0.65)
+        if bus_position is None:
+            bus_position = auto.find_element("mirror/mybus_maximum_distance.png", threshold=0.65)
+        
+        if bus_position is not None:
+            bus_x, bus_y = bus_position[0], bus_position[1]
+            nodes = identify_nodes(bus_x)
+            has_end_node = any(class_name in ("boss_battle", "small_boss_battle", "shop") for class_name, _ in nodes)
+            if has_end_node:
+                log.info(f"成功定位完整地图（第 {attempt + 1} 次尝试，已检测到终点/商店节点）")
+                merged_nodes = nodes
+                merged_roads = identify_road(bus_x)
+                break
+            else:
+                log.warning(f"第 {attempt + 1} 次尝试：未检测到终点或商店节点，继续尝试滚动缩小...")
+        else:
+            log.warning(f"第 {attempt + 1} 次尝试：无法定位当前玩家（巴士）位置，继续尝试滚动缩小...")
+            
+        # Click bottom-left blank area and scroll again to ensure zoom-out is applied
+        auto.mouse_click(cx, cy)
         sleep(0.5)
+        for _ in range(3):
+            auto.mouse_scroll(-3, cx, cy)
+            sleep(0.2)
     else:
-        log.debug("使用鼠标拖拽复位地图...")
-        auto.mouse_drag(int(300 * scale), int(540 * scale), drag_time=1.0, dx=int(600 * scale), dy=0)
-        sleep(0.5)
-        auto.mouse_to_blank()
+        # Fallback: if all attempts failed to find the end node, use the last detected nodes
+        log.warning("已达到最大重试次数，仍未检测到完整的终点节点，将使用当前检测到的节点进行规划")
+        if bus_position is not None:
+            bus_x, bus_y = bus_position[0], bus_position[1]
+            merged_nodes = identify_nodes(bus_x)
+            merged_roads = identify_road(bus_x)
+        else:
+            log.warning("无法定位当前玩家（巴士）位置，寻路失败")
+            return False, []
+            
+    if not merged_nodes:
+        log.warning("未检测到任何节点，寻路失败")
+        return False, []
 
     log.info(
         f"全局路网扫描完成。合并后共有节点 {len(merged_nodes)} 个，连线 {len(merged_roads)} 条。开始 Dijkstra 规划..."
     )
 
+    log.info(f"全局路网扫描完成。共有节点 {len(merged_nodes)} 个，连线 {len(merged_roads)} 条。开始 Dijkstra 规划...")
+    
     initial_bus_pos = Position.MID
     if bus_y < 540 * scale - 100 * scale:
         initial_bus_pos = Position.TOP
@@ -443,7 +505,12 @@ def identify_nodes(bus_x):
     # Crop to ROI
     cropped_image = original_image[y_min:y_max, x_min:x_max]
     # Apply CLAHE to grayscale and convert back to BGR to maintain ONNX input format
-    gray = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2GRAY)
+    if len(cropped_image.shape) == 2:
+        gray = cropped_image
+    elif cropped_image.shape[2] == 1:
+        gray = cropped_image[:, :, 0]
+    else:
+        gray = cv2.cvtColor(cropped_image, cv2.COLOR_BGR2GRAY)
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     clahe_img = clahe.apply(gray)
     cropped_image = cv2.cvtColor(clahe_img, cv2.COLOR_GRAY2BGR)
@@ -564,7 +631,7 @@ def identify_road(bus_x, min_length=160, merge_distance=230):
         if detected and detected[0] is not None:
             return detected[0]
 
-    auto.take_screenshot()
+    auto.take_screenshot(gray=False)
     screenshot = np.array(auto.screenshot)
     scale_factor = cfg.set_win_size / 1440
     x_min = max(0, int(bus_x - 50 * scale_factor))
@@ -574,7 +641,12 @@ def identify_road(bus_x, min_length=160, merge_distance=230):
 
     roi_img = screenshot[y_min:y_max, x_min:x_max]
     # Apply CLAHE to grayscale for robust LSD line segment detection
-    gray = cv2.cvtColor(roi_img, cv2.COLOR_BGR2GRAY)
+    if len(roi_img.shape) == 2:
+        gray = roi_img
+    elif roi_img.shape[2] == 1:
+        gray = roi_img[:, :, 0]
+    else:
+        gray = cv2.cvtColor(roi_img, cv2.COLOR_BGR2GRAY)
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     clahe_img = clahe.apply(gray)
     raw_lines = get_detected_lines(clahe_img)  # 调用检测函数获取原始线段数据
@@ -915,7 +987,13 @@ class RouteGraph:
                 all_road = all_road[:2]
         road_layer = 1
         for layer_road in all_road:
+            if not layer_road:
+                road_layer += 1
+                continue
             if layer_road[0][1][0] < bus_x:
+                continue
+            if f"layer{road_layer}" not in self.layers or f"layer{road_layer + 1}" not in self.layers:
+                road_layer += 1
                 continue
             for road in layer_road:
                 if road[0] == "UP":

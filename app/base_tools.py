@@ -497,6 +497,7 @@ class BaseLineEdit(BaseLayout):
         self.config_name = config_name
         self.setObjectName(config_name)
         self.line_edit = LineEdit(self)
+        self.line_edit.setClearButtonEnabled(True)
         self.hBoxLayout.addWidget(self.line_edit, stretch=1)
         self.line_edit.textChanged.connect(self.text_changed)
 
