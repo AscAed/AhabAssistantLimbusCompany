@@ -11,3 +11,6 @@
 ## 2025-02-12 - MessageBoxEdit UX Auto-Select & Clear Button
 **Learning:** When using `MessageBoxEdit` to prompt users for text input, the default text is not auto-selected and there is no clear button, making it tedious for users to replace or clear the default value (which is the most common action). PySide6 `qfluentwidgets.LineEdit` supports both auto-selection via `selectAll()` and a clear button via `setClearButtonEnabled(True)`.
 **Action:** Whenever implementing a dialog with pre-filled text input (like `MessageBoxEdit`), always call `self.lineEdit.selectAll()` and `self.lineEdit.setClearButtonEnabled(True)` to allow users to immediately overwrite or easily clear the default value, matching native desktop UX expectations.
+## 2024-08-11 - Pointer cursor on CheckBox component
+**Learning:** PySide6/qfluentwidgets component CheckBox sometimes lacks pointer visual affordance when intended for user interaction, especially in specific layout contexts like footers.
+**Action:** When adding or checking interactive CheckBox components in PySide6 with `qfluentwidgets`, verify and explicitly set `Qt.CursorShape.PointingHandCursor` if they miss default pointing hand behavior.
