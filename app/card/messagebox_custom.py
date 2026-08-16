@@ -38,6 +38,8 @@ class MessageBoxHtml(MessageBox):
         self.contentLabel.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         FluentStyleSheet.DIALOG.apply(self.contentLabel)
         self.contentLabel.setWordWrap(True)  # 启用自动换行
+        self.yesButton.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cancelButton.setCursor(Qt.CursorShape.PointingHandCursor)
 
         # 创建滚动区域并配置
         self.scrollArea = ScrollArea(self.widget)
@@ -57,6 +59,7 @@ class MessageBoxHtml(MessageBox):
         # self.jumpButton = QPushButton('跳转', parent)
         self.jumpButton.setCursor(Qt.CursorShape.PointingHandCursor)
         self.jumpButton.setToolTip(self.tr("跳转到发布页面"))
+        self.jumpButton.setAccessibleName(self.tr("跳转到发布页面"))
         self.jumpButton.installEventFilter(
             ToolTipFilter(self.jumpButton, showDelay=300, position=ToolTipPosition.BOTTOM)
         )
@@ -122,6 +125,8 @@ class MessageBoxConfirm(MessageBox):
         self.textLayout.addWidget(self.contentLabel, 0, Qt.AlignTop)
         self.yesButton.setText(self.tr("确认"))
         self.cancelButton.setText(self.tr("取消"))
+        self.yesButton.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cancelButton.setCursor(Qt.CursorShape.PointingHandCursor)
 
     def open_url(self, url):
         QDesktopServices.openUrl(QUrl(url))
@@ -138,6 +143,8 @@ class MessageBoxEdit(MessageBox):
 
         self.yesButton.setText(self.tr("确认"))
         self.cancelButton.setText(self.tr("取消"))
+        self.yesButton.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cancelButton.setCursor(Qt.CursorShape.PointingHandCursor)
 
         self.lineEdit = LineEdit(self)
         self.lineEdit.setText(self.content)
@@ -167,6 +174,7 @@ class MessageBoxWarning(MessageBox):
         if cfg.language_in_program == "en":
             self.buttonGroup.setMinimumWidth(350)
         self.cancelButton.setHidden(True)
+        self.yesButton.setCursor(Qt.CursorShape.PointingHandCursor)
 
 
 class BaseInfoBar(InfoBar):
@@ -428,6 +436,8 @@ class MessageBoxDate(MessageBox):
 
         self.yesButton.setText(self.tr("确认"))
         self.cancelButton.setText(self.tr("取消"))
+        self.yesButton.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cancelButton.setCursor(Qt.CursorShape.PointingHandCursor)
 
         self.datePicker = BetterDateTimeEdit(self)
         self.datePicker.setDateTime(content)
@@ -451,6 +461,8 @@ class MessageBoxSpinbox(MessageBox):
 
         self.yesButton.setText(self.tr("确认"))
         self.cancelButton.setText(self.tr("取消"))
+        self.yesButton.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cancelButton.setCursor(Qt.CursorShape.PointingHandCursor)
 
         self.box = SpinBox(self)
         initial_value = cfg.get_value(config_name, 0)
