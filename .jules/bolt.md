@@ -73,6 +73,9 @@
 ## 2026-07-26 - [Avoid redundant screenshots in UI polling loops]
 **Learning:** In polling loops for UI automation, sequential calls to `find_element(..., take_screenshot=True)` will force a fresh screenshot on every check. When a single frame is valid for multiple conditional checks, this introduces massive unnecessary I/O and processing overhead.
 **Action:** Take a screenshot once at the start of the loop (`auto.take_screenshot()`), and remove `take_screenshot=True` from subsequent `find_element` calls within that iteration to reuse the cached frame.
+## 2026-08-16 - [Avoid find_feature_element loops for UI nodes]
+**Learning:** Calling `auto.find_feature_element` iteratively within a loop (e.g., node evaluation) causes massive CPU spikes because it executes multi-scale resizing and Canny edge detection. Furthermore, it inherently does not cache the screen state.
+**Action:** Use `auto.find_element(target, take_screenshot=False, roi=...)` for sequential checks against static templates to reuse a single screenshot and leverage direct 1:1 OpenCV template matching.
 
 ## 2026-07-28 - [Fast Binary Mask Bounding Box]
 **Learning:** In computer vision (e.g. `get_bbox`), creating a mask using `(max_c > threshold).astype(np.uint8)` is significantly slower than using OpenCV's `cv2.threshold` for generating binary arrays.
