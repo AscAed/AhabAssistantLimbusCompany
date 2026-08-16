@@ -40,7 +40,7 @@ def safe_unpack_archive(archive_path, extract_dir, format=None):
             else:
                 tf.extractall(extract_dir)
     else:
-        shutil.unpack_archive(archive_path, extract_dir, format=format)
+        raise ValueError(f"检测到不支持的安全解压格式: {archive_path}")
 
 
 class Updater:

@@ -322,7 +322,6 @@ def safe_unpack_archive(archive_path: str, extract_dir: str, format=None) -> Non
     安全解压归档文件，防止 Zip Slip (路径穿越) 漏洞。
     """
     import os
-    import shutil
     import tarfile
     import zipfile
 
@@ -351,4 +350,4 @@ def safe_unpack_archive(archive_path: str, extract_dir: str, format=None) -> Non
             else:
                 tf.extractall(extract_dir)
     else:
-        shutil.unpack_archive(archive_path, extract_dir, format=format)
+        raise ValueError(f"检测到不支持的安全解压格式: {archive_path}")
