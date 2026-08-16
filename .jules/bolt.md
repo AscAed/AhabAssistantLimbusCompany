@@ -73,3 +73,7 @@
 ## 2026-07-26 - [Avoid redundant screenshots in UI polling loops]
 **Learning:** In polling loops for UI automation, sequential calls to `find_element(..., take_screenshot=True)` will force a fresh screenshot on every check. When a single frame is valid for multiple conditional checks, this introduces massive unnecessary I/O and processing overhead.
 **Action:** Take a screenshot once at the start of the loop (`auto.take_screenshot()`), and remove `take_screenshot=True` from subsequent `find_element` calls within that iteration to reuse the cached frame.
+
+## 2025-02-12 - Prevent redundant numpy conversions of PIL images
+**Learning:** Found a major performance bottleneck where `np.array(self.screenshot)` was called repeatedly for a PIL Image inside tight find_element/automation loops. Since `np.array()` on a 1920x1080 PIL Image takes around ~1.2ms to ~11ms (depending on memory state/system), doing this multiple times per automation tick accumulates massive micro-stuttering overhead.
+**Action:** When a global state object (like a screenshot in UI automation) requires multiple formats (e.g., PIL for OCR, NumPy for OpenCV template matching), cache both formats at the point of capture rather than converting on-demand within iteration loops.
