@@ -73,6 +73,9 @@
 ## 2026-07-26 - [Avoid redundant screenshots in UI polling loops]
 **Learning:** In polling loops for UI automation, sequential calls to `find_element(..., take_screenshot=True)` will force a fresh screenshot on every check. When a single frame is valid for multiple conditional checks, this introduces massive unnecessary I/O and processing overhead.
 **Action:** Take a screenshot once at the start of the loop (`auto.take_screenshot()`), and remove `take_screenshot=True` from subsequent `find_element` calls within that iteration to reuse the cached frame.
+## 2026-08-15 - File I/O Optimization in existing_image_paths
+**Learning:** Repeated `os.path.exists` calls in hot loops like `detect_state()` cause significant disk I/O bottlenecks. Caching them requires carefully injecting dynamic global properties (like `path_manager.pic_path` and `current_language`) into the cache key by making them hashable tuples.
+**Action:** When adding `lru_cache` to utility methods handling dynamic lists, create a static helper that takes hashable representations (tuples) of the state. Always ensure cached functions returning lists actually return copies (or use tuples and convert back to lists) to prevent mutability-induced cache corruption.
 
 ## 2026-08-15 - Fast path multi-scale feature matching
 **Learning:** In `find_feature_element`, running `cv2.resize` and `cv2.matchTemplate` sequentially across scales `[0.85, 1.0, 1.15]` performs unnecessary and extremely costly computations if the element already natively matches at the 1.0 scale (which it does 90%+ of the time).
