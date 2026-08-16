@@ -207,7 +207,9 @@ class ImageUtils:
             max_c = image
 
         # 获取掩码，以支持包含浮点在内的各种类型
-        mask = (max_c > threshold).astype(np.uint8)
+        _, mask = cv2.threshold(max_c, threshold, 1, cv2.THRESH_BINARY)
+        if mask.dtype != np.uint8:
+            mask = mask.astype(np.uint8)
 
         # cv2.boundingRect 要求输入为 8 位单通道图像 (CV_8UC1)
         x, y, w, h = cv2.boundingRect(mask)
