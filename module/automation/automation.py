@@ -386,6 +386,26 @@ class Automation(metaclass=SingletonMeta):
         if model is None:
             model = self.model
 
+        # Intercept legend_assets.png to support closed legend panel state on roadmap
+        if target == "mirror/road_in_mir/legend_assets.png":
+            if take_screenshot:
+                while self.take_screenshot() is None:
+                    continue
+            res = self._find_element_by_type(target, find_type, threshold, model, my_crop or roi, min_dist, additional_stack)
+            if res:
+                return res
+            for bus_template in ("mirror/mybus_default_distance.png", "mirror/mybus_maximum_distance.png"):
+                res_bus = self.find_image_element(
+                    bus_template,
+                    threshold=0.78,  # Increased from 0.65 to 0.78 to prevent false positives
+                    model=model,
+                    my_crop=None,
+                    additional_stack=additional_stack + 1
+                )
+                if res_bus:
+                    log.debug(f"Legend panel is closed, detected roadmap screen via bus: {bus_template} at {res_bus}")
+                    return res_bus
+
         effective_crop = my_crop if my_crop is not None else roi
 
         # Enforce Region of Interest (ROI) boundaries for specific elements if no custom crop is specified
@@ -671,9 +691,11 @@ class Automation(metaclass=SingletonMeta):
             else:
                 screenshot_gray = screenshot
 
-            scales = [0.85, 1.0, 1.15]
+            scales = [1.0, 0.85, 1.15]
             best_match_val = -1
             best_center = None
+            threshold = 0.70
+            matched = False
 
             for scale in scales:
                 if scale == 1.0:
@@ -699,8 +721,10 @@ class Automation(metaclass=SingletonMeta):
                         int(max_loc[1]) + h_st // 2 + crop_offset[1]
                     )
 
-            threshold = 0.70
-            matched = best_match_val >= threshold
+                # ⚡ Bolt: Fast-path early exit if we found a strong match immediately at 1.0 scale
+                if best_match_val >= threshold:
+                    matched = True
+                    break
             
             if not matched:
                 try:
@@ -733,6 +757,10 @@ class Automation(metaclass=SingletonMeta):
                                 int(max_loc[0]) + w_st // 2 + crop_offset[0],
                                 int(max_loc[1]) + h_st // 2 + crop_offset[1]
                             )
+
+                        # ⚡ Bolt: Fast-path early exit for Canny edge matching too
+                        if best_edge_match_val >= 0.30:
+                            break
                     
                     if best_edge_match_val >= 0.30:
                         log.debug(
@@ -1054,6 +1082,36 @@ class PageStateDispatcher:
         if (self.auto.find_element("mirror/road_to_mir/enter_assets.png", take_screenshot=False) or
             self.auto.find_element("mirror/road_to_mir/resume_assets.png", take_screenshot=False) or
             self.auto.find_element("mirror/road_to_mir/enter_mirror_assets.png", take_screenshot=False)):
+        # Check Theme Pack before Road Map
+        if (self.auto.find_element("mirror/theme_pack/feature_theme_pack_assets.png") or
+            self.auto.find_element("mirror/theme_pack/normal_assets.png") or
+            self.auto.find_element("mirror/theme_pack/hard_assets.png")):
+            return GameState.THEME_PACK
+
+        # Check EGO Gift Selection before Road Map
+        if (self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_card.png") or
+            self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_box_assets.png") or
+            self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_refuse_assets.png")):
+            return GameState.EGO_GIFT_SELECT
+
+        # Check Event skip before Road Map
+        if self.auto.find_element("event/skip_assets.png"):
+            return GameState.EVENT
+
+        # Check Road Map after overlay/menu screens to prevent closed-panel bus fallback false positives
+        if (self.auto.find_element("mirror/road_in_mir/legend_assets.png") or
+                self.auto.find_element("mirror/road_in_mir/to_window_assets.png")):
+            return GameState.ROAD_MAP
+
+        if (self.auto.find_element("mirror/claim_reward/battle_statistics_assets.png") or
+            self.auto.find_element("mirror/claim_reward/claim_rewards_assets.png") or
+            self.auto.find_element("mirror/claim_reward/complete_mirror_100%_assets.png") or
+            self.auto.find_element("mirror/claim_reward/use_enkephalin_assets.png")):
+            return GameState.CLAIM_REWARD
+
+        if (self.auto.find_element("mirror/road_to_mir/enter_assets.png") or
+            self.auto.find_element("mirror/road_to_mir/resume_assets.png") or
+            self.auto.find_element("mirror/road_to_mir/enter_mirror_assets.png")):
             return GameState.MIRROR_ENTRANCE
 
         if (self.auto.find_element("home/drive_assets.png", take_screenshot=False) or

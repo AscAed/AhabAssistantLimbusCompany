@@ -51,6 +51,18 @@ def test_page_state_dispatcher(mock_automation):
     state = dispatcher.detect_state()
     assert state == GameState.UNKNOWN
 
+    # Test prioritization: Theme Pack vs Road Map overlap (simulating the bug where both match)
+    # The dispatcher should prioritize THEME_PACK
+    def side_effect(target, **kwargs):
+        return target in (
+            "mirror/road_in_mir/legend_assets.png",  # false positive or actual match
+            "mirror/theme_pack/normal_assets.png"    # the actual theme pack screen indicator
+        )
+    mock_automation.find_element = MagicMock(side_effect=side_effect)
+    state = dispatcher.detect_state()
+    assert state == GameState.THEME_PACK
+
+
 @patch("tasks.mirror.mirror.auto")
 @patch("module.config.cfg")
 def test_check_and_recover_process(mock_cfg, mock_auto):
