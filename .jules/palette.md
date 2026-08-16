@@ -21,3 +21,6 @@
 ## 2025-02-12 - Missing Accessible Name on ObserveGiftSelectionRow ToolButton
 **Learning:** In PySide6, creating icon-only tool buttons requires an explicit `setAccessibleName` for screen readers to interpret the button's action. The `ObserveGiftSelectionRow` in `app/base_combination.py` had a remove button with a tooltip but lacked an accessible name, making it invisible to screen readers.
 **Action:** Always ensure that icon-only `TransparentToolButton` widgets have `setAccessibleName` called on them with a descriptive translation string.
+## 2025-02-12 - MessageBox Default Buttons Affordance
+**Learning:** In `qfluentwidgets`, the default `yesButton` and `cancelButton` provided by the base `MessageBox` class do not automatically use a pointing hand cursor. When creating custom dialogs by subclassing `MessageBox`, failing to explicitly set the cursor for these buttons leads to inconsistent interaction cues compared to other UI elements.
+**Action:** Always explicitly set `self.yesButton.setCursor(Qt.CursorShape.PointingHandCursor)` and `self.cancelButton.setCursor(Qt.CursorShape.PointingHandCursor)` (if not hidden) in the `__init__` of any custom `MessageBox` subclass to ensure consistent visual affordance.
