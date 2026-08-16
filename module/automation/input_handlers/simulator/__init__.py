@@ -63,6 +63,8 @@ def insert_swipe(p0, p3, speed=15, min_distance=10):
             + p3 * t**3
         )
         point = point.astype(int).tolist()
+        # ⚡ Bolt: Replace np.linalg.norm with squared Euclidean distance to avoid numpy allocation overhead in tight loop
+        if (point[0] - prev[0])**2 + (point[1] - prev[1])**2 < min_dist_sq:
 
         # 使用简单的欧氏平方距离代替 numpy 操作，避免 python 层在密集循环中调用 numpy 的开销
         if (point[0] - prev[0]) ** 2 + (point[1] - prev[1]) ** 2 < min_dist_sq:
@@ -74,6 +76,12 @@ def insert_swipe(p0, p3, speed=15, min_distance=10):
     # Delete nearing points
     if len(points) > 1:
         p_start = points[0]
+        # ⚡ Bolt: Replace np.linalg.norm array operations with python loop and squared distance math
+        filtered_points = [p_start]
+        for p in points[1:]:
+            if (p[0] - p_start[0])**2 + (p[1] - p_start[1])**2 > min_dist_sq:
+                filtered_points.append(p)
+        points = filtered_points
         new_points = [p_start]
         for p in points[1:]:
             if (p[0] - p_start[0])**2 + (p[1] - p_start[1])**2 > min_dist_sq:
@@ -84,4 +92,5 @@ def insert_swipe(p0, p3, speed=15, min_distance=10):
             points = [p0.tolist(), p3.tolist()]
     else:
         points = [p0.tolist(), p3.tolist()]
+
     return points
