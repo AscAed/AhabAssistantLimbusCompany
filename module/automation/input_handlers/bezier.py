@@ -16,6 +16,8 @@ def generate_bezier_path(
     Returns:
         A list of (x, y) coordinates representing the path.
     """
+    start = (int(round(start[0])), int(round(start[1])))
+    end = (int(round(end[0])), int(round(end[1])))
     x0, y0 = start
     x1, y1 = end
     dx = x1 - x0
