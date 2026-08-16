@@ -82,6 +82,8 @@ def start_socket_server(port, signaler):
                         signaler.arguments_received.emit(data.split("|"))
                 except socket.timeout:
                     pass
+                except Exception as e:
+                    log.warning(f"接收参数失败: {e}")
 
 
 def send_args_to_existing_instance(port, args):
