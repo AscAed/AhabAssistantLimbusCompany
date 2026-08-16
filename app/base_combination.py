@@ -29,8 +29,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from qfluentwidgets import (
-    FluentIcon as FIF,
-    TransparentToolButton,
     ComboBox,
     FlyoutViewBase,
     IndicatorPosition,
@@ -55,6 +53,7 @@ from qfluentwidgets import (
 from qfluentwidgets import (
     FluentIcon as FIF,
 )
+from ruamel.yaml import YAML
 
 from app.base_tools import *
 from app.base_tools import FluentIconBase, QIcon
@@ -342,7 +341,8 @@ class MirrorTeamCombination(QFrame):
             )
             return
 
-        data: dict = cfg.yaml.load(setting)
+        yaml = YAML(typ="safe")
+        data: dict = yaml.load(setting)
         from module.config import TeamSetting
 
         try:

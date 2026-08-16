@@ -32,7 +32,7 @@ def export_team_settings(team_num: int, file_path: str) -> bool:
             log.error(f"队伍 {team_num} 未找到")
             return False
 
-        yaml = YAML()
+        yaml = YAML(typ="safe")
         export_data = team_setting.model_dump()
 
         # 从导出中排除统计字段；team_number 表示游戏内编队编号，需要保留。
@@ -62,9 +62,7 @@ def export_team_settings(team_num: int, file_path: str) -> bool:
         return False
 
 
-def import_team_settings(
-    file_path: str, team_num: int
-) -> tuple[Optional[TeamSetting], Optional[dict], list[str]]:
+def import_team_settings(file_path: str, team_num: int) -> tuple[Optional[TeamSetting], Optional[dict], list[str]]:
     """从 YAML 文件导入队伍设置
 
     Args:
@@ -78,7 +76,7 @@ def import_team_settings(
         - missing_fields: 缺失的必需字段列表，如果所有字段都存在则为空列表
     """
     try:
-        yaml = YAML()
+        yaml = YAML(typ="safe")
         with open(file_path, "r", encoding="utf-8") as f:
             data = yaml.load(f)
 
@@ -91,9 +89,7 @@ def import_team_settings(
             team_setting = TeamSetting(**data)
             return team_setting, theme_pack_weight, []
         except ValidationError as e:
-            missing_fields = [
-                err["loc"][0] for err in e.errors() if err["type"] == "missing"
-            ]
+            missing_fields = [err["loc"][0] for err in e.errors() if err["type"] == "missing"]
             if missing_fields:
                 # 使用 model_construct 为缺失字段创建默认值
                 team_setting = TeamSetting.model_construct(**data)
@@ -106,9 +102,7 @@ def import_team_settings(
         return None, None, [str(e)]
 
 
-def apply_team_settings(
-    team_num: int, team_setting: TeamSetting, theme_pack_weight: Optional[dict]
-) -> None:
+def apply_team_settings(team_num: int, team_setting: TeamSetting, theme_pack_weight: Optional[dict]) -> None:
     """应用导入的队伍设置到配置"""
     cfg.config.teams[str(team_num)] = team_setting
 
@@ -116,7 +110,7 @@ def apply_team_settings(
         theme_pack_weight_path = Path(theme_list.build_team_weight_path(team_num))
         theme_pack_weight_path.parent.mkdir(parents=True, exist_ok=True)
 
-        yaml = YAML()
+        yaml = YAML(typ="safe")
         with open(theme_pack_weight_path, "w", encoding="utf-8") as f:
             yaml.dump(theme_pack_weight, f)
 
