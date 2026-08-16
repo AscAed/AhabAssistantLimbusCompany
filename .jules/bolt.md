@@ -73,6 +73,10 @@
 ## 2026-07-26 - [Avoid redundant screenshots in UI polling loops]
 **Learning:** In polling loops for UI automation, sequential calls to `find_element(..., take_screenshot=True)` will force a fresh screenshot on every check. When a single frame is valid for multiple conditional checks, this introduces massive unnecessary I/O and processing overhead.
 **Action:** Take a screenshot once at the start of the loop (`auto.take_screenshot()`), and remove `take_screenshot=True` from subsequent `find_element` calls within that iteration to reuse the cached frame.
+
+## 2026-08-15 - Fast path multi-scale feature matching
+**Learning:** In `find_feature_element`, running `cv2.resize` and `cv2.matchTemplate` sequentially across scales `[0.85, 1.0, 1.15]` performs unnecessary and extremely costly computations if the element already natively matches at the 1.0 scale (which it does 90%+ of the time).
+**Action:** Reorder scales to prioritize `[1.0, 0.85, 1.15]` and implement an early exit `break` when the match threshold is met. This skips massive image resizing overhead when the native scale is sufficient.
 ## 2025-03-10 - O(N) Spatial Hashing for Image Template Coordinates
 **Learning:** In multi-target image matching, filtering out overlapping coordinates by checking each point against all kept points with an O(N^2) nested loop creates a massive bottleneck when thousands of points are matched.
 **Action:** Replace the nested distance check loop with an O(N) Spatial Hashing grid (`grid = {}`; `cell = (int(x//dist), int(y//dist))`). This yields a >100x speedup (~4.3s down to ~0.03s for 5000 points) by only checking adjacent grid cells.
