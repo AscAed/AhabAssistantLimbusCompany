@@ -63,66 +63,52 @@ def EXP_luxcavation(combat_count: int = 1):
         ):
             auto.key_press("esc")
             continue
-        if auto.find_element(
-            "luxcavation/exp_enter.png", threshold=0.85, take_screenshot=True
-        ):
-            if level := auto.find_element(
-                "luxcavation/exp_enter.png", find_type="image_with_multiple_targets"
-            ):
+        if auto.find_element("luxcavation/exp_enter.png", threshold=0.85, take_screenshot=True):
+            if level := auto.find_element("luxcavation/exp_enter.png", find_type="image_with_multiple_targets"):
                 level = sorted(level, key=lambda x: x[0], reverse=True)
                 scale = cfg.set_win_size / 1440
                 log.debug(f"经验本检测到 {len(level)} 个关卡入口: {level}")
                 for lv_idx, lv in enumerate(level):
                     if combat_count > 1:
                         box_position = (lv[0] + 300 * scale, lv[1] - 450 * scale)
-                        if not _prepare_continuous_combat_count(
-                            combat_count, "EXP", box_position
-                        ):
-                            log.debug(
-                                f"经验本第 {lv_idx + 1} 关连续战斗设置失败，降级尝试下一关"
-                            )
+                        if not _prepare_continuous_combat_count(combat_count, "EXP", box_position):
+                            log.debug(f"经验本第 {lv_idx + 1} 关连续战斗设置失败，降级尝试下一关")
                             continue
 
                     select_team = False
                     for retry in range(3):
-                        log.debug(
-                            f"经验本尝试第 {lv_idx + 1} 关 (x={lv[0]}, y={lv[1]}), 第 {retry + 1}/3 次"
-                        )
+                        log.debug(f"经验本尝试第 {lv_idx + 1} 关 (x={lv[0]}, y={lv[1]}), 第 {retry + 1}/3 次")
                         auto.mouse_click(lv[0], lv[1])
                         sleep(1)
                         auto.mouse_to_blank()
                         for _ in range(3):
+                            # ⚡ Bolt: Take screenshot once and reuse frame to prevent 2x redundant I/O overhead on short-circuit OR failures
+                            auto.take_screenshot()
                             if auto.find_element(
-                                "teams/identify_assets.png", take_screenshot=True
+                                "teams/identify_assets.png", take_screenshot=False
                             ) or auto.find_element(
                                 "home/first_prompt_assets.png",
                                 model="clam",
-                                take_screenshot=True,
+                                take_screenshot=False,
                             ):
-                                log.debug(
-                                    f"经验本第 {lv_idx + 1} 关点击成功，已进入编队界面"
-                                )
+                                log.debug(f"经验本第 {lv_idx + 1} 关点击成功，已进入编队界面")
                                 select_team = True
                                 break
                         if select_team:
                             break
                     if select_team:
                         break
-                    log.debug(
-                        f"经验本第 {lv_idx + 1} 关 3 次尝试均未进入编队，降级尝试下一关"
-                    )
+                    log.debug(f"经验本第 {lv_idx + 1} 关 3 次尝试均未进入编队，降级尝试下一关")
         if auto.click_element("home/luxcavation_assets.png"):
             continue
-        if auto.find_element("home/inferno_bus_assets.png") and not auto.find_element(
-            "home/luxcavation_assets.png"
-        ):
+        if auto.find_element("home/inferno_bus_assets.png") and not auto.find_element("home/luxcavation_assets.png"):
             sleep(1)
             if not auto.find_element("home/luxcavation_assets.png"):
                 auto.click_element("home/window_assets.png")
                 continue
-        if auto.find_element(
-            "base/renew_confirm_assets.png", model="clam"
-        ) and auto.find_element("home/drive_assets.png", model="normal"):
+        if auto.find_element("base/renew_confirm_assets.png", model="clam") and auto.find_element(
+            "home/drive_assets.png", model="normal"
+        ):
             auto.click_element("base/renew_confirm_assets.png")
             from tasks.base.back_init_menu import back_init_menu
 
@@ -147,27 +133,21 @@ def thread_luxcavation(combat_count: int = 1):
     def _click_level_targets(level: list, log_prefix: str) -> bool:
         for lv_idx, lv in enumerate(level):
             for retry in range(3):
-                log.debug(
-                    f"{log_prefix}尝试第 {lv_idx + 1} 关 (x={lv[0]}, y={lv[1]}), 第 {retry + 1}/3 次"
-                )
+                log.debug(f"{log_prefix}尝试第 {lv_idx + 1} 关 (x={lv[0]}, y={lv[1]}), 第 {retry + 1}/3 次")
                 auto.mouse_click(lv[0], lv[1])
                 sleep(1)
                 auto.mouse_to_blank()
                 for _ in range(3):
-                    if auto.find_element(
-                        "teams/identify_assets.png", take_screenshot=True
-                    ) or auto.find_element(
+                    # ⚡ Bolt: Take screenshot once and reuse frame to prevent 2x redundant I/O overhead on short-circuit OR failures
+                    auto.take_screenshot()
+                    if auto.find_element("teams/identify_assets.png", take_screenshot=False) or auto.find_element(
                         "home/first_prompt_assets.png",
                         model="clam",
-                        take_screenshot=True,
+                        take_screenshot=False,
                     ):
-                        log.debug(
-                            f"{log_prefix}第 {lv_idx + 1} 关点击成功，已进入编队界面"
-                        )
+                        log.debug(f"{log_prefix}第 {lv_idx + 1} 关点击成功，已进入编队界面")
                         return True
-            log.debug(
-                f"{log_prefix}第 {lv_idx + 1} 关 3 次尝试均未进入编队，降级尝试下一关"
-            )
+            log.debug(f"{log_prefix}第 {lv_idx + 1} 关 3 次尝试均未进入编队，降级尝试下一关")
         return False
 
     loop_count = 30
@@ -182,16 +162,12 @@ def thread_luxcavation(combat_count: int = 1):
         if (
             auto.find_element("home/first_prompt_assets.png", model="clam")
             and auto.find_element("home/back_assets.png", model="normal")
-            and not auto.find_element(
-                "luxcavation/thread_enter_assets.png", threshold=0.78
-            )
+            and not auto.find_element("luxcavation/thread_enter_assets.png", threshold=0.78)
             and not auto.find_element("luxcavation/thread_consume.png")
         ):
             auto.key_press("esc")
             continue
-        if thread_enter := auto.click_element(
-            "luxcavation/thread_enter_assets.png", threshold=0.78, click=False
-        ):
+        if thread_enter := auto.click_element("luxcavation/thread_enter_assets.png", threshold=0.78, click=False):
             # 纽本连战次数框位于外层纺锤卡片，需在进入关卡列表前设置。
             if combat_count > 1 and not continuous_combat_set:
                 if not _prepare_continuous_combat_count(combat_count, "Thread"):
@@ -200,9 +176,7 @@ def thread_luxcavation(combat_count: int = 1):
                 continuous_combat_set = True
             auto.mouse_click(thread_enter[0], thread_enter[1])
             sleep(0.5)
-            if pos := auto.find_element(
-                "luxcavation/thread_consume.png", take_screenshot=True
-            ):
+            if pos := auto.find_element("luxcavation/thread_consume.png", take_screenshot=True):
                 if scroll_bar := auto.find_element("luxcavation/thread_scroll_bar.png"):
                     auto.mouse_drag_down(scroll_bar[0], scroll_bar[1], reverse=2)
                 else:
@@ -268,16 +242,14 @@ def thread_luxcavation(combat_count: int = 1):
             continue
         if auto.click_element("home/luxcavation_assets.png"):
             continue
-        if auto.find_element("home/inferno_bus_assets.png") and not auto.find_element(
-            "home/luxcavation_assets.png"
-        ):
+        if auto.find_element("home/inferno_bus_assets.png") and not auto.find_element("home/luxcavation_assets.png"):
             sleep(1)
             if not auto.find_element("home/luxcavation_assets.png"):
                 auto.click_element("home/window_assets.png")
                 continue
-        if auto.find_element(
-            "base/renew_confirm_assets.png", model="clam"
-        ) and auto.find_element("home/drive_assets.png", model="normal"):
+        if auto.find_element("base/renew_confirm_assets.png", model="clam") and auto.find_element(
+            "home/drive_assets.png", model="normal"
+        ):
             auto.click_element("base/renew_confirm_assets.png")
             from tasks.base.back_init_menu import back_init_menu
 
