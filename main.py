@@ -77,10 +77,16 @@ def start_socket_server(port, signaler):
         while True:
             conn, addr = s.accept()
             with conn:
-                data = conn.recv(1024).decode("utf-8")
-                if data:
-                    # 收到参数后通过信号发送给主线程处理
-                    signaler.arguments_received.emit(data.split("|"))
+                conn.settimeout(1.0)
+                try:
+                    data = conn.recv(1024).decode("utf-8")
+                    if data:
+                        # 收到参数后通过信号发送给主线程处理
+                        signaler.arguments_received.emit(data.split("|"))
+                except socket.timeout:
+                    pass
+                except Exception as e:
+                    log.warning(f"接收参数失败: {e}")
 
 
 def send_args_to_existing_instance(port, args):

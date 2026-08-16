@@ -76,3 +76,8 @@
 **Vulnerability:** Raw socket connections (e.g., `socket.connect()`) without an explicit timeout will hang indefinitely if the remote server fails to respond, potentially causing the main process or automation worker to deadlock and leading to a Denial of Service (DoS) state.
 **Learning:** While third-party libraries like `requests` and `urllib` are commonly audited for missing timeouts, underlying raw socket connections are often overlooked but share the exact same default behavior of infinite wait times.
 **Prevention:** Always set an explicit timeout (e.g., `socket.settimeout(10.0)`) before calling `socket.connect()`. Crucially, for persistent, long-lived sockets that expect idle periods during streaming (like minitouch), always reset the socket to blocking mode (`socket.settimeout(None)`) immediately after a successful connection to prevent idle drops.
+
+## 2025-02-21 - [Missing Timeout on Accepted Socket Connection]
+**Vulnerability:** In `main.py`, the single-threaded socket server `start_socket_server` accepted connections but called `conn.recv()` without a timeout. This is vulnerable to a local Denial of Service (DoS) attack where a malicious or malfunctioning client connects and never sends data, blocking the server from handling legitimate parameters from other instances.
+**Learning:** Even local socket servers acting as IPC mechanisms must configure a timeout for `.recv()`. A hanging connection will block the thread loop, preventing it from calling `accept()` for subsequent connections.
+**Prevention:** Always use `settimeout()` on accepted connection sockets before attempting to read data, and catch `socket.timeout` appropriately.
