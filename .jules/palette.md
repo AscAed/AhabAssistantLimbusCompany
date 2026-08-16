@@ -11,6 +11,9 @@
 ## 2025-02-12 - MessageBoxEdit UX Auto-Select & Clear Button
 **Learning:** When using `MessageBoxEdit` to prompt users for text input, the default text is not auto-selected and there is no clear button, making it tedious for users to replace or clear the default value (which is the most common action). PySide6 `qfluentwidgets.LineEdit` supports both auto-selection via `selectAll()` and a clear button via `setClearButtonEnabled(True)`.
 **Action:** Whenever implementing a dialog with pre-filled text input (like `MessageBoxEdit`), always call `self.lineEdit.selectAll()` and `self.lineEdit.setClearButtonEnabled(True)` to allow users to immediately overwrite or easily clear the default value, matching native desktop UX expectations.
+## 2025-02-12 - LineEdit UX Clear Button
+**Learning:** When using `LineEdit` from `qfluentwidgets` in custom widgets (like `BaseLineEdit`), the default configuration does not include a clear button. This lacks the standard, expected affordance for users to easily clear text inputs. PySide6 `qfluentwidgets.LineEdit` natively supports a clear button via `setClearButtonEnabled(True)`.
+**Action:** When working with or creating components that wrap `LineEdit`, always explicitly enable the clear button by calling `setClearButtonEnabled(True)` to improve input usability and provide better UX.
 
 ## 2025-02-12 - Upgrading text buttons to icon-only buttons
 **Learning:** Upgrading standard text-based buttons (like `PushButton` with text "Clear") to icon-only buttons (like `TransparentToolButton(FIF.DELETE)`) improves visual clarity and modernizes the layout. However, it introduces a risk of accessibility regressions because the text label is removed.
