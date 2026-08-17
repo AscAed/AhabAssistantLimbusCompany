@@ -305,7 +305,7 @@ class MumuControl(AbstractInput):
                     log.error(
                         f"断开连接失败，端口号{port}不正确，可能是拼写错误或不规范"
                     )
-        except:
+        except Exception:
             pass
 
     def start_game(self):
@@ -372,7 +372,7 @@ class MumuControl(AbstractInput):
                         )
                         if key:
                             break
-                    except:
+                    except Exception:
                         continue
                 if not key:
                     log.debug(
@@ -384,7 +384,7 @@ class MumuControl(AbstractInput):
                 ).strip('"')
                 mumu_version, _ = winreg.QueryValueEx(key, "DisplayVersion")
                 winreg.CloseKey(key)
-            except:
+            except Exception:
                 log.error(
                     "读取注册表失败，无法获取MuMu安装路径，也可能是未安装MuMu模拟器，或使用了某种特供版本",
                     exc_info=True,
@@ -430,7 +430,7 @@ class MumuControl(AbstractInput):
             if multi_instance_number is None and self.multi_instance_number is None:
                 self.multi_instance_number = 0
             if int(self.multi_instance_number) <= 1536:
-                cmd = f"{self.exe_path} adb -v {self.multi_instance_number}"
+                cmd = [self.exe_path, "adb", "-v", str(self.multi_instance_number)]
                 no_window_flag = (
                     subprocess.CREATE_NO_WINDOW
                     if hasattr(subprocess, "CREATE_NO_WINDOW")
@@ -529,7 +529,7 @@ class MumuControl(AbstractInput):
             log.debug(f"MUMU模拟器编号{self.multi_instance_number}关闭完成")
         except userStopError:
             raise
-        except:
+        except Exception:
             self.mumu_control_api_backend()
             self.stop()
 
@@ -546,7 +546,7 @@ class MumuControl(AbstractInput):
                 )
             else:
                 return self.install_path
-        except:
+        except Exception:
             self.mumu_control_api_backend()
             self.get_device_path()
 
@@ -570,7 +570,7 @@ class MumuControl(AbstractInput):
                 return os.path.join(
                     self.install_path, "sdk", "external_renderer_ipc.dll"
                 )
-        except:
+        except Exception:
             self.mumu_control_api_backend()
             self.get_nemu_client_path()
 
@@ -658,7 +658,7 @@ class MumuControl(AbstractInput):
                 capture_output=True,
                 creationflags=no_window_flag,
             )
-        except:
+        except Exception:
             self.mumu_control_api_backend()
             self.disable_app_keptlive()
 
@@ -686,7 +686,7 @@ class MumuControl(AbstractInput):
                 capture_output=True,
                 creationflags=no_window_flag,
             )
-        except:
+        except Exception:
             self.mumu_control_api_backend()
             self.enable_app_keptlive()
 
@@ -1109,7 +1109,7 @@ class MumuControl(AbstractInput):
 
         self.up()
 
-    def mouse_scroll(self, direction: int = -3) -> bool:
+    def mouse_scroll(self, direction: int = -3, x: int = None, y: int = None) -> bool:
         """占位"""
         return True
 

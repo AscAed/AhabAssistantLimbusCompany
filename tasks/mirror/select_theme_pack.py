@@ -19,25 +19,29 @@ def select_theme_pack(
     scale = cfg.set_win_size / 1080
     if path_manager.current_language == "zh_cn":
         theme_pack_list_zh = theme_list.get_effective_theme_pack_list(
-            hard_switch, "zh_cn", team_num, use_custom_theme_pack_weight
+            hard_switch, "zh_cn", team_num, use_custom_theme_pack_weight, floor
         )
         theme_pack_list_en = {}
     elif path_manager.current_language == "en":
         theme_pack_list_zh = {}
         theme_pack_list_en = theme_list.get_effective_theme_pack_list(
-            hard_switch, "en", team_num, use_custom_theme_pack_weight
+            hard_switch, "en", team_num, use_custom_theme_pack_weight, floor
         )
     else:
         theme_pack_list_zh = theme_list.get_effective_theme_pack_list(
-            hard_switch, "zh_cn", team_num, use_custom_theme_pack_weight
+            hard_switch, "zh_cn", team_num, use_custom_theme_pack_weight, floor
         )
         theme_pack_list_en = theme_list.get_effective_theme_pack_list(
-            hard_switch, "en", team_num, use_custom_theme_pack_weight
+            hard_switch, "en", team_num, use_custom_theme_pack_weight, floor
         )
     refresh_times = 3
     difficulty = None
-    if auto.find_element("mirror/road_in_mir/legend_assets.png", take_screenshot=True):
-        return
+    # 如果检测到卡包选择界面指示图，不执行因图例检测（兜底误匹配）而触发的提前返回
+    if not (auto.find_element("mirror/theme_pack/feature_theme_pack_assets.png", take_screenshot=True) or
+            auto.find_element("mirror/theme_pack/normal_assets.png") or
+            auto.find_element("mirror/theme_pack/hard_assets.png")):
+        if auto.find_element("mirror/road_in_mir/legend_assets.png"):
+            return
     while True:
         # 自动截图
         if auto.take_screenshot() is None:
@@ -67,9 +71,7 @@ def select_theme_pack(
                     None, my_crop=difficulty_bbox, only_text=True
                 )
                 if not isinstance(ocr_result, str):
-                    if auto.find_element(
-                        "mirror/road_in_mir/legend_assets.png", take_screenshot=True
-                    ):
+                    if auto.find_element("mirror/road_in_mir/legend_assets.png"):
                         return
                     continue
                 if "normal" in ocr_result:
@@ -122,7 +124,6 @@ def select_theme_pack(
             if all_theme_pack := auto.find_element(
                 "mirror/theme_pack/theme_pack_features.png",
                 find_type="image_with_multiple_targets",
-                take_screenshot=True,
             ):
                 if floor == 4 and cfg.skip_event_pack:
                     all_theme_pack.sort(key=lambda pos: (pos[0], pos[1]))

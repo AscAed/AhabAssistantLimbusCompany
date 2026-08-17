@@ -1,3 +1,5 @@
+# ruff: noqa: T201  # CLI script intentionally prints export diagnostics.
+
 import subprocess
 import sys
 from pathlib import Path

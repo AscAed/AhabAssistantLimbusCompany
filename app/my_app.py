@@ -70,12 +70,12 @@ class Language(Enum):
     AUTO = QLocale()
 
 
-from app.common.ui_config import (
+from app.common.ui_config import (  # noqa: E402
     apply_font_config,
     get_main_window_style,
     get_title_bar_style,
 )
-from app.widget.dev_watermark import DevWatermark
+from app.widget.dev_watermark import DevWatermark  # noqa: E402
 
 
 # 自定义托盘菜单，处理鼠标在外部释放时关闭菜单

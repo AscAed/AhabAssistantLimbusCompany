@@ -32,7 +32,7 @@ from qfluentwidgets import (
 from qfluentwidgets import FluentIcon as FIF
 from qfluentwidgets.components.settings.setting_card import SettingIconWidget
 
-from app import *
+from app import all_sinners_name, mediator, team_toggle_button_group, toggle_button_group
 from app.common.ui_config import get_setting_layout_style
 from module.config import cfg
 
@@ -129,9 +129,7 @@ class BaseCheckBox(BaseLayout):
         self.tips = tips
         self.check_box = RightClickCheckBox(title, self)
         self.check_box.installEventFilter(
-            ToolTipFilter(
-                self.check_box, showDelay=0, position=ToolTipPosition.BOTTOM_LEFT
-            )
+            ToolTipFilter(self.check_box, showDelay=0, position=ToolTipPosition.BOTTOM_LEFT)
         )
 
         self.hBoxLayout.addWidget(self.check_box, 0, Qt.AlignLeft)
@@ -210,6 +208,7 @@ class NormalTextButton(BaseButton):
 
         self.text = button_text
         self.button = PushButton(button_text, self)
+        self.button.setCursor(Qt.CursorShape.PointingHandCursor)
         if tactics == 1:
             self.button.setSizePolicy(
                 QSizePolicy.Expanding,  # 水平方向自动扩展
@@ -244,6 +243,10 @@ class ToSettingButton(BaseButton):
         self.setFixedWidth(50)
 
         self.button = SplitToolButton(icon, self)
+        self.button.setCursor(Qt.PointingHandCursor)
+        self.button.setToolTip("设置")
+        self.button.setAccessibleName("设置")
+        self.button.installEventFilter(ToolTipFilter(self.button, showDelay=300, position=ToolTipPosition.BOTTOM))
 
         self.menu = RoundMenu(parent=self)
         self.edit_name = Action(FIF.EDIT, "命名")
@@ -271,6 +274,8 @@ class ToSettingButton(BaseButton):
         mediator.switch_team_setting.emit(target)
 
     def retranslateUi(self):
+        self.button.setToolTip(self.tr("设置"))
+        self.button.setAccessibleName(self.tr("设置"))
         self.edit_name.setText(self.tr("命名"))
         self.del_action.setText(self.tr("删除"))
         self.copy_settings.setText(self.tr("复制"))
@@ -290,6 +295,10 @@ class ChangePageButton(BaseButton):
         self.setFixedWidth(50)
 
         self.button = ToggleToolButton(icon, self)
+        self.button.setCursor(Qt.PointingHandCursor)
+        self.button.setToolTip("切换页面")
+        self.button.setAccessibleName("切换页面")
+        self.button.installEventFilter(ToolTipFilter(self.button, showDelay=300, position=ToolTipPosition.BOTTOM))
         toggle_button_group[config_name] = self.button
         self.button.clicked.connect(self.on_click)
 
@@ -306,6 +315,10 @@ class ChangePageButton(BaseButton):
     def send_switch_signal(self, target: str):
         mediator.switch_page.emit(target)
 
+    def retranslateUi(self):
+        self.button.setToolTip(self.tr("切换页面"))
+        self.button.setAccessibleName(self.tr("切换页面"))
+
 
 class SettingTeamsButton(BaseButton):
     def __init__(
@@ -320,12 +333,20 @@ class SettingTeamsButton(BaseButton):
         self.setFixedWidth(50)
 
         self.button = ToolButton(icon, self)
+        self.button.setCursor(Qt.PointingHandCursor)
+        self.button.setToolTip("设置队伍")
+        self.button.setAccessibleName("设置队伍")
+        self.button.installEventFilter(ToolTipFilter(self.button, showDelay=300, position=ToolTipPosition.BOTTOM))
         self.button.clicked.connect(self.on_click)
 
         self.hBoxLayout.addWidget(self.button)
 
     def on_click(self):
         pass
+
+    def retranslateUi(self):
+        self.button.setToolTip(self.tr("设置队伍"))
+        self.button.setAccessibleName(self.tr("设置队伍"))
 
 
 class BaseLabel(BaseLayout):
@@ -401,11 +422,7 @@ class BaseComboBox(BaseLayout):
         self.combo_box = RightClickComboBox(self)
         self.hBoxLayout.addWidget(self.combo_box, stretch=1)
         self.setFixedHeight(30)
-        self.installEventFilter(
-            ToolTipFilter(
-                self, showDelay=tool_tip_delay, position=ToolTipPosition.BOTTOM_LEFT
-            )
-        )
+        self.installEventFilter(ToolTipFilter(self, showDelay=tool_tip_delay, position=ToolTipPosition.BOTTOM_LEFT))
         if combo_box_width and isinstance(combo_box_width, int):
             self.combo_box.setFixedWidth(combo_box_width)
 
@@ -480,6 +497,7 @@ class BaseLineEdit(BaseLayout):
         self.config_name = config_name
         self.setObjectName(config_name)
         self.line_edit = LineEdit(self)
+        self.line_edit.setClearButtonEnabled(True)
         self.hBoxLayout.addWidget(self.line_edit, stretch=1)
         self.line_edit.textChanged.connect(self.text_changed)
 

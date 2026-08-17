@@ -97,6 +97,8 @@ def onetime_mir_process(team_setting: TeamSetting, team_num: int):
             return True
         else:
             return False
+    except userStopError:
+        raise
     except Exception as e:
         log.exception(f"镜牢行动出错: {e}")
         return False
@@ -266,7 +268,7 @@ def Buy_enkephalin():
     lunacy_to_enkephalin(times=times)
 
 
-def Mirror_task():
+def Mirror_task(thread=None):
     # 判断执行镜牢任务的次数
     mir_times = cfg.set_mirror_count
     if cfg.infinite_dungeons:
@@ -278,6 +280,8 @@ def Mirror_task():
     cfg.normalize_and_sync_team_state(persist=False)
     # 开始执行镜牢任务
     while mir_times > 0:
+        if thread and getattr(thread, "is_stop", False):
+            raise userStopError("用户主动终止程序")
         # 检测配置的队伍能否顺利执行
         useful = False
         hard = bool(cfg.hard_mirror)
@@ -334,7 +338,7 @@ def Mirror_task():
         to_get_reward()
 
 
-def script_task() -> None | int:
+def script_task(thread=None) -> None | int:
     start_time = time()
     # 获取（启动）游戏对游戏窗口进行设置
     init_game()
@@ -363,25 +367,27 @@ def script_task() -> None | int:
     if auto.click_element("battle/turn_assets.png", take_screenshot=True):
         get_reward = battle.fight()
 
-    task_list = []
-    # 执行日常刷本任务
+    # 使用 STCE 引擎执行任务
+    from tasks.base.task_engine import (
+        BuyEnkephalinTask,
+        DailyLuxcavationTask,
+        GetRewardTask,
+        MirrorDungeonTask,
+        TaskEngine,
+    )
+    engine = TaskEngine(thread=thread)
+    engine.get_reward_context = get_reward
+
     if cfg.daily_task:
-        task_list.append(Daily_task_wrapper(get_reward=get_reward))
-
-    # 执行奖励领取任务
+        engine.add_task(DailyLuxcavationTask())
     if cfg.get_reward:
-        task_list.append(to_get_reward)
-
-    # 执行狂气换饼任务
+        engine.add_task(GetRewardTask())
     if cfg.buy_enkephalin:
-        task_list.append(Buy_enkephalin)
-
-    # 执行镜牢任务
+        engine.add_task(BuyEnkephalinTask())
     if cfg.mirror:
-        task_list.append(Mirror_task)
+        engine.add_task(MirrorDungeonTask())
 
-    for task in task_list:
-        task()
+    engine.run()
 
     if cfg.set_reduce_miscontact and not cfg.simulator:
         # 任务已结束，这里只恢复游戏窗口样式，避免把前台重新切回游戏。
@@ -430,6 +436,7 @@ class my_script_task(QThread):
         # 初始化，构造函数
         super().__init__()
         self.mutex = QMutex()
+        self.is_stop = False
 
     def run(self):
         self.mutex.lock()
@@ -469,7 +476,7 @@ class my_script_task(QThread):
         try:
             if keep_awake_enabled:
                 apply_power_keep_awake(True)
-            ret = script_task()
+            ret = script_task(thread=self)
             if ret == 0:
                 mediator.kill_signal.emit()
         finally:

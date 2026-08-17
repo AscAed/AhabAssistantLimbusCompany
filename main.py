@@ -11,12 +11,10 @@ _ORIG_SSLKEYLOGFILE = os.environ.pop("SSLKEYLOGFILE", None)
 
 # 将当前工作目录设置为程序所在的目录，确保无论从哪里执行，其工作目录都正确设置为程序本身的位置，避免路径错误。
 os.chdir(
-    os.path.dirname(sys.executable)
-    if getattr(sys, "frozen", False)
-    else os.path.dirname(os.path.abspath(__file__))
+    os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
 )
 # 解决 Windows DPI 缩放问题
-from ctypes import c_void_p, windll
+from ctypes import c_void_p, windll  # noqa: E402
 
 try:
     # 1. 尝试 Win10 1703+ 的最强方案 (Per Monitor V2)
@@ -36,17 +34,17 @@ except (AttributeError, OSError):
 
 # 先配好日志（给 "AALC" logger 挂 handler），再 import 会在 import 期就打日志的 app/config 模块，
 # 否则那些启动日志会丢。
-from module.logger import log
-from module.logger.my_log import Logger
+from module.logger import log  # noqa: E402
+from module.logger.my_log import Logger  # noqa: E402
 
 Logger()
 
 # 获取管理员权限
-import pyuac
+import pyuac  # noqa: E402
 
-from app.language_manager import LanguageManager
-from app.my_app import MainWindow
-from module.config import cfg
+from app.language_manager import LanguageManager  # noqa: E402
+from app.my_app import MainWindow  # noqa: E402
+from module.config import cfg  # noqa: E402
 
 if not pyuac.isUserAdmin():
     try:
@@ -55,12 +53,10 @@ if not pyuac.isUserAdmin():
     except Exception:
         sys.exit(1)
 
-from PySide6.QtCore import QObject, Qt, QTimer, Signal
-from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QObject, Qt, QTimer, Signal  # noqa: E402
+from PySide6.QtWidgets import QApplication  # noqa: E402
 
-QApplication.setHighDpiScaleFactorRoundingPolicy(
-    Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
-)
+QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
 QApplication.setAttribute(Qt.AA_DontCreateNativeWidgetSiblings)
 
 
@@ -69,18 +65,30 @@ class ArgumentSignaler(QObject):
     arguments_received = Signal(list)
 
 
-def start_socket_server(port, signaler):
+def start_socket_server(port, signaler, stop_event=None):
     """后台线程：监听新实例发来的参数"""
+    stop_event = stop_event or threading.Event()
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", port))
         s.listen(5)
-        while True:
-            conn, addr = s.accept()
+        s.settimeout(0.5)
+        while not stop_event.is_set():
+            try:
+                conn, addr = s.accept()
+            except socket.timeout:
+                continue
             with conn:
-                data = conn.recv(1024).decode("utf-8")
-                if data:
-                    # 收到参数后通过信号发送给主线程处理
-                    signaler.arguments_received.emit(data.split("|"))
+                # 🛡️ Sentinel: Enforce timeout to prevent indefinite hang on connection (DoS risk)
+                conn.settimeout(1.0)
+                try:
+                    data = conn.recv(1024).decode("utf-8")
+                    if data:
+                        # 收到参数后通过信号发送给主线程处理
+                        signaler.arguments_received.emit(data.split("|"))
+                except socket.timeout:
+                    pass
+                except Exception as e:
+                    log.warning(f"接收参数失败: {e}")
 
 
 def send_args_to_existing_instance(port, args):
@@ -99,10 +107,7 @@ def send_args_to_existing_instance(port, args):
 
 if __name__ == "__main__":
     if _ORIG_SSLKEYLOGFILE is not None:
-        log.warning(
-            f"检测到冲突的环境变量 SSLKEYLOGFILE={_ORIG_SSLKEYLOGFILE}，"
-            f"已在进程内清除，避免 OpenSSL 崩溃"
-        )
+        log.warning(f"检测到冲突的环境变量 SSLKEYLOGFILE={_ORIG_SSLKEYLOGFILE}，已在进程内清除，避免 OpenSSL 崩溃")
 
     # 定义一个唯一的端口号（建议选择 1024-65535 之间的随机数）
     APP_PORT = 62333
@@ -141,9 +146,7 @@ if __name__ == "__main__":
     # 4. 在后台启动 Socket 服务器（非阻塞主线程）
     # 注意：这里需要捕获 bind 异常，防止极短时间内双击导致的竞争
     try:
-        threading.Thread(
-            target=start_socket_server, args=(APP_PORT, signaler), daemon=True
-        ).start()
+        threading.Thread(target=start_socket_server, args=(APP_PORT, signaler), daemon=True).start()
     except OSError:
         # 如果走到这说明刚才的 bind 突然成功了但又瞬间失败，通常直接退出即可
         sys.exit(1)

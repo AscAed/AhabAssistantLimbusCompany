@@ -53,7 +53,7 @@ class AnnouncementThread(QThread):
         try:
             url = "https://gitee.com/KIYI/aalcresource/raw/main/AALC/announcements.json"
 
-            response = requests.get(url)
+            response = requests.get(url, timeout=10)
             response.raise_for_status()  # 如果状态码非200则抛出异常
 
             # 解析 JSON 数据
@@ -97,9 +97,7 @@ class Announcement(QWidget):
         if show_title:
             if content_type == "html":
                 # 在内容前添加标题
-                styled_content = (
-                    f"<h1 style='margin-bottom: 20px;'>{title}</h1>" + content
-                )
+                styled_content = f"<h1 style='margin-bottom: 20px;'>{title}</h1>" + content
                 self.content.setHtml(styled_content)
             elif content_type == "markdown":
                 try:
@@ -200,11 +198,13 @@ class AnnouncementBoard(FramelessDialog):
 
         # 复选框
         self.dontShowCheckbox = CheckBox(self.tr("下次公告更新前不再显示"))
+        self.dontShowCheckbox.setCursor(Qt.CursorShape.PointingHandCursor)
         self.dontShowCheckbox.setChecked(False)
         self.dontShowCheckbox.setEnabled(False)  # 初始禁用，滚动到底部后启用
 
         # 确认按钮
         self.yesButton = PrimaryPushButton(self.tr("确认"))
+        self.yesButton.setCursor(Qt.CursorShape.PointingHandCursor)
         self.yesButton.setFixedWidth(100)
         self.yesButton.setAttribute(Qt.WA_LayoutUsesWidgetRect)
         self.yesButton.clicked.connect(self.accept)
@@ -295,9 +295,7 @@ class AnnouncementBoard(FramelessDialog):
         # 为ALL页面设置滚动监听
         if hasattr(self.all.content, "verticalScrollBar"):
             scroll_bar = self.all.content.verticalScrollBar()
-            scroll_bar.valueChanged.connect(
-                lambda: self.check_scroll_position(self.tr("ALL~ 全部公告"))
-            )
+            scroll_bar.valueChanged.connect(lambda: self.check_scroll_position(self.tr("ALL~ 全部公告")))
 
         # 监听内容栈切换事件，以便为新显示的页面设置滚动监听
         self.content_stack.currentChanged.connect(self.on_stack_changed)
@@ -426,9 +424,7 @@ class AnnouncementBoard(FramelessDialog):
                     color: white;
                 }
                 """)
-            self.setStyleSheet(
-                "AnnouncementBoard { background-color: rgba(28, 28, 28, 1); }"
-            )
+            self.setStyleSheet("AnnouncementBoard { background-color: rgba(28, 28, 28, 1); }")
         else:
             self.sidebar.setStyleSheet(light_sidebar)
             self.title_list.setStyleSheet(light_list)
@@ -455,17 +451,13 @@ class AnnouncementBoard(FramelessDialog):
 
         # 加载 GitHub Markdown 样式
         css_path = (
-            "./assets/styles/github-markdown-dark.css"
-            if isDarkTheme()
-            else "./assets/styles/github-markdown-light.css"
+            "./assets/styles/github-markdown-dark.css" if isDarkTheme() else "./assets/styles/github-markdown-light.css"
         )
         try:
             with open(css_path, encoding="utf-8") as f:
                 css_content = f.read()
                 for title, widget in self.title_content_map.items():
-                    if hasattr(widget, "content") and hasattr(
-                        widget.content, "document"
-                    ):
+                    if hasattr(widget, "content") and hasattr(widget.content, "document"):
                         widget.content.document().setDefaultStyleSheet(css_content)
         except Exception:
             pass  # 样式加载失败时使用默认样式

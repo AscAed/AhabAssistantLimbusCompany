@@ -95,49 +95,89 @@ class Battle:
 
         return new_time
 
+    def _mouse_winrate_and_start(self):
+        log.info("执行链接战鼠标选路/战斗备用方案：点击胜率并启动战斗")
+        my_scale = cfg.set_win_size / 1440
+        # 寻找并点击胜率按钮
+        pos = auto.find_element("battle/win_rate_card.png", threshold=0.75)
+        if pos is None:
+            pos = auto.find_element("battle/win_rate_assets.png", threshold=0.7)
+        if pos is not None:
+            # 胜率按钮的偏移点击
+            auto.mouse_click(pos[0] + 50 * my_scale, pos[1] - 50 * my_scale)
+            sleep(0.5)
+        # 点击开始按钮 (右齿轮)
+        auto.click_element("battle/gear_right.png")
+
     def _battle_operation(
         self, first_turn: bool, defense_first_round: bool, avoid_skill_3: bool
     ):
         auto.mouse_click_blank()
+        is_chain_combat = auto.find_element("battle/gear_left.png", threshold=0.9) is not None
+        use_custom_chain_strategy = is_chain_combat and (defense_first_round or avoid_skill_3)
+
         if (
             first_turn
             and defense_first_round
-            and auto.find_element("battle/gear_left.png", threshold=0.9)
+            and is_chain_combat
         ):
             msg = "第一回合全员防御，开始战斗"
             if self._defense_this_round() is False:
                 defense_first_round = False
-                msg = "第一回合全员防御失败，本场战斗改为P+Enter"
-                auto.key_press("p")
-                sleep(0.5)
-                auto.key_press("enter")
-            sleep(2)
-            if not auto.find_element("battle/pause_assets.png", take_screenshot=True):
-                auto.key_press("p")
-                sleep(0.5)
-                auto.key_press("enter")
+                if use_custom_chain_strategy:
+                    msg = "第一回合全员防御失败，本场战斗改为鼠标点击胜率+启动"
+                    log.warning(msg)
+                    self._mouse_winrate_and_start()
+                else:
+                    msg = "第一回合全员防御失败，本场战斗改为P+Enter"
+                    auto.key_press("p")
+                    sleep(0.5)
+                    auto.key_press("enter")
+            else:
+                sleep(2)
+                if not auto.find_element("battle/pause_assets.png", take_screenshot=True):
+                    if use_custom_chain_strategy:
+                        auto.click_element("battle/gear_right.png")
+                    else:
+                        auto.key_press("p")
+                        sleep(0.5)
+                        auto.key_press("enter")
         elif self.defense_all_time:
-            if auto.find_element("battle/gear_left.png", threshold=0.9):
+            if is_chain_combat:
                 msg = "使用全员防御模式开始战斗"
                 self._defense_this_round()
-        elif avoid_skill_3 and auto.find_element("battle/gear_left.png", threshold=0.9):
+        elif avoid_skill_3 and is_chain_combat:
             msg = "使用避免3技能模式开始战斗"
             if self._chain_battle() is False:
                 avoid_skill_3 = False
-                msg = "使用避免三技能的链接战失败，本场战斗改为P+Enter"
-                auto.key_press("p")
-                sleep(0.5)
-                auto.key_press("enter")
-            sleep(2)
-            if not auto.find_element("battle/pause_assets.png", take_screenshot=True):
-                auto.key_press("p")
-                sleep(0.5)
-                auto.key_press("enter")
+                if use_custom_chain_strategy:
+                    msg = "使用避免三技能的链接战失败，本场战斗改为鼠标点击胜率+启动"
+                    log.warning(msg)
+                    self._mouse_winrate_and_start()
+                else:
+                    msg = "使用避免三技能的链接战失败，本场战斗改为P+Enter"
+                    auto.key_press("p")
+                    sleep(0.5)
+                    auto.key_press("enter")
+            else:
+                sleep(2)
+                if not auto.find_element("battle/pause_assets.png", take_screenshot=True):
+                    if use_custom_chain_strategy:
+                        auto.click_element("battle/gear_right.png")
+                    else:
+                        auto.key_press("p")
+                        sleep(0.5)
+                        auto.key_press("enter")
         else:
-            auto.key_press("p")
-            sleep(0.5)
-            auto.key_press("enter")
-            msg = "使用P+Enter开始战斗"
+            if use_custom_chain_strategy:
+                msg = "链接战触发备用操作，改为鼠标点击胜率+启动"
+                log.info(msg)
+                self._mouse_winrate_and_start()
+            else:
+                auto.key_press("p")
+                sleep(0.5)
+                auto.key_press("enter")
+                msg = "使用P+Enter开始战斗"
             if self.mouse_click_rate:
                 my_scale = cfg.set_win_size / 1440
                 if pos := auto.find_element("battle/win_rate_card.png", threshold=0.75):

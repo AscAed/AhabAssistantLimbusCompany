@@ -1,4 +1,3 @@
-import random
 import re
 from time import sleep, time
 from typing import Callable, TypeVar
@@ -357,7 +356,7 @@ class SimulatorControl(AbstractInput):
         scale = cfg.set_win_size / 1080
         self.mouse_drag(x, y, 0.4, 0, int(300 * scale * reverse))
 
-    def mouse_scroll(self, direction: int = -3) -> bool:
+    def mouse_scroll(self, direction: int = -3, x: int = None, y: int = None) -> bool:
         """占位"""
         return True
 
@@ -373,8 +372,8 @@ class SimulatorControl(AbstractInput):
 
         msg = "点击（1，1）空白位置"
         log.debug(msg)
-        x = coordinate[0] + random.randint(0, 10)
-        y = coordinate[1] + random.randint(0, 10)
+        x = coordinate[0] + 5
+        y = coordinate[1] + 5
         for i in range(times):
             self.mouse_click(x, y)
 

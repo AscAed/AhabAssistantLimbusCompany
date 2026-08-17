@@ -1,5 +1,5 @@
-import os
 import platform
+import subprocess
 import time
 from time import sleep
 
@@ -121,7 +121,7 @@ def kill_game():
         from module.game_and_screen import screen
 
         _, pid = win32process.GetWindowThreadProcessId(screen.handle.hwnd)
-        os.system(f"taskkill /F /PID {pid}")
+        subprocess.run(["taskkill", "/F", "/PID", str(pid)], check=False)
     sleep(10)
     wait_start = time.time()
     while True:

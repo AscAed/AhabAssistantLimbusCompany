@@ -1,13 +1,15 @@
 import base64
 import datetime
-from typing import Callable
+from typing import Callable, Union
 
 import pyperclip
 from PySide6.QtCore import (
+    QT_TRANSLATE_NOOP,
     QEasingCurve,
     QObject,
     QPropertyAnimation,
     QRect,
+    Qt,
     QTime,
     QUrl,
     Signal,
@@ -16,6 +18,7 @@ from PySide6.QtGui import (
     QColor,
     QDesktopServices,
     QFont,
+    QIcon,
     QKeyEvent,
     QKeySequence,
     QPainter,
@@ -24,12 +27,17 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QFrame,
     QGraphicsDropShadowEffect,
+    QHBoxLayout,
     QLabel,
     QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
     QWidget,
 )
 from qfluentwidgets import (
+    BodyLabel,
     ComboBox,
+    FluentIconBase,
     FlyoutViewBase,
     IndicatorPosition,
     InfoBarPosition,
@@ -46,11 +54,23 @@ from qfluentwidgets import (
     SwitchButton,
     TeachingTipTailPosition,
     TimePicker,
+    ToolTipFilter,
+    TransparentToolButton,
     setCustomStyleSheet,
 )
+from qfluentwidgets import (
+    FluentIcon as FIF,
+)
 
-from app.base_tools import *
-from app.base_tools import FluentIconBase, QIcon
+from app import mediator, task_check_box, team_toggle_button_group
+from app.base_tools import (
+    BaseCheckBox,
+    BaseComboBox,
+    BaseLabel,
+    BaseSpinBox,
+    ChangePageButton,
+    ToSettingButton,
+)
 from app.card.messagebox_custom import (
     BaseInfoBar,
     MessageBoxDate,
@@ -58,16 +78,17 @@ from app.card.messagebox_custom import (
     MessageBoxSpinbox,
 )
 from app.language_manager import LanguageManager
-from module.font_manager import font_manager
-from module.logger import log
-from module.my_error.my_error import settingsTypeError
-from module.update.check_update import check_update
 from app.observe_ego_gift_selection import (
     OBSERVE_COL_VALUES,
     OBSERVE_LEVEL_VALUES,
     OBSERVE_ROW_VALUES,
     ObserveGiftSelection,
 )
+from module.config import cfg
+from module.font_manager import font_manager
+from module.logger import log
+from module.my_error.my_error import settingsTypeError
+from module.update.check_update import check_update
 from utils.utils import decrypt_string, encrypt_string
 
 
@@ -85,9 +106,7 @@ class CheckBoxWithButton(QFrame):
 
         self.hBoxLayout = QHBoxLayout(self)
         self.box_text = check_box_title
-        self.box = BaseCheckBox(
-            check_box_name, check_box_icon, check_box_title, parent=self
-        )
+        self.box = BaseCheckBox(check_box_name, check_box_icon, check_box_title, parent=self)
         self.button = ChangePageButton(button_name, parent=self)
         self.hBoxLayout.addWidget(self.box)
         self.hBoxLayout.addWidget(self.button)
@@ -99,6 +118,7 @@ class CheckBoxWithButton(QFrame):
 
     def retranslateUi(self):
         self.box.check_box.setText(self.tr(self.box_text))
+        self.button.retranslateUi()
 
 
 class CheckBoxWithComboBox(QFrame):
@@ -213,9 +233,7 @@ class LabelWithSpinBox(QFrame):
         self.tips = tips
         self.text = label_text
         self.label = BaseLabel(label_text)
-        self.box = BaseSpinBox(
-            box_name, double=double, min_value=min_value, min_step=min_step
-        )
+        self.box = BaseSpinBox(box_name, double=double, min_value=min_value, min_step=min_step)
         self.vbox_layout.addWidget(self.label)
         self.vbox_layout.addWidget(self.box)
         self.vbox_layout.setAlignment(Qt.AlignCenter)
@@ -233,16 +251,12 @@ class LabelWithSpinBox(QFrame):
 
 
 class MirrorSpinBox(QFrame):
-    def __init__(
-        self, label_text, box_name, parent=None, double=False, min_value=0, min_step=1
-    ):
+    def __init__(self, label_text, box_name, parent=None, double=False, min_value=0, min_step=1):
         super().__init__(parent)
         self.box_layout = QHBoxLayout(self)
         self.text = label_text
         self.label = BaseLabel(label_text)
-        self.box = BaseSpinBox(
-            box_name, double=double, min_value=min_value, min_step=min_step
-        )
+        self.box = BaseSpinBox(box_name, double=double, min_value=min_value, min_step=min_step)
         self.box_layout.addWidget(self.label, stretch=1)
         self.box_layout.addWidget(self.box, stretch=2)
         self.setMaximumHeight(70)
@@ -267,9 +281,7 @@ class MirrorTeamCombination(QFrame):
         self.box_text = check_box_title
 
         self.hBoxLayout = QHBoxLayout(self)
-        self.box = BaseCheckBox(
-            check_box_name, check_box_icon, check_box_title, parent=self
-        )
+        self.box = BaseCheckBox(check_box_name, check_box_icon, check_box_title, parent=self)
         self.button = ToSettingButton(button_name, parent=self)
 
         self.hBoxLayout.setAlignment(Qt.AlignCenter)
@@ -351,9 +363,7 @@ class MirrorTeamCombination(QFrame):
             team_config = TeamSetting(**data)
         except Exception:
             BaseInfoBar.error(
-                title=QT_TRANSLATE_NOOP(
-                    "BaseInfoBar", "导入数据失败，可能是因为设置版本过旧或过新"
-                ),
+                title=QT_TRANSLATE_NOOP("BaseInfoBar", "导入数据失败，可能是因为设置版本过旧或过新"),
                 content="",
                 orient=Qt.Horizontal,
                 isClosable=True,
@@ -383,9 +393,7 @@ class MirrorTeamCombination(QFrame):
         name = cfg.config.teams[f"{self.team_number}"].remark_name
         if name is None:
             name = ""
-        message_box = MessageBoxEdit(
-            QT_TRANSLATE_NOOP("MessageBoxEdit", "设置备注名"), name, self.window()
-        )
+        message_box = MessageBoxEdit(QT_TRANSLATE_NOOP("MessageBoxEdit", "设置备注名"), name, self.window())
         self.retranslateTempUi(message_box)
         if message_box.exec():
             new_name = str(message_box.getText())
@@ -437,6 +445,7 @@ class SinnerSelect(QFrame):
         self.setObjectName(config_name)
         # Disable clipping so banner/overlays can extend beyond widget bounds
         self.setAttribute(Qt.WA_TransparentForMouseEvents, False)
+        self.setCursor(Qt.PointingHandCursor)
         # Initial Style
         self.setStyleSheet("""
             QFrame{
@@ -591,9 +600,7 @@ class SinnerSelect(QFrame):
                 number = int(text)
                 if number >= 8:
                     # BACKUP: Teal style
-                    banner_pixmap = QPixmap(
-                        "./assets/app/sinner/ui_components/SinnerBackup.png"
-                    )
+                    banner_pixmap = QPixmap("./assets/app/sinner/ui_components/SinnerBackup.png")
                     self.number_label.setStyleSheet("""
                         color: rgb(34, 255, 227);
                         """)
@@ -601,9 +608,7 @@ class SinnerSelect(QFrame):
                     self.number_glow_effect.setColor(QColor(7, 104, 92))
                 else:
                     # SELECTED: Amber style
-                    banner_pixmap = QPixmap(
-                        "./assets/app/sinner/ui_components/SinnerSelected.png"
-                    )
+                    banner_pixmap = QPixmap("./assets/app/sinner/ui_components/SinnerSelected.png")
                     self.number_label.setStyleSheet("""
                         color: rgb(255, 185, 0);
                         """)
@@ -612,9 +617,7 @@ class SinnerSelect(QFrame):
                 self.banner_label.setPixmap(banner_pixmap)
             except ValueError:
                 # Fallback if text is not a number
-                banner_pixmap = QPixmap(
-                    "./assets/app/sinner/ui_components/SinnerSelected.png"
-                )
+                banner_pixmap = QPixmap("./assets/app/sinner/ui_components/SinnerSelected.png")
                 self.banner_label.setPixmap(banner_pixmap)
                 # Fallback Glow
                 self.number_glow_effect.setColor(QColor(254, 95, 0))
@@ -744,9 +747,7 @@ class BaseSettingCardGroup(SettingCardGroup):
 
 
 class BasePushSettingCard(PushSettingCard):
-    def __init__(
-        self, text, icon: str | QIcon | FluentIconBase, title, content=None, parent=None
-    ):
+    def __init__(self, text, icon: str | QIcon | FluentIconBase, title, content=None, parent=None):
         super().__init__(text, icon, title, content, parent)
         self.text = text
         self.title = title
@@ -763,6 +764,7 @@ class BasePushSettingCard(PushSettingCard):
             color: black;
         }"""
         self.button.setProperty("isRunning", "false")
+        self.button.setCursor(Qt.CursorShape.PointingHandCursor)
         setCustomStyleSheet(self, lt_qss, dk_qss)
 
     def update_button(self, is_running: bool):
@@ -785,6 +787,7 @@ class BasePrimaryPushSettingCard(PrimaryPushSettingCard):
         self.text = text
         self.title = title
         self.content = content
+        self.button.setCursor(Qt.CursorShape.PointingHandCursor)
 
     def retranslateUi(self):
         self.titleLabel.setText(self.tr(self.title))
@@ -812,20 +815,20 @@ class PushSettingCardMirrorchyan(SettingCard):
 
         self.button2 = QPushButton("获取 CDK", self)
         self.button2.setObjectName("primaryButton")
+        self.button2.setCursor(Qt.CursorShape.PointingHandCursor)
         self.hBoxLayout.addWidget(self.button2, 0, Qt.AlignRight)
         self.hBoxLayout.addSpacing(10)
         self.button2.clicked.connect(self.__onclicked2)
 
         self.button = QPushButton(text, self)
+        self.button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.hBoxLayout.addWidget(self.button, 0, Qt.AlignRight)
         self.hBoxLayout.addSpacing(16)
         self.button.clicked.connect(self.__onclicked)
 
     def __onclicked(self):
         """保存 Mirror 酱 CDK，并立即触发一次更新检查刷新结果。"""
-        message_box = MessageBoxEdit(
-            self.tr(self.title), self.config_value, self.window()
-        )
+        message_box = MessageBoxEdit(self.tr(self.title), self.config_value, self.window())
         if message_box.exec():
             # 先写回新的 CDK 配置，再主动触发更新检查，便于立即验证下载源状态。
             base64_cdk = encrypt_string(message_box.getText())
@@ -887,9 +890,7 @@ class SwitchSettingCard(SettingCard):
         self.switchButton.setText(self.tr("开") if isChecked else self.tr("关"))
 
     def retranslateUi(self):
-        self.switchButton.setText(
-            self.tr("开") if self.switchButton.checked else self.tr("关")
-        )
+        self.switchButton.setText(self.tr("开") if self.switchButton.checked else self.tr("关"))
         self.titleLabel.setText(self.tr(self.title))
         self.contentLabel.setText(self.tr(self.content))
 
@@ -906,15 +907,11 @@ class PushSettingCardDate(BasePushSettingCard):
     ):
         self.config_name = config_name
         self.config_value = datetime.datetime.fromtimestamp(cfg.get_value(config_name))
-        super().__init__(
-            text, icon, title, self.config_value.strftime("%Y-%m-%d %H:%M"), parent
-        )
+        super().__init__(text, icon, title, self.config_value.strftime("%Y-%m-%d %H:%M"), parent)
         self.button.clicked.connect(self.__onclicked)
 
     def __onclicked(self):
-        message_box = MessageBoxDate(
-            self.tr(self.title), self.config_value, self.window()
-        )
+        message_box = MessageBoxDate(self.tr(self.title), self.config_value, self.window())
         if message_box.exec():
             self.config_value = message_box.getDateTime()
             cfg.set_value(self.config_name, self.config_value.timestamp())
@@ -977,9 +974,7 @@ class AutoDailyView(FlyoutViewBase):
             "autodaily_buy_enkephalin",
             "autodaily_mirror",
         ]
-        self.box_daily = BaseCheckBox(
-            "autodaily_daily", None, QT_TRANSLATE_NOOP("BaseCheckBox", "自动执行日常")
-        )
+        self.box_daily = BaseCheckBox("autodaily_daily", None, QT_TRANSLATE_NOOP("BaseCheckBox", "自动执行日常"))
         self.box_get_reward = BaseCheckBox(
             "autodaily_get_reward",
             None,
@@ -990,9 +985,7 @@ class AutoDailyView(FlyoutViewBase):
             None,
             QT_TRANSLATE_NOOP("BaseCheckBox", "自动狂气换体"),
         )
-        self.box_mirror = BaseCheckBox(
-            "autodaily_mirror", None, QT_TRANSLATE_NOOP("BaseCheckBox", "自动镜牢")
-        )
+        self.box_mirror = BaseCheckBox("autodaily_mirror", None, QT_TRANSLATE_NOOP("BaseCheckBox", "自动镜牢"))
         self.line_1.addWidget(self.box_daily)
         self.line_1.addWidget(self.box_get_reward)
         self.line_1.addWidget(self.box_buy_enkephalin)
@@ -1011,29 +1004,17 @@ class AutoDailyView(FlyoutViewBase):
             "autodaily_lock",
             "autodaily_exit_emulator",
         ]
-        self.box_exit_game = BaseCheckBox(
-            "autodaily_exit_game", None, QT_TRANSLATE_NOOP("BaseCheckBox", "退出游戏")
-        )
+        self.box_exit_game = BaseCheckBox("autodaily_exit_game", None, QT_TRANSLATE_NOOP("BaseCheckBox", "退出游戏"))
         self.box_exit_emulator = BaseCheckBox(
             "autodaily_exit_emulator",
             None,
             QT_TRANSLATE_NOOP("BaseCheckBox", "退出模拟器"),
         )
-        self.box_exit_aalc = BaseCheckBox(
-            "autodaily_exit_aalc", None, QT_TRANSLATE_NOOP("BaseCheckBox", "退出AALC")
-        )
-        self.box_sleep = BaseCheckBox(
-            "autodaily_sleep", None, QT_TRANSLATE_NOOP("BaseCheckBox", "睡眠")
-        )
-        self.box_hibernate = BaseCheckBox(
-            "autodaily_hibernate", None, QT_TRANSLATE_NOOP("BaseCheckBox", "休眠")
-        )
-        self.box_shutdown = BaseCheckBox(
-            "autodaily_shutdown", None, QT_TRANSLATE_NOOP("BaseCheckBox", "关机")
-        )
-        self.box_lock = BaseCheckBox(
-            "autodaily_lock", None, QT_TRANSLATE_NOOP("BaseCheckBox", "锁屏")
-        )
+        self.box_exit_aalc = BaseCheckBox("autodaily_exit_aalc", None, QT_TRANSLATE_NOOP("BaseCheckBox", "退出AALC"))
+        self.box_sleep = BaseCheckBox("autodaily_sleep", None, QT_TRANSLATE_NOOP("BaseCheckBox", "睡眠"))
+        self.box_hibernate = BaseCheckBox("autodaily_hibernate", None, QT_TRANSLATE_NOOP("BaseCheckBox", "休眠"))
+        self.box_shutdown = BaseCheckBox("autodaily_shutdown", None, QT_TRANSLATE_NOOP("BaseCheckBox", "关机"))
+        self.box_lock = BaseCheckBox("autodaily_lock", None, QT_TRANSLATE_NOOP("BaseCheckBox", "锁屏"))
         self.line_2.addWidget(self.box_exit_game)
         self.line_2.addWidget(self.box_exit_emulator)
         self.line_2.addWidget(self.box_exit_aalc)
@@ -1047,6 +1028,7 @@ class AutoDailyView(FlyoutViewBase):
 
         self.save_button_text = QT_TRANSLATE_NOOP("AutoDailyView", "保存")
         self.save_button = PrimaryPushButton(self.save_button_text)
+        self.save_button.setCursor(Qt.CursorShape.PointingHandCursor)
 
         self.line_3.addWidget(self.save_button)
 
@@ -1123,9 +1105,7 @@ class AutoDailyView(FlyoutViewBase):
 
     def __save(self):
         if len(self.exit_setting) < 7:
-            self.exit_setting = list(self.exit_setting) + [False] * (
-                7 - len(self.exit_setting)
-            )
+            self.exit_setting = list(self.exit_setting) + [False] * (7 - len(self.exit_setting))
         cfg.set_value(self.config_name + "_task", self.setting)
         cfg.set_value(self.config_name + "_task_exit", self.exit_setting)
         # 关闭弹出窗
@@ -1186,6 +1166,7 @@ class DailySettingCard(SwitchSettingCard):
             autodaily_qtime = QTime(0, 0)
         self.autodaily_timepicker.setTime(autodaily_qtime)
         self.button = PushButton(self.button_text, self)
+        self.button.setCursor(Qt.CursorShape.PointingHandCursor)
         current_count = self.hBoxLayout.count()
         self.hBoxLayout.insertWidget(current_count - 2, self.autodaily_timepicker)
         self.hBoxLayout.insertSpacing(current_count - 1, 20)
@@ -1193,9 +1174,7 @@ class DailySettingCard(SwitchSettingCard):
         self.hBoxLayout.insertWidget(current_count - 2, self.button)
         self.hBoxLayout.insertSpacing(current_count - 1, 20)
         self.autodaily_timepicker.setDisabled(not self.switchButton.isChecked())
-        self.autodaily_timepicker.timeChanged.connect(
-            self.__onAutoDailyTimepickerChanged
-        )
+        self.autodaily_timepicker.timeChanged.connect(self.__onAutoDailyTimepickerChanged)
         self.button.clicked.connect(self.__show_view)
         self.__connect_signal()
         self.retranslateUi()
@@ -1211,9 +1190,7 @@ class DailySettingCard(SwitchSettingCard):
 
     def __connect_signal(self):
         self.switchButton.checkedChanged.connect(self.__onAutoDailyCheckboxChanged)
-        self.autodaily_timepicker.timeChanged.connect(
-            self.__onAutoDailyTimepickerChanged
-        )
+        self.autodaily_timepicker.timeChanged.connect(self.__onAutoDailyTimepickerChanged)
 
     @staticmethod
     def __autodaily_taskname() -> str:
@@ -1251,9 +1228,7 @@ class DailySettingCard(SwitchSettingCard):
 
         cfg.set_value(self.value_name, time.toString("HH:mm"))
         helper.unregister_task(task_name)
-        helper.register_daily_task(
-            task_name, f"start --exit {self.config_name}", time.hour(), time.minute()
-        )
+        helper.register_daily_task(task_name, f"start --exit {self.config_name}", time.hour(), time.minute())
 
     def retranslateUi(self):
         self.button.setText(self.tr(self.button_text))
@@ -1350,9 +1325,7 @@ class KeyEditButton(PushButton):
             index += 1
 
     def __on_clicked(self):
-        input_card = HotketInputCard(
-            self.tr("设置快捷键"), self.key_config, self.window()
-        )
+        input_card = HotketInputCard(self.tr("设置快捷键"), self.key_config, self.window())
         mediator.hotkey_listener_stop_signal.emit()
         if input_card.exec():
             self.key_name = cfg.get_value(self.key_config)
@@ -1430,11 +1403,10 @@ class HotketInputCard(MessageBox):
         self.key_name: str = cfg.get_value(key_config)
         self.yesButton.setText(self.tr("保存"))
         self.resetButton = PushButton(self.tr("重置"))
+        self.resetButton.setCursor(Qt.CursorShape.PointingHandCursor)
         self.buttonLayout.insertWidget(1, self.resetButton, 1, Qt.AlignVCenter)
         self.cancelButton.setText(self.tr("取消"))
-        self.contentLabel.setText(
-            self.tr("按下键盘以设置快捷键, 部分特殊按键可能无法使用")
-        )
+        self.contentLabel.setText(self.tr("按下键盘以设置快捷键, 部分特殊按键可能无法使用"))
 
         self.key_widget = QWidget()
         self.key_widget.setFixedSize(400, 200)
@@ -1508,7 +1480,7 @@ class HotketInputCard(MessageBox):
             "pgup",
             "pgdown",
             "capslock",
-        ]:
+        ):
             if len(key_name) > 1:
                 key_parts.append(f"<{key_name.lower()}>")
             else:
@@ -1606,9 +1578,7 @@ class TextProgressBar(ProgressBar):
         """计算百分比"""
         if self.maximum() <= self.minimum():
             return 100
-        return int(
-            (self.value() - self.minimum()) * 100 / (self.maximum() - self.minimum())
-        )
+        return int((self.value() - self.minimum()) * 100 / (self.maximum() - self.minimum()))
 
 
 class ObserveGiftSelectionRow(QFrame):
@@ -1642,7 +1612,11 @@ class ObserveGiftSelectionRow(QFrame):
         self.level_combo = ComboBox(self)
         self.row_combo = ComboBox(self)
         self.col_combo = ComboBox(self)
-        self.remove_button = PushButton("-", self)
+        self.remove_button = TransparentToolButton(FIF.REMOVE, self)
+        self.remove_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.remove_button.setToolTip(self.tr("移除或清空当前控件组"))
+        self.remove_button.setAccessibleName(self.tr("移除或清空当前控件组"))
+        self.remove_button.installEventFilter(ToolTipFilter(self.remove_button, showDelay=0))
         self.system_group = QWidget(self)
         self.level_group = QWidget(self)
         self.row_group = QWidget(self)
@@ -1658,7 +1632,10 @@ class ObserveGiftSelectionRow(QFrame):
         self.row_combo.setFixedWidth(90)
         self.col_combo.setFixedWidth(90)
         self.remove_button.setFixedWidth(34)
+        self.remove_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.remove_button.setToolTip(self.tr("移除或清空当前控件组"))
+        self.remove_button.setAccessibleName(self.tr("移除或清空当前控件组"))
+        self.remove_button.installEventFilter(ToolTipFilter(self.remove_button, showDelay=0))
 
         self._init_group_layout(self.system_group, self.system_label, self.system_combo)
         self._init_group_layout(self.level_group, self.level_label, self.level_combo)
@@ -1684,9 +1661,7 @@ class ObserveGiftSelectionRow(QFrame):
         self.level_combo.currentIndexChanged.connect(self._emit_selection_changed)
         self.row_combo.currentIndexChanged.connect(self._emit_selection_changed)
         self.col_combo.currentIndexChanged.connect(self._emit_selection_changed)
-        self.remove_button.clicked.connect(
-            lambda: self.removeRequested.emit(self.row_index)
-        )
+        self.remove_button.clicked.connect(lambda: self.removeRequested.emit(self.row_index))
 
         self.set_selection(ObserveGiftSelection())
 
@@ -1752,9 +1727,7 @@ class ObserveGiftSelectionRow(QFrame):
 
         self._refresh_style()
 
-    def retranslate_row(
-        self, labels: dict[str, str], system_options: list[tuple[str, str]]
-    ):
+    def retranslate_row(self, labels: dict[str, str], system_options: list[tuple[str, str]]):
         self._labels = labels
         self._system_options = system_options
         self.system_label.setText(labels["system"])

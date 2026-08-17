@@ -701,7 +701,7 @@ class SettingInterface(QWidget):
         self.win_input_type_card.retranslateUi()
 
     def __onZoomCardValueChanged(self):
-        bar = BaseInfoBar.success(
+        BaseInfoBar.success(
             title=QT_TRANSLATE_NOOP("BaseInfoBar", "更改将在重新启动后生效"),
             content="",
             orient=Qt.Horizontal,

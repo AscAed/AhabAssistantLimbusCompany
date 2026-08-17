@@ -22,9 +22,7 @@ def get_day_of_week():
     day = now_time.isoweekday()  # isoweekday() 返回 1（周一）~7（周日）
     hour = now_time.hour  # 小时（0-23）
 
-    if (
-        hour < 6 and day == 1
-    ):  # 如果是凌晨0点到6点之间，且不是周一，则视为前一天 （修复周一凌晨判断传参为0的bug）
+    if hour < 6 and day == 1:  # 如果是凌晨0点到6点之间，且不是周一，则视为前一天 （修复周一凌晨判断传参为0的bug）
         day = 7
     elif hour < 6:
         day -= 1
@@ -105,11 +103,14 @@ def find_skill3(background, known_rgb, threshold=40, min_pixels=10):
 
     # merging neightbouring clusters
     merged = []
+    limit_in = (67 * comp) ** 2
+    limit_out = (66 * comp) ** 2
     while cluster_centers:
         current = cluster_centers.pop()
-        group = [c for c in cluster_centers if np.linalg.norm(current - c) <= 67 * comp]
+        # ⚡ Bolt: Replace np.linalg.norm with squared distance for O(n) performance improvement avoiding numpy allocations
+        group = [c for c in cluster_centers if (current[0] - c[0]) ** 2 + (current[1] - c[1]) ** 2 <= limit_in]
         cluster_centers = [
-            c for c in cluster_centers if np.linalg.norm(current - c) > 66 * comp
+            c for c in cluster_centers if (current[0] - c[0]) ** 2 + (current[1] - c[1]) ** 2 > limit_out
         ]
         merged.append(np.mean([current] + group, axis=0))
 
@@ -239,22 +240,16 @@ def run_as_user(command: list[str], timeout: int = 30):
     task_name = "TempNonAdminTask"
     bat_path = None
 
-    no_window_flag = (
-        subprocess.CREATE_NO_WINDOW
-        if hasattr(subprocess, "CREATE_NO_WINDOW")
-        else 0x08000000
-    )
+    no_window_flag = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, "CREATE_NO_WINDOW") else 0x08000000
 
-    def run_cmd(cmd: str, ignore_error: bool = False):
+    def run_cmd(cmd: list[str], ignore_error: bool = False):
         try:
-            res = subprocess.run(
-                cmd, shell=True, capture_output=True, text=True, timeout=10
-            )
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             if res.returncode != 0 and not ignore_error:
-                log.debug(f"命令执行失败: {cmd}\n错误: {res.stderr.strip()}")
+                log.debug(f"命令执行失败: {' '.join(cmd)}\n错误: {res.stderr.strip()}")
             return res
         except subprocess.TimeoutExpired:
-            log.debug(f"命令执行超时: {cmd}")
+            log.debug(f"命令执行超时: {' '.join(cmd)}")
             return None
 
     def _fallback_launch():
@@ -264,18 +259,30 @@ def run_as_user(command: list[str], timeout: int = 30):
 
     try:
         # 1. 预清理：强制删除旧任务 (/f)
-        run_cmd(f'schtasks /delete /tn "{task_name}" /f', ignore_error=True)
+        run_cmd(["schtasks", "/delete", "/tn", task_name, "/f"], ignore_error=True)
 
         # 2. 创建临时批处理文件
-        with tempfile.NamedTemporaryFile(
-            delete=False, suffix=".bat", mode="w", encoding="gbk"
-        ) as bat:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".bat", mode="w", encoding="gbk") as bat:
             bat.write(f"@echo off\n{subprocess.list2cmdline(command)}\nexit\n")
             bat_path = bat.name
 
         # 3. 创建任务
-        username = os.environ.get("USERNAME")
-        create_cmd = f'schtasks /create /f /tn "{task_name}" /sc once /st 23:59 /ru "{username}" /tr "cmd.exe /c \'{bat_path}\'"'
+        username = os.environ.get("USERNAME", "")
+        create_cmd = [
+            "schtasks",
+            "/create",
+            "/f",
+            "/tn",
+            task_name,
+            "/sc",
+            "once",
+            "/st",
+            "23:59",
+            "/ru",
+            username,
+            "/tr",
+            f"cmd.exe /c '{bat_path}'",
+        ]
         create_result = run_cmd(create_cmd)
         if create_result is None or create_result.returncode != 0:
             _fallback_launch()
@@ -283,7 +290,7 @@ def run_as_user(command: list[str], timeout: int = 30):
 
         # 4. 立即执行任务
         log.debug(f"启动任务: {command}")
-        run_result = run_cmd(f'schtasks /run /tn "{task_name}"')
+        run_result = run_cmd(["schtasks", "/run", "/tn", task_name])
         if run_result is None or run_result.returncode != 0:
             _fallback_launch()
             return
@@ -292,9 +299,7 @@ def run_as_user(command: list[str], timeout: int = 30):
         sleep(2)
 
     except Exception as e:
-        log.warning(
-            f"run_as_user schtasks 路径异常 ({type(e).__name__}: {e}), 尝试 Popen 降级"
-        )
+        log.warning(f"run_as_user schtasks 路径异常 ({type(e).__name__}: {e}), 尝试 Popen 降级")
         try:
             proc = subprocess.Popen(command, creationflags=no_window_flag)
             log.debug(f"run_as_user Popen 降级成功, pid={proc.pid}")
@@ -302,7 +307,7 @@ def run_as_user(command: list[str], timeout: int = 30):
             log.error(f"run_as_user Popen 降级也失败了: {e2}")
     finally:
         # 6. 最终清理
-        run_cmd(f'schtasks /delete /tn "{task_name}" /f', ignore_error=True)
+        run_cmd(["schtasks", "/delete", "/tn", task_name, "/f"], ignore_error=True)
         if isinstance(bat_path, (str, bytes, os.PathLike)) and os.path.exists(bat_path):
             try:
                 os.unlink(bat_path)
@@ -310,3 +315,39 @@ def run_as_user(command: list[str], timeout: int = 30):
                 log.debug(f"任务: {command} 尝试删除临时脚本失败: {e}")
 
     return True
+
+
+def safe_unpack_archive(archive_path: str, extract_dir: str, format=None) -> None:
+    """
+    安全解压归档文件，防止 Zip Slip (路径穿越) 漏洞。
+    """
+    import os
+    import tarfile
+    import zipfile
+
+    extract_dir = os.path.abspath(extract_dir)
+
+    if archive_path.endswith(".zip") or format == "zip":
+        with zipfile.ZipFile(archive_path, "r") as zf:
+            for member in zf.namelist():
+                member_path = os.path.abspath(os.path.join(extract_dir, member))
+                if os.path.commonpath([extract_dir, member_path]) != extract_dir:
+                    raise ValueError(f"检测到 Zip Slip 漏洞，非法路径: {member}")
+            zf.extractall(extract_dir)
+    elif archive_path.endswith((".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz")) or format in (
+        "tar",
+        "gztar",
+        "bztar",
+        "xztar",
+    ):
+        with tarfile.open(archive_path, "r:*") as tf:
+            for member in tf.getmembers():
+                member_path = os.path.abspath(os.path.join(extract_dir, member.name))
+                if os.path.commonpath([extract_dir, member_path]) != extract_dir:
+                    raise ValueError(f"检测到 Zip Slip 漏洞，非法路径: {member.name}")
+            if hasattr(tarfile, "data_filter"):
+                tf.extractall(extract_dir, filter="data")
+            else:
+                tf.extractall(extract_dir)
+    else:
+        raise ValueError(f"检测到不支持的安全解压格式: {archive_path}")

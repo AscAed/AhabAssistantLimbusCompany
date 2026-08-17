@@ -1,15 +1,15 @@
-import pytest
 from unittest.mock import MagicMock, patch
-import numpy as np
+
+import pytest
 
 from module.automation.automation import Automation, GameState, PageStateDispatcher
 from tasks.mirror.mirror import Mirror
-from module.config import TeamSetting
+
 
 @pytest.fixture
 def mock_automation():
     with patch("module.automation.automation.cfg") as mock_cfg, \
-         patch("module.automation.automation.ocr") as mock_ocr:
+         patch("module.automation.automation.ocr"):
         mock_cfg.set_win_size = 1440
         mock_cfg.memory_protection = False
         
@@ -50,6 +50,18 @@ def test_page_state_dispatcher(mock_automation):
     mock_automation.find_element = MagicMock(return_value=None)
     state = dispatcher.detect_state()
     assert state == GameState.UNKNOWN
+
+    # Test prioritization: Theme Pack vs Road Map overlap (simulating the bug where both match)
+    # The dispatcher should prioritize THEME_PACK
+    def side_effect(target, **kwargs):
+        return target in (
+            "mirror/road_in_mir/legend_assets.png",  # false positive or actual match
+            "mirror/theme_pack/normal_assets.png"    # the actual theme pack screen indicator
+        )
+    mock_automation.find_element = MagicMock(side_effect=side_effect)
+    state = dispatcher.detect_state()
+    assert state == GameState.THEME_PACK
+
 
 @patch("tasks.mirror.mirror.auto")
 @patch("module.config.cfg")

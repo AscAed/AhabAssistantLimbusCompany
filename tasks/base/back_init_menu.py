@@ -83,6 +83,9 @@ def back_init_menu(*, allow_restart: bool = True):
         if auto.find_element("mirror/road_in_mir/legend_assets.png"):
             auto.click_element("mirror/road_in_mir/setting_assets.png")
             continue
+        if auto.find_element("mirror/theme_pack/feature_theme_pack_assets.png"):
+            auto.click_element("mirror/road_in_mir/setting_assets.png")
+            continue
 
         if auto.find_element(
             "mirror/road_in_mir/select_encounter_reward_card_assets.png"
