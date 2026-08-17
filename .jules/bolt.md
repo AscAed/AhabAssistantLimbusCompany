@@ -101,3 +101,7 @@
 
 **Learning:** When developing screen simulation components (like minitouch), it's important to pass screen max coordinate limits downwards into the builder layer so that logic bounds logic can evaluate whether the `x` and `y` offsets exceed display parameters locally before commands are pushed onto device stacks and potentially crash.
 **Action:** Always retrieve and supply `max_x`, `max_y` limit configuration parameters into underlying structural components during their instantiation, and ensure explicit boundary exceptions are raised directly instead of silently clipping to improve failure visibility.
+
+## 2026-08-17 - Optimize multi-scale template matching early exit
+**Learning:** In multi-scale OpenCV template matching, evaluating the native scale (1.0) first and implementing an early-exit threshold prevents computationally expensive `cv2.resize` and `cv2.matchTemplate` operations if a sufficient match is already found at the native resolution.
+**Action:** For multi-scale OpenCV template matching, evaluate the native scale (1.0) first and implement an early-exit threshold.
