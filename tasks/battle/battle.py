@@ -1,6 +1,7 @@
 import random
 import re
 import time
+from enum import Enum
 from time import sleep
 from typing import Callable, Optional
 
@@ -17,6 +18,12 @@ from tasks.base.retry import retry
 from tasks.event import event_handling
 from utils.image_utils import ImageUtils
 from utils.utils import find_skill3
+
+
+class BattleMode(Enum):
+    CONTINUOUS = "continuous"
+    FOCUSED = "focused"
+    UNKNOWN = "unknown"
 
 
 class Battle:
@@ -109,12 +116,120 @@ class Battle:
         # 点击开始按钮 (右齿轮)
         auto.click_element("battle/gear_right.png")
 
+    @staticmethod
+    def _wait_for_pause(timeout: float = 1.5, poll_interval: float = 0.3) -> bool:
+        return (
+            auto.wait_until_appear(
+                "battle/pause_assets.png",
+                timeout=timeout,
+                poll_interval=poll_interval,
+            )
+            is not None
+        )
+
+    @staticmethod
+    def _detect_battle_mode(
+        retry_count: int = 2,
+    ) -> tuple[BattleMode, dict[BattleMode, float]]:
+        scores: dict[BattleMode, float] = {}
+        for attempt in range(retry_count):
+            if auto.take_screenshot() is None:
+                continue
+
+            screenshot = np.array(auto.screenshot)
+            if screenshot.size == 0:
+                continue
+
+            scores.clear()
+            for mode, template_path in (
+                (BattleMode.CONTINUOUS, "battle/gear_left_continuous.png"),
+                (BattleMode.FOCUSED, "battle/gear_left_focused.png"),
+            ):
+                template = ImageUtils.load_image(template_path, resize=False)
+                if template is None:
+                    continue
+                _, score = ImageUtils.match_template(screenshot, template, None, model="clam")
+                scores[mode] = score
+
+            if scores:
+                break
+
+            if attempt < retry_count - 1:
+                sleep(0.2)
+
+        if not scores:
+            return BattleMode.UNKNOWN, {}
+
+        best_mode, best_score = max(scores.items(), key=lambda item: item[1])
+        sorted_scores = sorted(scores.values(), reverse=True)
+        second_score = sorted_scores[1] if len(sorted_scores) > 1 else 0.0
+
+        if best_score < 0.75 or best_score - second_score < 0.05:
+            return BattleMode.UNKNOWN, scores
+
+        return best_mode, scores
+
+    def _start_battle_with_keyboard_then_mouse(self, reason: str) -> bool:
+        log.info(reason)
+        auto.key_press("p")
+        sleep(0.5)
+        auto.key_press("enter")
+        if self._wait_for_pause():
+            self.mouse_click_rate = False
+            return True
+
+        log.warning("键盘启动未生效，改用鼠标兜底")
+        self.mouse_click_rate = True
+        self._mouse_winrate_and_start()
+        if self._wait_for_pause():
+            return True
+
+        self.mouse_click_rate = False
+        return False
+
+    def _start_continuous_defense(self, move_back: bool = False) -> bool:
+        if self._defense_this_round(move_back=move_back) is False:
+            return False
+
+        if self._wait_for_pause():
+            self.mouse_click_rate = False
+            return True
+
+        log.warning("连续遭遇战防御拖拽未确认，使用Enter兜底")
+        auto.key_press("enter")
+        if self._wait_for_pause():
+            self.mouse_click_rate = False
+            return True
+
+        log.warning("连续遭遇战防御后未进入战斗，重试一次")
+        if self._defense_this_round(move_back=move_back) is False:
+            return False
+        if self._wait_for_pause():
+            self.mouse_click_rate = False
+            return True
+
+        log.warning("连续遭遇战防御重试未确认，使用Enter兜底")
+        auto.key_press("enter")
+        if self._wait_for_pause():
+            self.mouse_click_rate = False
+            return True
+
+        return False
+
     def _battle_operation(
         self, first_turn: bool, defense_first_round: bool, avoid_skill_3: bool
     ):
         auto.mouse_click_blank()
-        is_chain_combat = auto.find_element("battle/gear_left.png", threshold=0.9) is not None
+        battle_mode, battle_mode_scores = self._detect_battle_mode()
+        is_chain_combat = battle_mode == BattleMode.CONTINUOUS
         use_custom_chain_strategy = is_chain_combat and (defense_first_round or avoid_skill_3)
+        if battle_mode_scores:
+            score_msg = ", ".join(
+                f"{mode.value}={score:.3f}" for mode, score in battle_mode_scores.items()
+            )
+            log.debug(f"战斗模式识别结果: {battle_mode.value}, {score_msg}")
+        else:
+            log.debug("战斗模式识别结果: unknown")
 
         if (
             first_turn
@@ -122,30 +237,21 @@ class Battle:
             and is_chain_combat
         ):
             msg = "第一回合全员防御，开始战斗"
-            if self._defense_this_round() is False:
-                defense_first_round = False
-                if use_custom_chain_strategy:
-                    msg = "第一回合全员防御失败，本场战斗改为鼠标点击胜率+启动"
-                    log.warning(msg)
-                    self._mouse_winrate_and_start()
-                else:
-                    msg = "第一回合全员防御失败，本场战斗改为P+Enter"
-                    auto.key_press("p")
-                    sleep(0.5)
-                    auto.key_press("enter")
-            else:
-                sleep(2)
-                if not auto.find_element("battle/pause_assets.png", take_screenshot=True):
-                    if use_custom_chain_strategy:
-                        auto.click_element("battle/gear_right.png")
-                    else:
-                        auto.key_press("p")
-                        sleep(0.5)
-                        auto.key_press("enter")
+            if self._start_continuous_defense() is False:
+                msg = "第一回合全员防御失败，本场战斗停止，等待后续重试"
+                log.warning(msg)
+                return False
         elif self.defense_all_time:
             if is_chain_combat:
                 msg = "使用全员防御模式开始战斗"
-                self._defense_this_round()
+                if self._start_continuous_defense() is False:
+                    msg = "使用全员防御模式失败，本场战斗停止，等待后续重试"
+                    log.warning(msg)
+                    return False
+            else:
+                msg = "使用全员防御模式开始战斗，但当前不是连续遭遇战，改为P+Enter"
+                if self._start_battle_with_keyboard_then_mouse(msg) is False:
+                    return False
         elif avoid_skill_3 and is_chain_combat:
             msg = "使用避免3技能模式开始战斗"
             if self._chain_battle() is False:
@@ -156,40 +262,33 @@ class Battle:
                     self._mouse_winrate_and_start()
                 else:
                     msg = "使用避免三技能的链接战失败，本场战斗改为P+Enter"
-                    auto.key_press("p")
-                    sleep(0.5)
-                    auto.key_press("enter")
+                    if self._start_battle_with_keyboard_then_mouse(msg) is False:
+                        return False
             else:
                 sleep(2)
                 if not auto.find_element("battle/pause_assets.png", take_screenshot=True):
                     if use_custom_chain_strategy:
                         auto.click_element("battle/gear_right.png")
                     else:
-                        auto.key_press("p")
-                        sleep(0.5)
-                        auto.key_press("enter")
+                        retry_reason = "链接战避免三技能后未识别到暂停，改为P+Enter"
+                        if self._start_battle_with_keyboard_then_mouse(retry_reason) is False:
+                            return False
         else:
-            if use_custom_chain_strategy:
+            if not is_chain_combat:
+                msg = "非连续遭遇战，使用P+Enter开始战斗"
+                if self._start_battle_with_keyboard_then_mouse(msg) is False:
+                    return False
+            elif use_custom_chain_strategy:
                 msg = "链接战触发备用操作，改为鼠标点击胜率+启动"
                 log.info(msg)
                 self._mouse_winrate_and_start()
+                if self._wait_for_pause() is False:
+                    log.warning("鼠标备用操作未进入战斗")
+                    return False
             else:
-                auto.key_press("p")
-                sleep(0.5)
-                auto.key_press("enter")
                 msg = "使用P+Enter开始战斗"
-            if self.mouse_click_rate:
-                my_scale = cfg.set_win_size / 1440
-                if pos := auto.find_element("battle/win_rate_card.png", threshold=0.75):
-                    pos = [pos[0] + 50 * my_scale, pos[1] - 50 * my_scale]
-                    auto.mouse_click(pos[0], pos[1])
-                    auto.click_element("battle/gear_right.png")
-            else:
-                sleep(1)
-                if not auto.find_element("battle/pause_assets.png", threshold=0.75):
-                    self.mouse_click_rate = True
-                else:
-                    self.mouse_click_rate = False
+                if self._start_battle_with_keyboard_then_mouse(msg) is False:
+                    return False
         log.debug(msg)
 
     @begin_and_finish_time_log(task_name="一次战斗")
@@ -359,9 +458,10 @@ class Battle:
                 except Exception:
                     ocr_result = ""
                 if "turn" in ocr_result:
-                    self._battle_operation(
+                    if self._battle_operation(
                         first_turn, defense_first_round, avoid_skill_3
-                    )
+                    ) is False:
+                        return False
                     chance = self.INIT_CHANCE
                     waiting = self._update_wait_time(waiting, False, total_count)
                     self.identify_keyword_turn = False
@@ -370,9 +470,10 @@ class Battle:
                 if auto.click_element("battle/turn_assets.png") or auto.find_element(
                     "battle/win_rate_assets.png"
                 ):
-                    self._battle_operation(
+                    if self._battle_operation(
                         first_turn, defense_first_round, avoid_skill_3
-                    )
+                    ) is False:
+                        return False
                     chance = self.INIT_CHANCE
                     waiting = self._update_wait_time(waiting, False, total_count)
                     continue
@@ -380,11 +481,12 @@ class Battle:
                 if auto.find_element(
                     "battle/more_information_assets.png"
                 ) or auto.find_element("battle/win_rate_assets.png"):
-                    self._battle_operation(
+                    if self._battle_operation(
                         first_turn,
                         defense_first_round,
                         avoid_skill_3,
-                    )
+                    ) is False:
+                        return False
                     chance = self.INIT_CHANCE
                     waiting = self._update_wait_time(waiting, False, total_count)
                     continue
@@ -408,9 +510,10 @@ class Battle:
                     or auto.find_element("battle/win_rate_assets.png")
                     or auto.find_element("battle/win_rate_card.png", threshold=0.75)
                 ):
-                    self._battle_operation(
+                    if self._battle_operation(
                         first_turn, defense_first_round, avoid_skill_3
-                    )
+                    ) is False:
+                        return False
                     chance = self.INIT_CHANCE
                     waiting = self._update_wait_time(waiting, False, total_count)
                     continue
@@ -418,9 +521,10 @@ class Battle:
                 if not infinite_battle:
                     auto.mouse_to_blank()
                 if auto.find_language_text("胜率", "rate"):
-                    self._battle_operation(
+                    if self._battle_operation(
                         first_turn, defense_first_round, avoid_skill_3
-                    )
+                    ) is False:
+                        return False
                     chance = self.INIT_CHANCE
                     waiting = self._update_wait_time(waiting, False, total_count)
                     sleep(1)
@@ -429,9 +533,10 @@ class Battle:
                     continue
             if self.mouse_click_rate:
                 if auto.find_element("battle/win_rate_card.png", threshold=0.75):
-                    self._battle_operation(
+                    if self._battle_operation(
                         first_turn, defense_first_round, avoid_skill_3
-                    )
+                    ) is False:
+                        return False
                     chance = self.INIT_CHANCE
                     waiting = self._update_wait_time(waiting, False, total_count)
 
@@ -693,22 +798,41 @@ class Battle:
 
             skill_nums = int((bbox[2] - bbox[0]) / (145 * scale))
 
-            skill_list = []
-            Battle._calculate_skills_position(skill_list, gear_left, skill_nums)
+            click_positions: list[list] = []
+            Battle._calculate_skills_position(click_positions, gear_left, skill_nums)
 
-            for skill in skill_list:
+            for skill in click_positions:
                 auto.mouse_click(skill[0], skill[1])
                 if cfg.simulator:
                     sleep(cfg.mouse_action_interval)
                 else:
                     sleep(cfg.mouse_action_interval // 1.5)
 
-            skill_list.insert(0, gear_left)
-            skill_list.append(
-                [gear_right[0] + 5 * skill_nums * scale, gear_right[1] + 150 * scale]
-            )
+            fallback_release_gear = [gear_right[0], gear_right[1] + 150 * scale]
+            drag_positions: list[list] = [gear_left, *click_positions]
 
-            auto.mouse_drag_link(skill_list)
+            def resolve_drag_release_gear() -> tuple[int, int] | list[int]:
+                shifted_gear_right = auto.wait_until_appear(
+                    "battle/gear_right.png",
+                    timeout=1.0,
+                    poll_interval=0.1,
+                )
+                if shifted_gear_right is not None:
+                    log.debug(
+                        f"按住拖拽后识别到下移右齿轮:({shifted_gear_right[0]},{shifted_gear_right[1]})"
+                    )
+                    return shifted_gear_right
+
+                log.debug(
+                    f"按住拖拽后未识别右齿轮，使用释放兜底坐标:"
+                    f"({fallback_release_gear[0]},{fallback_release_gear[1]})"
+                )
+                return fallback_release_gear
+
+            auto.mouse_drag_link(
+                drag_positions,
+                resolve_last_position=resolve_drag_release_gear,
+            )
 
             auto.mouse_to_blank(move_back=move_back)
 

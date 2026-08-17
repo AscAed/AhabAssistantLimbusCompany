@@ -1,5 +1,5 @@
 from time import sleep
-from typing import overload
+from typing import Callable, overload
 
 import pyautogui
 import win32api
@@ -319,7 +319,13 @@ class Input(WinAbstractInput, metaclass=SingletonMeta):
             sleep(humanised_delay(0.005, "gaussian"))
         self.wait_pause()
 
-    def mouse_drag_link(self, position: list, drag_time=0.1, move_back=False) -> None:
+    def mouse_drag_link(
+        self,
+        position: list,
+        drag_time=0.1,
+        move_back=False,
+        resolve_last_position: Callable[[], tuple[int, int] | list[int] | None] | None = None,
+    ) -> None:
         if move_back:
             current_mouse_position = self.get_mouse_position()
 
@@ -342,6 +348,20 @@ class Input(WinAbstractInput, metaclass=SingletonMeta):
                     pyautogui.moveTo(px, py)
                 sleep(humanised_delay(step_time, "gaussian"))
             curr_x, curr_y = tx, ty
+
+        if resolve_last_position is not None:
+            resolved = resolve_last_position()
+            if resolved is not None:
+                tx, ty = self.pos_offset(resolved[0], resolved[1])
+                path = generate_bezier_path((curr_x, curr_y), (tx, ty))
+                step_time = drag_time / max(1, len(path))
+                for px, py in path:
+                    if self.driver:
+                        self.driver.mouse_move(px, py)
+                    else:
+                        pyautogui.moveTo(px, py)
+                    sleep(humanised_delay(step_time, "gaussian"))
+                curr_x, curr_y = tx, ty
             
         if self.driver:
             self.driver.mouse_up(curr_x, curr_y)
@@ -633,7 +653,13 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         self.wait_pause()
         return True
 
-    def mouse_drag_link(self, position: list, drag_time=0.1, move_back=False) -> None:
+    def mouse_drag_link(
+        self,
+        position: list,
+        drag_time=0.1,
+        move_back=False,
+        resolve_last_position: Callable[[], tuple[int, int] | list[int] | None] | None = None,
+    ) -> None:
         """鼠标从指定位置拖动到指定位置
         Args:
             x (int): 起始x坐标
@@ -644,36 +670,77 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
         if move_back:
             current_mouse_position = self.get_mouse_position()
 
-        self.set_active()
-        start_x, start_y = self._randomize_coords(position[0][0], position[0][1])
-        self._post_bezier_move(start_x, start_y)
-        self.mouse_down(start_x, start_y)
-        
-        curr_x, curr_y = start_x, start_y
-        hwnd = screen.handle.hwnd
-        for pos in position:
-            tx, ty = pos[0], pos[1]
-            path = generate_bezier_path((curr_x, curr_y), (tx, ty))
-            step_time = drag_time / max(1, len(path))
-            for px, py in path:
-                if self.driver:
-                    self.driver.mouse_move(px, py)
-                else:
-                    long_position = win32api.MAKELONG(px, py)
-                    wparam = win32con.MK_LBUTTON
-                    if self.use_post_message:
-                        win32api.PostMessage(hwnd, win32con.WM_MOUSEMOVE, wparam, long_position)
-                    else:
-                        win32gui.SendMessage(hwnd, win32con.WM_MOUSEMOVE, wparam, long_position)
-                sleep(humanised_delay(step_time, "gaussian"))
-            curr_x, curr_y = tx, ty
-            
-        self.last_x = curr_x
-        self.last_y = curr_y
-        self.mouse_up(curr_x, curr_y)
+        mouse_pressed = False
+        curr_x = curr_y = 0
+        is_active = False
+        client_rect = None
+        try:
+            self.set_active()
+            start_x, start_y = self._randomize_coords(position[0][0], position[0][1])
+            curr_x, curr_y = start_x, start_y
+            is_active = screen.handle.isActive
+            client_rect = screen.handle.rect() if is_active else None
+            if is_active and client_rect:
+                win32api.SetCursorPos((client_rect[0] + start_x, client_rect[1] + start_y))
+            log.debug(f"后台连线开始，按下位置:({start_x},{start_y})")
+            self._post_bezier_move(start_x, start_y)
+            # Mark pressed before dispatch: a partially delivered down message still needs an up.
+            mouse_pressed = True
+            self.mouse_down(start_x, start_y)
 
-        if move_back and current_mouse_position:
-            self.mouse_move(current_mouse_position)
+            hwnd = screen.handle.hwnd
+            for pos in position:
+                tx, ty = pos[0], pos[1]
+                path = generate_bezier_path((curr_x, curr_y), (tx, ty))
+                step_time = drag_time / max(1, len(path))
+                for px, py in path:
+                    curr_x, curr_y = px, py
+                    if is_active and client_rect:
+                        win32api.SetCursorPos((client_rect[0] + px, client_rect[1] + py))
+                    if self.driver:
+                        self.driver.mouse_move(px, py)
+                    else:
+                        long_position = win32api.MAKELONG(px, py)
+                        wparam = win32con.MK_LBUTTON
+                        if self.use_post_message:
+                            win32api.PostMessage(hwnd, win32con.WM_MOUSEMOVE, wparam, long_position)
+                        else:
+                            win32gui.SendMessage(hwnd, win32con.WM_MOUSEMOVE, wparam, long_position)
+                    sleep(humanised_delay(step_time, "gaussian"))
+                curr_x, curr_y = tx, ty
+
+            if resolve_last_position is not None:
+                resolved = resolve_last_position()
+                if resolved is not None:
+                    tx, ty = int(resolved[0]), int(resolved[1])
+                    path = generate_bezier_path((curr_x, curr_y), (tx, ty))
+                    step_time = drag_time / max(1, len(path))
+                    for px, py in path:
+                        curr_x, curr_y = px, py
+                        if is_active and client_rect:
+                            win32api.SetCursorPos((client_rect[0] + px, client_rect[1] + py))
+                        if self.driver:
+                            self.driver.mouse_move(px, py)
+                        else:
+                            long_position = win32api.MAKELONG(px, py)
+                            wparam = win32con.MK_LBUTTON
+                            if self.use_post_message:
+                                win32api.PostMessage(hwnd, win32con.WM_MOUSEMOVE, wparam, long_position)
+                            else:
+                                win32gui.SendMessage(hwnd, win32con.WM_MOUSEMOVE, wparam, long_position)
+                        sleep(humanised_delay(step_time, "gaussian"))
+                    curr_x, curr_y = tx, ty
+        finally:
+            if mouse_pressed:
+                self.last_x = curr_x
+                self.last_y = curr_y
+                if is_active and client_rect:
+                    win32api.SetCursorPos((client_rect[0] + curr_x, client_rect[1] + curr_y))
+                log.debug(f"后台连线结束，释放位置:({curr_x},{curr_y})")
+                self.mouse_up(curr_x, curr_y)
+
+            if move_back and current_mouse_position:
+                self.mouse_move(current_mouse_position)
 
     def set_active(self):
         """将游戏窗口激活并置前，确保输入坐标与游戏接收的坐标一致"""
@@ -910,7 +977,13 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
 
         screen.handle.set_window_pos(*pos)
 
-    def mouse_drag_link(self, position: list, drag_time=0.1, move_back=False) -> None:
+    def mouse_drag_link(
+        self,
+        position: list,
+        drag_time=0.1,
+        move_back=False,
+        resolve_last_position: Callable[[], tuple[int, int] | list[int] | None] | None = None,
+    ) -> None:
         start_x, start_y = self._randomize_coords(position[0][0], position[0][1])
         raw_pos = self._set_window_pos(start_x, start_y)
         self.set_active()
@@ -919,7 +992,9 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
             tx, ty = self._randomize_coords(pos[0], pos[1])
             self._window_move_to(tx, ty, duration=drag_time)
 
-        last = position[-1]
+        last = resolve_last_position() if resolve_last_position is not None else position[-1]
+        if last is None:
+            last = position[-1]
         last_x, last_y = self._randomize_coords(last[0], last[1])
         self.mouse_up(last_x, last_y)
         screen.handle.set_window_pos(*raw_pos)
