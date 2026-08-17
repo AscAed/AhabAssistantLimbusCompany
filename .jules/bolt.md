@@ -97,3 +97,7 @@
 ## 2023-11-20 - [Spatial Hashing for Multi-Target Optimization]
 **Learning:** When filtering large sets of 2D coordinates (like OpenCV template matches) to remove overlaps, using an O(N^2) nested distance check loop against all previously kept points creates a massive bottleneck for dense match arrays.
 **Action:** Use an O(N) Spatial Hashing grid (`cell = (int(x//dist), int(y//dist))`) to bucket retained points, and only check against the immediate 3x3 neighboring cells. This transforms filtering from a nested O(N^2) loop into an O(1) neighbor check, yielding up to 90x speedup for large result sets.
+## 2026-07-17 - Add Screen Bounds Checking for Minitouch Input
+
+**Learning:** When developing screen simulation components (like minitouch), it's important to pass screen max coordinate limits downwards into the builder layer so that logic bounds logic can evaluate whether the `x` and `y` offsets exceed display parameters locally before commands are pushed onto device stacks and potentially crash.
+**Action:** Always retrieve and supply `max_x`, `max_y` limit configuration parameters into underlying structural components during their instantiation, and ensure explicit boundary exceptions are raised directly instead of silently clipping to improve failure visibility.
