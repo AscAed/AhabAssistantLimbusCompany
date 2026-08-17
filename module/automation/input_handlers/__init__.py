@@ -1,4 +1,5 @@
 from time import sleep, time
+from typing import Callable
 
 from module.logger import log
 
@@ -95,7 +96,13 @@ class AbstractInput:
             f"未实现的输入方法 {self.__class__.__name__}.mouse_drag_down"
         )
 
-    def mouse_drag_link(self, position: list, drag_time=0.1, move_back=False) -> None:
+    def mouse_drag_link(
+        self,
+        position: list,
+        drag_time=0.1,
+        move_back=False,
+        resolve_last_position: Callable[[], tuple[int, int] | list[int] | None] | None = None,
+    ) -> None:
         """鼠标从指定位置拖动到指定位置
         Args:
             x (int): 起始x坐标

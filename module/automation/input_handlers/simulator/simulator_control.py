@@ -486,7 +486,13 @@ class SimulatorControl(AbstractInput):
             return False
         return True
 
-    def mouse_drag_link(self, position: list, drag_time=0.15, move_back=False) -> None:
+    def mouse_drag_link(
+        self,
+        position: list,
+        drag_time=0.15,
+        move_back=False,
+        resolve_last_position=None,
+    ) -> None:
         """
         拖动鼠标经过多个中间点（折线），最后松开
         """
@@ -494,6 +500,11 @@ class SimulatorControl(AbstractInput):
             self.get_simulator()
         msg = f"开始拉链，列表{position}"
         log.debug(msg)
+
+        if resolve_last_position is not None:
+            resolved = resolve_last_position()
+            if resolved is not None:
+                position = [*position, resolved]
 
         position_conversion = []
         for pos in position:

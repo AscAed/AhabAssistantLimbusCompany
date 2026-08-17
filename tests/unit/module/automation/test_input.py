@@ -1,5 +1,7 @@
 from unittest.mock import patch
 
+import pytest
+
 from module.automation.input_handlers.bezier import generate_bezier_path
 from module.automation.input_handlers.delay import humanised_delay
 from module.automation.input_handlers.driver_interface import InputDriver
@@ -191,6 +193,150 @@ def test_background_input_bezier_and_driver(mock_cfg, mock_screen):
     actual_y = driver.downs[0][1]
     assert target_x - radius <= actual_x <= target_x + radius
     assert target_y - radius <= actual_y <= target_y + radius
+
+
+@patch("module.automation.input_handlers.input.generate_bezier_path", side_effect=lambda start, end: [start, end])
+@patch("module.automation.input_handlers.input.win32gui.SendMessage")
+@patch("module.automation.input_handlers.input.win32api.SetCursorPos")
+@patch("module.automation.input_handlers.input.screen")
+@patch("module.automation.input_handlers.input.cfg")
+def test_background_drag_link_syncs_cursor_before_press(
+    mock_cfg,
+    mock_screen,
+    mock_set_cursor_pos,
+    mock_send_message,
+    _mock_path,
+):
+    import win32con
+
+    mock_cfg.config.use_post_message = False
+    mock_cfg.config.mouse_down_duration = 0
+    mock_screen.handle.hwnd = 12345
+    mock_screen.handle.isActive = True
+    mock_screen.handle.rect.return_value = (10, 20, 1920, 1080)
+
+    handler = BackgroundInput()
+    handler.set_driver(None)
+    handler.use_post_message = False
+    events = []
+    mock_set_cursor_pos.side_effect = lambda pos: events.append(("cursor", pos))
+
+    with patch.object(handler, "set_active"), \
+         patch.object(handler, "_post_bezier_move"), \
+         patch.object(handler, "mouse_down", side_effect=lambda x, y: events.append(("down", x, y))), \
+         patch.object(handler, "mouse_up", side_effect=lambda x, y: events.append(("up", x, y))):
+        handler.mouse_drag_link([(100, 200), (300, 400)], drag_time=0)
+
+    assert mock_set_cursor_pos.call_args_list[0].args[0] == (110, 220)
+    assert mock_set_cursor_pos.call_args_list[-1].args[0] == (310, 420)
+    assert events[0] == ("cursor", (110, 220))
+    assert events[1] == ("down", 100, 200)
+    assert events[-2] == ("cursor", (310, 420))
+    assert events[-1] == ("up", 300, 400)
+    move_messages = [
+        call for call in mock_send_message.call_args_list if call.args[1] == win32con.WM_MOUSEMOVE
+    ]
+    assert move_messages
+    assert all(call.args[2] == win32con.MK_LBUTTON for call in move_messages)
+
+
+@patch("module.automation.input_handlers.input.generate_bezier_path", side_effect=lambda start, end: [start, end])
+@patch("module.automation.input_handlers.input.win32api.SetCursorPos")
+@patch("module.automation.input_handlers.input.screen")
+@patch("module.automation.input_handlers.input.cfg")
+def test_background_drag_link_resolves_release_after_fixed_points(
+    mock_cfg,
+    mock_screen,
+    mock_set_cursor_pos,
+    _mock_path,
+):
+    mock_cfg.config.use_post_message = False
+    mock_cfg.config.mouse_down_duration = 0
+    mock_screen.handle.hwnd = 12345
+    mock_screen.handle.isActive = True
+    mock_screen.handle.rect.return_value = (10, 20, 1920, 1080)
+
+    handler = BackgroundInput()
+    events = []
+    mock_set_cursor_pos.side_effect = lambda pos: events.append(("cursor", pos))
+
+    def resolve_release():
+        events.append(("resolve",))
+        return 500, 600
+
+    with patch.object(handler, "set_active"), \
+         patch.object(handler, "_post_bezier_move"), \
+         patch.object(handler, "mouse_down", side_effect=lambda x, y: events.append(("down", x, y))), \
+         patch.object(handler, "mouse_up", side_effect=lambda x, y: events.append(("up", x, y))):
+        handler.mouse_drag_link(
+            [(100, 200), (300, 400)],
+            drag_time=0,
+            resolve_last_position=resolve_release,
+        )
+
+    assert events[1] == ("down", 100, 200)
+    assert events.index(("resolve",)) > events.index(("down", 100, 200))
+    assert events[-2] == ("cursor", (510, 620))
+    assert events[-1] == ("up", 500, 600)
+
+
+@patch("module.automation.input_handlers.input.generate_bezier_path", side_effect=lambda start, end: [start, end])
+@patch("module.automation.input_handlers.input.win32api.SetCursorPos")
+@patch("module.automation.input_handlers.input.screen")
+@patch("module.automation.input_handlers.input.cfg")
+def test_background_drag_link_does_not_move_inactive_cursor(
+    mock_cfg,
+    mock_screen,
+    mock_set_cursor_pos,
+    _mock_path,
+):
+    mock_cfg.config.use_post_message = False
+    mock_cfg.config.mouse_down_duration = 0
+    mock_screen.handle.hwnd = 12345
+    mock_screen.handle.isActive = False
+
+    handler = BackgroundInput()
+    handler.set_driver(None)
+    handler.use_post_message = False
+
+    with patch.object(handler, "set_active"), \
+         patch.object(handler, "_post_bezier_move"), \
+         patch.object(handler, "mouse_down"), \
+         patch.object(handler, "mouse_up"), \
+         patch("module.automation.input_handlers.input.win32gui.SendMessage"):
+        handler.mouse_drag_link([(100, 200), (300, 400)], drag_time=0)
+
+    mock_set_cursor_pos.assert_not_called()
+
+
+@patch("module.automation.input_handlers.input.generate_bezier_path", side_effect=lambda start, end: [start, end])
+@patch("module.automation.input_handlers.input.win32gui.SendMessage", side_effect=RuntimeError("move failed"))
+@patch("module.automation.input_handlers.input.screen")
+@patch("module.automation.input_handlers.input.cfg")
+def test_background_drag_link_releases_when_move_fails(
+    mock_cfg,
+    mock_screen,
+    _mock_send_message,
+    _mock_path,
+):
+    mock_cfg.config.use_post_message = False
+    mock_cfg.config.mouse_down_duration = 0
+    mock_screen.handle.hwnd = 12345
+    mock_screen.handle.isActive = False
+
+    handler = BackgroundInput()
+    handler.set_driver(None)
+    handler.use_post_message = False
+
+    with patch.object(handler, "set_active"), \
+         patch.object(handler, "_post_bezier_move"), \
+         patch.object(handler, "mouse_down"), \
+         patch.object(handler, "mouse_up") as mock_mouse_up:
+        with pytest.raises(RuntimeError, match="move failed"):
+            handler.mouse_drag_link([(100, 200), (300, 400)], drag_time=0)
+
+    mock_mouse_up.assert_called_once_with(100, 200)
+
 
 # 7. Test WindowMoveInput.mouse_click uses randomized coords
 @patch("module.automation.input_handlers.input.screen")
