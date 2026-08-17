@@ -1,3 +1,4 @@
+import functools
 import os
 from collections import OrderedDict
 
@@ -91,7 +92,6 @@ class ImageUtils:
             return (None, None) if return_path else None
         except Exception as e:
             log.error(f"加载图片时发生错误： {e}")
-            return None, None
             return (None, None) if return_path else None
 
     @staticmethod

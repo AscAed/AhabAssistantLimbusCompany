@@ -3,7 +3,7 @@ from enum import Enum
 from PySide6.QtCore import QT_TRANSLATE_NOOP
 
 from app.mediator import Mediator
-from module.config import cfg
+from module.domain_constants import ALL_SINNERS_NAME, ALL_SYSTEMS
 
 mediator = Mediator()
 
@@ -131,33 +131,8 @@ refresh_count_options = {
 blank_team_setting = {}
 
 
-all_sinners_name = [
-    "YiSang",
-    "Faust",
-    "DonQuixote",
-    "Ryoshu",
-    "Meursault",
-    "HongLu",
-    "Heathcliff",
-    "Ishmael",
-    "Rodion",
-    "Sinclair",
-    "Outis",
-    "Gregor",
-]
-
-all_systems_name = {
-    0: "burn",
-    1: "bleed",
-    2: "tremor",
-    3: "rupture",
-    4: "poise",
-    5: "sinking",
-    6: "charge",
-    7: "slash",
-    8: "pierce",
-    9: "blunt",
-}
+all_sinners_name = ALL_SINNERS_NAME
+all_systems_name = ALL_SYSTEMS
 
 second_system_mode = [
     "second_system_fuse_IV",

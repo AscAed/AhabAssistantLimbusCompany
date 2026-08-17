@@ -1,3 +1,5 @@
+# ruff: noqa: T201  # CLI updater intentionally reports progress via stdout.
+
 import json
 import os
 import shutil
@@ -11,7 +13,6 @@ import psutil
 def safe_unpack_archive(archive_path, extract_dir, format=None):
     """安全解压归档文件，防止 Zip Slip (路径穿越) 漏洞。"""
     import os
-    import shutil
     import tarfile
     import zipfile
 
@@ -72,7 +73,8 @@ class Updater:
     def extract_file(self):
         """解压下载的文件。"""
         print("开始解压...")
-        while True:
+        last_error = None
+        for attempt in range(1, 4):
             try:
                 if os.path.exists(self.exe_path):
                     subprocess.run(
@@ -89,9 +91,10 @@ class Updater:
                     safe_unpack_archive(self.download_file_path, self.temp_path)
                 print("解压完成")
                 return True
-            except Exception:
-                input("解压失败，按回车键重新解压. . .多次失败请手动下载更新")
-                return False
+            except Exception as e:
+                last_error = e
+                print(f"解压失败（第 {attempt}/3 次）：{e}")
+        raise RuntimeError("解压更新包失败") from last_error
 
     def cover_folder(self):
         """覆盖安装最新版本的文件。"""
@@ -105,7 +108,8 @@ class Updater:
             except Exception as e:
                 print(f"删除旧资源文件失败: {e}")
             print("开始覆盖安装...")
-            while True:
+            last_error = None
+            for attempt in range(1, 4):
                 try:
                     shutil.copytree(
                         self.extract_folder_path,
@@ -115,8 +119,11 @@ class Updater:
                     print("覆盖安装完成")
                     break
                 except Exception as e:
+                    last_error = e
                     print(f"覆盖安装失败: {e}")
-                    input("按回车键重试. . . \n Press any key to continue")
+                    print(f"将重试（第 {attempt}/3 次）")
+            else:
+                raise RuntimeError("覆盖安装失败") from last_error
 
     def _apply_incremental_update(self):
         """根据 changes.json 执行增量更新。"""
@@ -209,9 +216,10 @@ class Updater:
             print("检测到已解压的更新包，使用新更新器继续更新...")
             return
 
-        while True:
-            if self.extract_file():
-                return
+        try:
+            self.extract_file()
+        except Exception as e:
+            raise RuntimeError("准备更新包失败") from e
 
     def _handoff_to_new_updater(self, current_executable=None):
         if not self.file_name:
@@ -290,7 +298,11 @@ class Updater:
 
     def run(self, apply_mode=False):
         """运行更新流程。"""
-        self._prepare_update_payload(apply_mode)
+        try:
+            self._prepare_update_payload(apply_mode)
+        except Exception as e:
+            print(f"更新准备失败：{e}")
+            return False
         if not apply_mode and self._handoff_to_new_updater():
             return
         self.terminate_processes()

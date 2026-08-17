@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QT_TRANSLATE_NOOP, Qt, QTimer
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -24,7 +24,26 @@ from qfluentwidgets import (
 )
 from qfluentwidgets import FluentIcon as FIF
 
-from app import *
+from app import (
+    after_fuse_level_IV,
+    all_checkbox_config_name,
+    all_combobox_config_name,
+    all_sinners_name,
+    all_systems,
+    all_systems_name,
+    all_teams,
+    fixed_team_use,
+    mediator,
+    refresh_count_options,
+    reward_cards,
+    second_system_mode,
+    second_systems,
+    shop_strategy,
+    shopping_strategy,
+    skill_replacement_mode,
+    skill_replacement_sinner,
+    start_gift,
+)
 from app.base_combination import (
     CheckBoxWithComboBox,
     LabelWithComboBox,
@@ -62,6 +81,48 @@ from module.config.team_import_export import (
     generate_team_export_filename,
     import_team_settings,
 )
+
+_SINNER_DEFINITIONS = [
+    ("sinner_YiSang", "YiSang", "李箱"),
+    ("sinner_Faust", "Faust", "浮士德"),
+    ("sinner_DonQuixote", "DonQuixote", "堂吉诃德"),
+    ("sinner_Ryoshu", "Ryoshu", "良秀"),
+    ("sinner_Meursault", "Meursault", "默尔索"),
+    ("sinner_HongLu", "HongLu", "鸿璐"),
+    ("sinner_Heathcliff", "Heathcliff", "希斯克利夫"),
+    ("sinner_Ishmael", "Ishmael", "以实玛利"),
+    ("sinner_Rodion", "Rodion", "罗佳"),
+    ("sinner_Sinclair", "Sinclair", "辛克莱"),
+    ("sinner_Outis", "Outis", "奥提斯"),
+    ("sinner_Gregor", "Gregor", "格里高尔"),
+]
+
+_SYSTEM_CHECKBOX_DEFINITIONS = [
+    ("burn", "system_burn", "./assets/app/status_effects/burn.png", "烧伤"),
+    ("bleed", "system_bleed", "./assets/app/status_effects/bleed.png", "流血"),
+    ("tremor", "system_tremor", "./assets/app/status_effects/tremor.png", "震颤"),
+    ("rupture", "system_rupture", "./assets/app/status_effects/rupture.png", "破裂"),
+    ("sinking", "system_sinking", "./assets/app/status_effects/sinking.png", "沉沦"),
+    ("poise", "system_poise", "./assets/app/status_effects/poise.png", "呼吸"),
+    ("charge", "system_charge", "./assets/app/status_effects/charge.png", "充能"),
+    ("slash", "system_slash", "./assets/app/status_effects/slash.png", "斩击"),
+    ("pierce", "system_pierce", "./assets/app/status_effects/pierce.png", "突刺"),
+    ("blunt", "system_blunt", "./assets/app/status_effects/blunt.png", "打击"),
+]
+
+_OBSERVE_SYSTEM_IDS = [
+    "burn",
+    "bleed",
+    "tremor",
+    "rupture",
+    "sinking",
+    "poise",
+    "charge",
+    "slash",
+    "pierce",
+    "blunt",
+    "general",
+]
 
 
 class TeamSettingCard(QFrame):
@@ -132,132 +193,14 @@ class TeamSettingCard(QFrame):
             self.tr("选择商店策略"), "shop_strategy", shop_strategy, vbox=False
         )
 
-        self.sinner_YiSang = SinnerSelect(
-            "YiSang",
-            self.tr("李箱"),
-            None,
-        )
-        self.sinner_Faust = SinnerSelect(
-            "Faust",
-            self.tr("浮士德"),
-            None,
-        )
-        self.sinner_DonQuixote = SinnerSelect(
-            "DonQuixote",
-            self.tr("堂吉诃德"),
-            None,
-        )
-        self.sinner_Ryoshu = SinnerSelect(
-            "Ryoshu",
-            self.tr("良秀"),
-            None,
-        )
-        self.sinner_Meursault = SinnerSelect(
-            "Meursault",
-            self.tr("默尔索"),
-            None,
-        )
-        self.sinner_HongLu = SinnerSelect(
-            "HongLu",
-            self.tr("鸿璐"),
-            None,
-        )
-
-        self.sinner_Heathcliff = SinnerSelect(
-            "Heathcliff",
-            self.tr("希斯克利夫"),
-            None,
-        )
-        self.sinner_Ishmael = SinnerSelect(
-            "Ishmael",
-            self.tr("以实玛利"),
-            None,
-        )
-        self.sinner_Rodion = SinnerSelect(
-            "Rodion",
-            self.tr("罗佳"),
-            None,
-        )
-        self.sinner_Sinclair = SinnerSelect(
-            "Sinclair",
-            self.tr("辛克莱"),
-            None,
-        )
-        self.sinner_Outis = SinnerSelect(
-            "Outis",
-            self.tr("奥提斯"),
-            None,
-        )
-        self.sinner_Gregor = SinnerSelect(
-            "Gregor",
-            self.tr("格里高尔"),
-            None,
-        )
+        for attr_name, key, label in _SINNER_DEFINITIONS:
+            setattr(self, attr_name, SinnerSelect(key, self.tr(label), None))
 
         self.shop_setting = BaseLabel(self.tr("舍弃的体系"))
         self.shop_setting.add_icon(FIF.DELETE)
 
-        self.burn = BaseCheckBox(
-            "system_burn",
-            "./assets/app/status_effects/burn.png",
-            self.tr("烧伤"),
-            icon_size=30,
-        )
-        self.bleed = BaseCheckBox(
-            "system_bleed",
-            "./assets/app/status_effects/bleed.png",
-            self.tr("流血"),
-            icon_size=30,
-        )
-        self.tremor = BaseCheckBox(
-            "system_tremor",
-            "./assets/app/status_effects/tremor.png",
-            self.tr("震颤"),
-            icon_size=30,
-        )
-        self.rupture = BaseCheckBox(
-            "system_rupture",
-            "./assets/app/status_effects/rupture.png",
-            self.tr("破裂"),
-            icon_size=30,
-        )
-        self.sinking = BaseCheckBox(
-            "system_sinking",
-            "./assets/app/status_effects/sinking.png",
-            self.tr("沉沦"),
-            icon_size=30,
-        )
-
-        self.poise = BaseCheckBox(
-            "system_poise",
-            "./assets/app/status_effects/poise.png",
-            self.tr("呼吸"),
-            icon_size=30,
-        )
-        self.charge = BaseCheckBox(
-            "system_charge",
-            "./assets/app/status_effects/charge.png",
-            self.tr("充能"),
-            icon_size=30,
-        )
-        self.slash = BaseCheckBox(
-            "system_slash",
-            "./assets/app/status_effects/slash.png",
-            self.tr("斩击"),
-            icon_size=30,
-        )
-        self.pierce = BaseCheckBox(
-            "system_pierce",
-            "./assets/app/status_effects/pierce.png",
-            self.tr("突刺"),
-            icon_size=30,
-        )
-        self.blunt = BaseCheckBox(
-            "system_blunt",
-            "./assets/app/status_effects/blunt.png",
-            self.tr("打击"),
-            icon_size=30,
-        )
+        for attr_name, key, icon_path, label in _SYSTEM_CHECKBOX_DEFINITIONS:
+            setattr(self, attr_name, BaseCheckBox(key, icon_path, self.tr(label), icon_size=30))
 
         self.customize_settings_module = CustomizeSettingsModule(self.team_num)
         self.observe_ego_gift_module = ObserveEgoGiftModule(self.team_num)
@@ -286,30 +229,16 @@ class TeamSettingCard(QFrame):
         self.combobox_layout.add(self.select_shop_strategy)
 
         self.sinner_layout.setContentsMargins(15, 10, 15, 20)
-        self.sinner_layout.addWidget(self.sinner_YiSang, 0, 0)
-        self.sinner_layout.addWidget(self.sinner_Faust, 0, 1)
-        self.sinner_layout.addWidget(self.sinner_DonQuixote, 0, 2)
-        self.sinner_layout.addWidget(self.sinner_Ryoshu, 0, 3)
-        self.sinner_layout.addWidget(self.sinner_Meursault, 0, 4)
-        self.sinner_layout.addWidget(self.sinner_HongLu, 0, 5)
         self.sinner_layout.setVerticalSpacing(10)
-        self.sinner_layout.addWidget(self.sinner_Heathcliff, 1, 0)
-        self.sinner_layout.addWidget(self.sinner_Ishmael, 1, 1)
-        self.sinner_layout.addWidget(self.sinner_Rodion, 1, 2)
-        self.sinner_layout.addWidget(self.sinner_Sinclair, 1, 3)
-        self.sinner_layout.addWidget(self.sinner_Outis, 1, 4)
-        self.sinner_layout.addWidget(self.sinner_Gregor, 1, 5)
+        for row in range(2):
+            for col in range(6):
+                attr_name, _, _ = _SINNER_DEFINITIONS[row * 6 + col]
+                self.sinner_layout.addWidget(getattr(self, attr_name), row, col)
 
-        self.gift_system_list_1.addWidget(self.burn)
-        self.gift_system_list_1.addWidget(self.bleed)
-        self.gift_system_list_1.addWidget(self.tremor)
-        self.gift_system_list_1.addWidget(self.rupture)
-        self.gift_system_list_1.addWidget(self.sinking)
-        self.gift_system_list_2.addWidget(self.poise)
-        self.gift_system_list_2.addWidget(self.charge)
-        self.gift_system_list_2.addWidget(self.slash)
-        self.gift_system_list_2.addWidget(self.pierce)
-        self.gift_system_list_2.addWidget(self.blunt)
+        for attr_name, *_ in _SYSTEM_CHECKBOX_DEFINITIONS[:5]:
+            self.gift_system_list_1.addWidget(getattr(self, attr_name))
+        for attr_name, *_ in _SYSTEM_CHECKBOX_DEFINITIONS[5:]:
+            self.gift_system_list_2.addWidget(getattr(self, attr_name))
         self.gift_system_layout.add(self.shop_setting)
         self.gift_system_layout.add(self.gift_system_list_1)
         self.gift_system_layout.add(self.gift_system_list_2)
@@ -595,30 +524,12 @@ class TeamSettingCard(QFrame):
         self.select_team.label.label.setText(self.tr("选择队伍名称"))
         self.select_system.label.label.setText(self.tr("选择队伍体系"))
         self.select_shop_strategy.label.label.setText(self.tr("选择商店策略"))
-        self.sinner_YiSang.name_label.setText(self.tr("李箱"))
-        self.sinner_Faust.name_label.setText(self.tr("浮士德"))
-        self.sinner_DonQuixote.name_label.setText(self.tr("堂吉诃德"))
-        self.sinner_Ryoshu.name_label.setText(self.tr("良秀"))
-        self.sinner_Meursault.name_label.setText(self.tr("默尔索"))
-        self.sinner_HongLu.name_label.setText(self.tr("鸿璐"))
-        self.sinner_Heathcliff.name_label.setText(self.tr("希斯克利夫"))
-        self.sinner_Ishmael.name_label.setText(self.tr("以实玛利"))
-        self.sinner_Rodion.name_label.setText(self.tr("罗佳"))
-        self.sinner_Sinclair.name_label.setText(self.tr("辛克莱"))
-        self.sinner_Outis.name_label.setText(self.tr("奥提斯"))
-        self.sinner_Gregor.name_label.setText(self.tr("格里高尔"))
+        for attr_name, _, label in _SINNER_DEFINITIONS:
+            getattr(self, attr_name).name_label.setText(self.tr(label))
         self.shop_setting.label.setText(self.tr("舍弃的体系"))
 
-        self.burn.check_box.setText(self.tr("烧伤"))
-        self.bleed.check_box.setText(self.tr("流血"))
-        self.tremor.check_box.setText(self.tr("震颤"))
-        self.rupture.check_box.setText(self.tr("破裂"))
-        self.sinking.check_box.setText(self.tr("沉沦"))
-        self.poise.check_box.setText(self.tr("呼吸"))
-        self.charge.check_box.setText(self.tr("充能"))
-        self.slash.check_box.setText(self.tr("斩击"))
-        self.pierce.check_box.setText(self.tr("突刺"))
-        self.blunt.check_box.setText(self.tr("打击"))
+        for attr_name, _, _, label in _SYSTEM_CHECKBOX_DEFINITIONS:
+            getattr(self, attr_name).check_box.setText(self.tr(label))
 
         self.export_button.setText(self.tr("导出设置"))
         self.import_button.setText(self.tr("导入设置"))
@@ -746,57 +657,7 @@ class CustomizeSettingsModule(QFrame):
         self.reward_cards.add_items(reward_cards)
 
         QT_TRANSLATE_NOOP("CustomizeSettingsModule", "星光")
-        self.starlight_1 = StarlightCard(
-            "starlight_1",
-            get_starlight_bonus_name(0, cfg.language_in_program),
-            self.team_num,
-        )
-        self.starlight_2 = StarlightCard(
-            "starlight_2",
-            get_starlight_bonus_name(1, cfg.language_in_program),
-            self.team_num,
-        )
-        self.starlight_3 = StarlightCard(
-            "starlight_3",
-            get_starlight_bonus_name(2, cfg.language_in_program),
-            self.team_num,
-        )
-        self.starlight_4 = StarlightCard(
-            "starlight_4",
-            get_starlight_bonus_name(3, cfg.language_in_program),
-            self.team_num,
-        )
-        self.starlight_5 = StarlightCard(
-            "starlight_5",
-            get_starlight_bonus_name(4, cfg.language_in_program),
-            self.team_num,
-        )
-
-        self.starlight_6 = StarlightCard(
-            "starlight_6",
-            get_starlight_bonus_name(5, cfg.language_in_program),
-            self.team_num,
-        )
-        self.starlight_7 = StarlightCard(
-            "starlight_7",
-            get_starlight_bonus_name(6, cfg.language_in_program),
-            self.team_num,
-        )
-        self.starlight_8 = StarlightCard(
-            "starlight_8",
-            get_starlight_bonus_name(7, cfg.language_in_program),
-            self.team_num,
-        )
-        self.starlight_9 = StarlightCard(
-            "starlight_9",
-            get_starlight_bonus_name(8, cfg.language_in_program),
-            self.team_num,
-        )
-        self.starlight_10 = StarlightCard(
-            "starlight_10",
-            get_starlight_bonus_name(9, cfg.language_in_program),
-            self.team_num,
-        )
+        self._create_starlight_cards()
         self.starlight_select_all = StarlightLevelSelector(
             "starlight_all",
             QT_TRANSLATE_NOOP("CustomizeSettingsModule", "全选"),
@@ -936,6 +797,18 @@ class CustomizeSettingsModule(QFrame):
         self.team_code_input.line_edit.setPlaceholderText(self.tr("输入编队码"))
         self.team_code_input.line_edit.setMaximumWidth(400)
 
+    def _create_starlight_cards(self):
+        self.starlight_cards: list[StarlightCard] = []
+        for index in range(len(STARLIGHT_BONUS_COSTS)):
+            attr_name = f"starlight_{index + 1}"
+            card = StarlightCard(
+                attr_name,
+                get_starlight_bonus_name(index, cfg.language_in_program),
+                self.team_num,
+            )
+            setattr(self, attr_name, card)
+            self.starlight_cards.append(card)
+
     def __init_layout(self):
         self.first_line.addWidget(self.do_not_heal)
         self.first_line.addWidget(self.do_not_buy)
@@ -1073,9 +946,10 @@ class CustomizeSettingsModule(QFrame):
         self.starlight_clear_button.setToolTip(clear_text)
         self.starlight_clear_button.setAccessibleName(clear_text)
 
-        for index in range(1, 11):
-            starlight = self.findChild(StarlightLevelSelector, f"starlight_{index}")
-            starlight.set_label_text(get_starlight_bonus_name(index - 1, cfg.language_in_program))
+        for index, starlight in enumerate(self.starlight_cards, start=1):
+            starlight.starlight_checkbox.set_label_text(
+                get_starlight_bonus_name(index - 1, cfg.language_in_program)
+            )
             if index <= 5:
                 floor_shop = self.findChild(BaseCheckBox, f"ignore_shop_{index}")
                 floor_shop.retranslateUi()
@@ -1281,19 +1155,7 @@ class ObserveEgoGiftModule(QFrame):
         self.selection_rows_layout.setAlignment(Qt.AlignTop)
 
     def __init_card(self):
-        self.observe_systems = [
-            ("burn", self.tr("烧伤")),
-            ("bleed", self.tr("流血")),
-            ("tremor", self.tr("震颤")),
-            ("rupture", self.tr("破裂")),
-            ("sinking", self.tr("沉沦")),
-            ("poise", self.tr("呼吸")),
-            ("charge", self.tr("充能")),
-            ("slash", self.tr("斩击")),
-            ("pierce", self.tr("突刺")),
-            ("blunt", self.tr("打击")),
-            ("general", self.tr("泛用")),
-        ]
+        self.observe_systems = self._observe_system_labels()
 
         self._system_buttons: dict[str, SystemIconButton] = {}
         for system, label in self.observe_systems:
@@ -1324,6 +1186,22 @@ class ObserveEgoGiftModule(QFrame):
             "row": self.tr("所在行"),
             "col": self.tr("所在列"),
         }
+
+    def _observe_system_labels(self) -> list[tuple[str, str]]:
+        labels = {
+            "burn": self.tr("烧伤"),
+            "bleed": self.tr("流血"),
+            "tremor": self.tr("震颤"),
+            "rupture": self.tr("破裂"),
+            "sinking": self.tr("沉沦"),
+            "poise": self.tr("呼吸"),
+            "charge": self.tr("充能"),
+            "slash": self.tr("斩击"),
+            "pierce": self.tr("突刺"),
+            "blunt": self.tr("打击"),
+            "general": self.tr("泛用"),
+        }
+        return [(system, labels[system]) for system in _OBSERVE_SYSTEM_IDS]
 
     def _preview_hint_tooltip(self) -> str:
         return self.tr(
@@ -1488,19 +1366,7 @@ class ObserveEgoGiftModule(QFrame):
     def retranslateUi(self):
         self.observe_ego_gift_checkbox.check_box.setText(self.tr("启用观测"))
         self.preview_hint_button.setToolTip(self._preview_hint_tooltip())
-        self.observe_systems = [
-            ("burn", self.tr("烧伤")),
-            ("bleed", self.tr("流血")),
-            ("tremor", self.tr("震颤")),
-            ("rupture", self.tr("破裂")),
-            ("sinking", self.tr("沉沦")),
-            ("poise", self.tr("呼吸")),
-            ("charge", self.tr("充能")),
-            ("slash", self.tr("斩击")),
-            ("pierce", self.tr("突刺")),
-            ("blunt", self.tr("打击")),
-            ("general", self.tr("泛用")),
-        ]
+        self.observe_systems = self._observe_system_labels()
         for system, label in self.observe_systems:
             if system in self._system_buttons:
                 if self._system_buttons[system]._force_text or self._system_buttons[system]._normal_pixmap.isNull():

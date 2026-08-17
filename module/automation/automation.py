@@ -674,7 +674,7 @@ class Automation(metaclass=SingletonMeta):
             else:
                 screenshot_gray = screenshot
 
-            scales = [1.0, 0.85, 1.15]
+            scales = [0.85, 1.0, 1.15]
             best_match_val = -1
             best_center = None
             threshold = 0.70
@@ -712,11 +712,6 @@ class Automation(metaclass=SingletonMeta):
             threshold = 0.70
             matched = best_match_val >= threshold
 
-                # ⚡ Bolt: Fast-path early exit if we found a strong match immediately at 1.0 scale
-                if best_match_val >= threshold:
-                    matched = True
-                    break
-            
             if not matched:
                 try:
                     template_edges = cv2.Canny(template, 50, 200)
@@ -1050,13 +1045,17 @@ class PageStateDispatcher:
         if self.auto.find_element("mirror/shop/shop_coins_assets.png", take_screenshot=False):
             return GameState.SHOP
 
+        if (
+            self.auto.find_element("mirror/theme_pack/feature_theme_pack_assets.png", take_screenshot=False)
+            or self.auto.find_element("mirror/theme_pack/normal_assets.png", take_screenshot=False)
+            or self.auto.find_element("mirror/theme_pack/hard_assets.png", take_screenshot=False)
+        ):
+            return GameState.THEME_PACK
+
         if self.auto.find_element(
             "mirror/road_in_mir/legend_assets.png", take_screenshot=False
         ) or self.auto.find_element("mirror/road_in_mir/to_window_assets.png", take_screenshot=False):
             return GameState.ROAD_MAP
-
-        if self.auto.find_element("mirror/theme_pack/feature_theme_pack_assets.png", take_screenshot=False):
-            return GameState.THEME_PACK
 
         if (
             self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_card.png", take_screenshot=False)
@@ -1081,39 +1080,6 @@ class PageStateDispatcher:
             or self.auto.find_element("mirror/road_to_mir/resume_assets.png", take_screenshot=False)
             or self.auto.find_element("mirror/road_to_mir/enter_mirror_assets.png", take_screenshot=False)
         ):
-        if (self.auto.find_element("mirror/road_to_mir/enter_assets.png", take_screenshot=False) or
-            self.auto.find_element("mirror/road_to_mir/resume_assets.png", take_screenshot=False) or
-            self.auto.find_element("mirror/road_to_mir/enter_mirror_assets.png", take_screenshot=False)):
-        # Check Theme Pack before Road Map
-        if (self.auto.find_element("mirror/theme_pack/feature_theme_pack_assets.png") or
-            self.auto.find_element("mirror/theme_pack/normal_assets.png") or
-            self.auto.find_element("mirror/theme_pack/hard_assets.png")):
-            return GameState.THEME_PACK
-
-        # Check EGO Gift Selection before Road Map
-        if (self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_card.png") or
-            self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_box_assets.png") or
-            self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_refuse_assets.png")):
-            return GameState.EGO_GIFT_SELECT
-
-        # Check Event skip before Road Map
-        if self.auto.find_element("event/skip_assets.png"):
-            return GameState.EVENT
-
-        # Check Road Map after overlay/menu screens to prevent closed-panel bus fallback false positives
-        if (self.auto.find_element("mirror/road_in_mir/legend_assets.png") or
-                self.auto.find_element("mirror/road_in_mir/to_window_assets.png")):
-            return GameState.ROAD_MAP
-
-        if (self.auto.find_element("mirror/claim_reward/battle_statistics_assets.png") or
-            self.auto.find_element("mirror/claim_reward/claim_rewards_assets.png") or
-            self.auto.find_element("mirror/claim_reward/complete_mirror_100%_assets.png") or
-            self.auto.find_element("mirror/claim_reward/use_enkephalin_assets.png")):
-            return GameState.CLAIM_REWARD
-
-        if (self.auto.find_element("mirror/road_to_mir/enter_assets.png") or
-            self.auto.find_element("mirror/road_to_mir/resume_assets.png") or
-            self.auto.find_element("mirror/road_to_mir/enter_mirror_assets.png")):
             return GameState.MIRROR_ENTRANCE
 
         if self.auto.find_element("home/drive_assets.png", take_screenshot=False) or self.auto.find_element(

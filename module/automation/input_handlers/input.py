@@ -1,8 +1,6 @@
-import random
 from time import sleep
 from typing import overload
 
-import numpy as np
 import pyautogui
 import win32api
 import win32con
@@ -147,15 +145,14 @@ class WinAbstractInput(AbstractInput):
         return MESSAGE_KEY_WPARAMS.get(vk, vk)
 
     def _randomize_coords(self, x: int, y: int, radius: int = 4) -> tuple[int, int]:
-        """Adds a small uniform random offset to coordinates to avoid static pixel-perfect click patterns."""
-        return x + random.randint(-radius, radius), y + random.randint(-radius, radius)
+        """Return coordinates unchanged for deterministic, audit-safe input behavior."""
+        return x, y
 
 
 
 def human_delay(base_time=0.1, std_dev=0.03):
-    """生成正态分布的随机延迟，更符合人类操作习惯，下限保护为0.01"""
-    delay = np.random.normal(base_time, std_dev)
-    return max(0.01, delay)
+    """生成固定延迟，保持接口兼容，下限保护为0.01。"""
+    return max(0.01, base_time)
 
 
 class Input(WinAbstractInput, metaclass=SingletonMeta):
@@ -283,8 +280,8 @@ class Input(WinAbstractInput, metaclass=SingletonMeta):
 
         msg = "点击（1，1）空白位置"
         log.debug(msg, stacklevel=2)
-        x = coordinate[0] + random.randint(0, 10)
-        y = coordinate[1] + random.randint(0, 10)
+        x = coordinate[0] + 5
+        y = coordinate[1] + 5
         self.mouse_click(x, y, times=times, move_back=False)
 
         if move_back and current_mouse_position:
@@ -617,8 +614,8 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
 
         msg = "点击（1，1）空白位置"
         log.debug(msg, stacklevel=2)
-        x = coordinate[0] + random.randint(0, 10)
-        y = coordinate[1] + random.randint(0, 10)
+        x = coordinate[0] + 5
+        y = coordinate[1] + 5
         rx, ry = self._randomize_coords(x, y)
         for i in range(times):
             self.set_mouse_pos(rx, ry)
@@ -930,8 +927,8 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
     def mouse_click_blank(self, coordinate=(1, 1), times=1, move_back=False) -> bool:
         msg = "点击（1，1）空白位置"
         log.debug(msg, stacklevel=2)
-        x = coordinate[0] + random.randint(0, 10)
-        y = coordinate[1] + random.randint(0, 10)
+        x = coordinate[0] + 5
+        y = coordinate[1] + 5
         # _randomize_coords is applied inside mouse_click for WindowMoveInput
         self.mouse_click(x, y, times=times)
         return True

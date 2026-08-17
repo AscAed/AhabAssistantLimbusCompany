@@ -14,7 +14,7 @@ os.chdir(
     os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
 )
 # 解决 Windows DPI 缩放问题
-from ctypes import c_void_p, windll
+from ctypes import c_void_p, windll  # noqa: E402
 
 try:
     # 1. 尝试 Win10 1703+ 的最强方案 (Per Monitor V2)
@@ -34,17 +34,17 @@ except (AttributeError, OSError):
 
 # 先配好日志（给 "AALC" logger 挂 handler），再 import 会在 import 期就打日志的 app/config 模块，
 # 否则那些启动日志会丢。
-from module.logger import log
-from module.logger.my_log import Logger
+from module.logger import log  # noqa: E402
+from module.logger.my_log import Logger  # noqa: E402
 
 Logger()
 
 # 获取管理员权限
-import pyuac
+import pyuac  # noqa: E402
 
-from app.language_manager import LanguageManager
-from app.my_app import MainWindow
-from module.config import cfg
+from app.language_manager import LanguageManager  # noqa: E402
+from app.my_app import MainWindow  # noqa: E402
+from module.config import cfg  # noqa: E402
 
 if not pyuac.isUserAdmin():
     try:
@@ -53,8 +53,8 @@ if not pyuac.isUserAdmin():
     except Exception:
         sys.exit(1)
 
-from PySide6.QtCore import QObject, Qt, QTimer, Signal
-from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QObject, Qt, QTimer, Signal  # noqa: E402
+from PySide6.QtWidgets import QApplication  # noqa: E402
 
 QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
 QApplication.setAttribute(Qt.AA_DontCreateNativeWidgetSiblings)
@@ -65,13 +65,18 @@ class ArgumentSignaler(QObject):
     arguments_received = Signal(list)
 
 
-def start_socket_server(port, signaler):
+def start_socket_server(port, signaler, stop_event=None):
     """后台线程：监听新实例发来的参数"""
+    stop_event = stop_event or threading.Event()
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.bind(("127.0.0.1", port))
         s.listen(5)
-        while True:
-            conn, addr = s.accept()
+        s.settimeout(0.5)
+        while not stop_event.is_set():
+            try:
+                conn, addr = s.accept()
+            except socket.timeout:
+                continue
             with conn:
                 # 🛡️ Sentinel: Enforce timeout to prevent indefinite hang on connection (DoS risk)
                 conn.settimeout(1.0)

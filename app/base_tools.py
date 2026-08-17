@@ -32,7 +32,7 @@ from qfluentwidgets import (
 from qfluentwidgets import FluentIcon as FIF
 from qfluentwidgets.components.settings.setting_card import SettingIconWidget
 
-from app import *
+from app import all_sinners_name, mediator, team_toggle_button_group, toggle_button_group
 from app.common.ui_config import get_setting_layout_style
 from module.config import cfg
 

@@ -12,6 +12,7 @@ class TaskStatus(Enum):
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
     SKIPPED = "SKIPPED"
+    STOPPED = "STOPPED"
 
 
 class Task:
@@ -80,7 +81,7 @@ class MirrorDungeonTask(Task):
 
     def run(self, engine) -> bool:
         from tasks.base.script_task_scheme import Mirror_task
-        Mirror_task()
+        Mirror_task(thread=engine.thread)
         return True
 
 
@@ -140,7 +141,7 @@ class TaskEngine:
                         task.status = TaskStatus.SUCCESS
                         log.info(f"==> 任务引擎：任务 [{task.name}] 执行完成")
                 except userStopError as e:
-                    task.status = TaskStatus.FAILED
+                    task.status = TaskStatus.STOPPED
                     task.error = e
                     raise e
                 except Exception as e:

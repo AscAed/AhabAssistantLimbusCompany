@@ -22,7 +22,7 @@ from tasks.base.make_enkephalin_module import make_enkephalin_module
 from tasks.base.retry import retry
 from tasks.battle import battle
 from tasks.event import event_handling
-from tasks.mirror.in_shop import Shop
+from tasks.mirror.in_shop import Shop, wait_for_screenshot
 from tasks.mirror.reward_card import get_reward_card
 from tasks.mirror.search_road import (
     MirrorMap,
@@ -318,7 +318,7 @@ class Mirror:
                             msg = f"启动后第{self.floor}层卡包，该楼层时间不完整"
                         to_log_with_time(msg, floor_time)
                     self.floor_times[floor_num] = time.time()
-                except:
+                except Exception:
                     log.info("楼层异常，可能是OCR识别错误，本轮镜牢层间的时间记录无效")
                 self.get_floor_num = True
                 main_loop_count += 50
@@ -331,8 +331,7 @@ class Mirror:
 
             elif state == GameState.ROAD_MAP:
                 auto.mouse_to_blank()
-                while auto.take_screenshot() is None:
-                    continue
+                wait_for_screenshot()
                 if auto.click_element(
                     "mirror/road_in_mir/ego_gift_get_confirm_assets.png"
                 ):
@@ -356,8 +355,7 @@ class Mirror:
                 if cfg.floor_3_exit and self.floor >= 4:
                     continue
 
-                while auto.take_screenshot() is None:
-                    continue
+                wait_for_screenshot()
                 if auto.find_element("mirror/road_in_mir/legend_assets.png") or auto.find_element("mirror/road_in_mir/to_window_assets.png"):
                     _, elapsed = self._time_call(self.search_road)
                     self.find_road_total_time += elapsed
@@ -655,7 +653,7 @@ class Mirror:
                                 ocr_result = ocr_result.split("x")
                                 self.pass_coins = int(ocr_result[-1])
                                 break
-                        except:
+                        except Exception:
                             continue
                     if self.pass_coins is None:
                         for _ in range(5):
@@ -683,7 +681,7 @@ class Mirror:
                                         ocr_result = ocr_result.split("x")
                                         self.pass_coins = int(ocr_result[-1])
                                         break
-                            except:
+                            except Exception:
                                 continue
                     if self.pass_coins:
                         msg = f"本次镜牢领取{self.pass_coins}个通行证经验"
@@ -790,7 +788,7 @@ class Mirror:
             last_floor_time = time.time() - self.floor_times[self.floor - 1]
             msg = f"启动后第{self.floor}层卡包"
             to_log_with_time(msg, last_floor_time)
-        except:
+        except Exception:
             log.info("楼层异常，可能是OCR识别错误，本轮镜牢层间的时间记录无效")
 
         # 输出战斗总时间
@@ -831,13 +829,6 @@ class Mirror:
         first_starlight = [coins[0] - 1800 * scale, coins[1] + 300 * scale]
         starlights_X = [first_starlight[0] + (i % 5) * 400 * scale for i in range(10)]
         starlights_Y = [first_starlight[1] + (i // 5) * 480 * scale for i in range(10)]
-
-        first_single_plus = (
-            first_starlight[0] - 80 * scale,
-            first_starlight[1] + 320 * scale,
-        )
-        double_plus_offset = 80 * scale * 2
-        star_card_size = (400 * scale, 480 * scale)
 
         loop_count = 30
         auto.model = "clam"
@@ -962,7 +953,7 @@ class Mirror:
                 team_system == "slash"
                 or team_system == "pierce"
                 or team_system == "blunt"
-            ) and scroll == False:
+            ) and not scroll:
                 while slash_button := auto.find_element(
                     "mirror/road_to_mir/slash_gift_1.png"
                 ):
@@ -979,7 +970,7 @@ class Mirror:
 
             if (
                 auto.click_element(f"mirror/road_to_mir/{team_system}_gift_assets.png")
-                and select_system == False
+                and not select_system
             ):
                 select_system = True
                 continue
@@ -1293,8 +1284,7 @@ class Mirror:
             auto.mouse_to_blank()
         try:
             for _ in range(3):
-                while auto.take_screenshot() is None:
-                    continue
+                wait_for_screenshot()
                 if search_road_default_distance():
                     sleep(1)
                     return True
@@ -1305,8 +1295,7 @@ class Mirror:
             for _ in range(3):
                 if cfg.background_click:
                     continue
-                while auto.take_screenshot() is None:
-                    continue
+                wait_for_screenshot()
                 if search_road_farthest_distance():
                     sleep(1)
                     return True
@@ -1323,7 +1312,12 @@ class Mirror:
         ):
             return True
         start_time = time.time()
-        log.info("寻路出错, 尝试重进镜牢")
+        log.warning("所有寻路策略均已失败，无法选择路径节点，尝试重进镜牢")
+        try:
+            from app import mediator
+            mediator.warning.emit("镜牢寻路失败：无法识别完整路径并选择节点，请检查游戏窗口和缩放设置")
+        except Exception:
+            pass
         while True:
             from tasks.base.retry import check_times
 

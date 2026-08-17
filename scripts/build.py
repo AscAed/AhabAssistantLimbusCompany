@@ -1,3 +1,5 @@
+# ruff: noqa: T201  # CLI build script intentionally prints progress.
+
 import argparse
 import os
 import shutil

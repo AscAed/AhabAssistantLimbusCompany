@@ -2,7 +2,7 @@ import os
 
 from markdown_it import MarkdownIt
 from mdit_py_plugins.anchors import anchors_plugin
-from PySide6.QtCore import QCoreApplication, Qt, QUrl
+from PySide6.QtCore import QT_TRANSLATE_NOOP, QCoreApplication, Qt, QUrl
 from PySide6.QtGui import (
     QColor,
     QDesktopServices,
@@ -30,7 +30,17 @@ from qfluentwidgets import (
 )
 from qfluentwidgets import FluentIcon as FIF
 
-from app import *
+from app import (
+    all_teams,
+    coutinuous_times,
+    mediator,
+    set_get_prize_options,
+    set_lunacy_to_enkephalin_options,
+    set_reduce_miscontact_options,
+    set_win_position_options,
+    set_win_size_options,
+    team_toggle_button_group,
+)
 from app.base_combination import (
     CheckBoxWithComboBox,
     LabelWithComboBox,
@@ -48,6 +58,42 @@ from module.config.team_import_export import apply_team_settings, import_team_se
 from module.logger import log
 
 from .markdown_it_imgdiv import imgdiv_plugin, render_div_close, render_div_open
+
+_MIRROR_CHECKBOX_DEFINITIONS = [
+    {
+        "attr": "hard_mirror",
+        "key": "hard_mirror",
+        "text": QT_TRANSLATE_NOOP("BaseCheckBox", "使用困难镜牢*"),
+        "tips": QT_TRANSLATE_NOOP(
+            "BaseCheckBox", "仅本次运行期间有效，重启AALC后失效\n右键可设置为永久生效\n注: 自动困牢会关闭本功能"
+        ),
+        "temporary": True,
+    },
+    {
+        "attr": "no_weekly_bonuses",
+        "key": "no_weekly_bonuses",
+        "text": QT_TRANSLATE_NOOP("BaseCheckBox", "不使用每周加成*"),
+        "tips": QT_TRANSLATE_NOOP(
+            "BaseCheckBox", "仅本次运行期间有效，重启AALC后失效\n右键可设置为永久生效"
+        ),
+        "temporary": True,
+    },
+    {"attr": "floor_3_exit", "key": "floor_3_exit", "text": QT_TRANSLATE_NOOP("BaseCheckBox", "只打三层")},
+    {"attr": "infinite_dungeons", "key": "infinite_dungeons", "text": QT_TRANSLATE_NOOP("BaseCheckBox", "无限坐牢")},
+    {
+        "attr": "save_rewards",
+        "key": "save_rewards",
+        "text": QT_TRANSLATE_NOOP("BaseCheckBox", "保存困牢奖励"),
+        "tips": QT_TRANSLATE_NOOP("BaseCheckBox", "仅在进行困难镜牢时生效，普通难度不生效"),
+    },
+    {"attr": "hard_mirror_single_bonuses", "key": "hard_mirror_single_bonuses", "text": QT_TRANSLATE_NOOP("BaseCheckBox", "困牢单次加成")},
+    {"attr": "select_event_pack", "key": "select_event_pack", "text": QT_TRANSLATE_NOOP("BaseCheckBox", "第五层选择（最左边）活动卡包")},
+    {"attr": "skip_event_pack", "key": "skip_event_pack", "text": QT_TRANSLATE_NOOP("BaseCheckBox", "第五层跳过（最左边）活动卡包")},
+    {"attr": "re_claim_rewards", "key": "re_claim_rewards", "text": QT_TRANSLATE_NOOP("BaseCheckBox", "再次领取奖励")},
+    {"attr": "not_skip_whitegossypium", "key": "not_skip_whitegossypium", "text": QT_TRANSLATE_NOOP("BaseCheckBox", "不跳过白棉花")},
+    {"attr": "fight_to_last_man", "key": "fight_to_last_man", "text": QT_TRANSLATE_NOOP("BaseCheckBox", "战斗直到全灭")},
+    {"attr": "mirror_keyboard_navigation", "key": "mirror_keyboard_navigation", "text": QT_TRANSLATE_NOOP("BaseCheckBox", "使用键盘进行镜牢寻路")},
+]
 
 
 class PageCard(QFrame):
@@ -446,91 +492,19 @@ class PageMirror(PageCard):
         )
         self.add_team_button.clicked.connect(self.show_team_creation_menu)
 
-        self.hard_mirror = BaseCheckBox(
-            "hard_mirror",
-            None,
-            QT_TRANSLATE_NOOP("BaseCheckBox", "使用困难镜牢*"),
-            center=False,
-            tips=QT_TRANSLATE_NOOP(
-                "BaseCheckBox",
-                "仅本次运行期间有效，重启AALC后失效\n右键可设置为永久生效\n注: 自动困牢会关闭本功能",
-            ),
-            temporary=True,
-        )
-        self.no_weekly_bonuses = BaseCheckBox(
-            "no_weekly_bonuses",
-            None,
-            QT_TRANSLATE_NOOP("BaseCheckBox", "不使用每周加成*"),
-            center=False,
-            tips=QT_TRANSLATE_NOOP(
-                "BaseCheckBox",
-                "仅本次运行期间有效，重启AALC后失效\n右键可设置为永久生效",
-            ),
-            temporary=True,
-        )
-        self.floor_3_exit = BaseCheckBox(
-            "floor_3_exit",
-            None,
-            QT_TRANSLATE_NOOP("BaseCheckBox", "只打三层"),
-            center=False,
-        )
-        self.infinite_dungeons = BaseCheckBox(
-            "infinite_dungeons",
-            None,
-            QT_TRANSLATE_NOOP("BaseCheckBox", "无限坐牢"),
-            center=False,
-        )
-        self.save_rewards = BaseCheckBox(
-            "save_rewards",
-            None,
-            QT_TRANSLATE_NOOP("BaseCheckBox", "保存困牢奖励"),
-            tips=QT_TRANSLATE_NOOP(
-                "BaseCheckBox", "仅在进行困难镜牢时生效，普通难度不生效"
-            ),
-            center=False,
-        )
-        self.hard_mirror_single_bonuses = BaseCheckBox(
-            "hard_mirror_single_bonuses",
-            None,
-            QT_TRANSLATE_NOOP("BaseCheckBox", "困牢单次加成"),
-            center=False,
-        )
-        self.select_event_pack = BaseCheckBox(
-            "select_event_pack",
-            None,
-            QT_TRANSLATE_NOOP("BaseCheckBox", "第五层选择（最左边）活动卡包"),
-            center=False,
-        )
-        self.skip_event_pack = BaseCheckBox(
-            "skip_event_pack",
-            None,
-            QT_TRANSLATE_NOOP("BaseCheckBox", "第五层跳过（最左边）活动卡包"),
-            center=False,
-        )
-        self.re_claim_rewards = BaseCheckBox(
-            "re_claim_rewards",
-            None,
-            QT_TRANSLATE_NOOP("BaseCheckBox", "再次领取奖励"),
-            center=False,
-        )
-        self.not_skip_whitegossypium = BaseCheckBox(
-            "not_skip_whitegossypium",
-            None,
-            QT_TRANSLATE_NOOP("BaseCheckBox", "不跳过白棉花"),
-            center=False,
-        )
-        self.fight_to_last_man = BaseCheckBox(
-            "fight_to_last_man",
-            None,
-            QT_TRANSLATE_NOOP("BaseCheckBox", "战斗直到全灭"),
-            center=False,
-        )
-        self.mirror_keyboard_navigation = BaseCheckBox(
-            "mirror_keyboard_navigation",
-            None,
-            QT_TRANSLATE_NOOP("BaseCheckBox", "使用键盘进行镜牢寻路"),
-            center=False,
-        )
+        for definition in _MIRROR_CHECKBOX_DEFINITIONS:
+            setattr(
+                self,
+                definition["attr"],
+                BaseCheckBox(
+                    definition["key"],
+                    None,
+                    definition["text"],
+                    center=False,
+                    tips=definition.get("tips"),
+                    temporary=definition.get("temporary", False),
+                ),
+            )
 
     def __init_layout(self):
         self.vbox_general.addWidget(self.team)
@@ -538,18 +512,8 @@ class PageMirror(PageCard):
         self.add_team.addWidget(self.add_team_button)
         self.vbox_general.addLayout(self.add_team)
 
-        self.vbox_advanced.addWidget(self.hard_mirror)
-        self.vbox_advanced.addWidget(self.no_weekly_bonuses)
-        self.vbox_advanced.addWidget(self.floor_3_exit)
-        self.vbox_advanced.addWidget(self.infinite_dungeons)
-        self.vbox_advanced.addWidget(self.save_rewards)
-        self.vbox_advanced.addWidget(self.hard_mirror_single_bonuses)
-        self.vbox_advanced.addWidget(self.select_event_pack)
-        self.vbox_advanced.addWidget(self.skip_event_pack)
-        self.vbox_advanced.addWidget(self.re_claim_rewards)
-        self.vbox_advanced.addWidget(self.not_skip_whitegossypium)
-        self.vbox_advanced.addWidget(self.fight_to_last_man)
-        self.vbox_advanced.addWidget(self.mirror_keyboard_navigation)
+        for definition in _MIRROR_CHECKBOX_DEFINITIONS:
+            self.vbox_advanced.addWidget(getattr(self, definition["attr"]))
 
         self.card_layout.insertWidget(self.card_layout.count() - 1, self.mirror_count)
 
@@ -840,18 +804,8 @@ class PageMirror(PageCard):
 
     def retranslateUi(self):
         self.mirror_count.retranslateUi()
-        self.hard_mirror.retranslateUi()
-        self.no_weekly_bonuses.retranslateUi()
-        self.floor_3_exit.retranslateUi()
-        self.infinite_dungeons.retranslateUi()
-        self.save_rewards.retranslateUi()
-        self.hard_mirror_single_bonuses.retranslateUi()
-        self.select_event_pack.retranslateUi()
-        self.skip_event_pack.retranslateUi()
-        self.re_claim_rewards.retranslateUi()
-        self.not_skip_whitegossypium.retranslateUi()
-        self.fight_to_last_man.retranslateUi()
-        self.mirror_keyboard_navigation.retranslateUi()
+        for definition in _MIRROR_CHECKBOX_DEFINITIONS:
+            getattr(self, definition["attr"]).retranslateUi()
         self.add_team_button.setToolTip(self.tr("添加队伍"))
         for child in self.findChildren(MirrorTeamCombination):
             child.retranslateUi()

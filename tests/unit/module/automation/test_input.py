@@ -1,11 +1,10 @@
-import pytest
-from unittest.mock import MagicMock, patch
-import numpy as np
+from unittest.mock import patch
 
 from module.automation.input_handlers.bezier import generate_bezier_path
 from module.automation.input_handlers.delay import humanised_delay
 from module.automation.input_handlers.driver_interface import InputDriver
-from module.automation.input_handlers.input import Input, BackgroundInput, WindowMoveInput
+from module.automation.input_handlers.input import BackgroundInput, Input, WindowMoveInput, human_delay
+
 
 # 1. Test Bezier Path Generator
 def test_generate_bezier_path():
@@ -24,6 +23,13 @@ def test_generate_bezier_path():
     assert short_path[0] == (1, 1)
     assert short_path[-1] == (2, 2)
 
+
+def test_generate_bezier_path_is_deterministic():
+    start = (10, 20)
+    end = (100, 200)
+
+    assert generate_bezier_path(start, end, steps=10) == generate_bezier_path(start, end, steps=10)
+
 # 2. Test Humanised Delays
 def test_humanised_delay():
     # Gaussian
@@ -35,6 +41,16 @@ def test_humanised_delay():
     for _ in range(50):
         delay = humanised_delay(0.05, "poisson")
         assert delay >= 0.001
+
+
+def test_human_delay_is_deterministic():
+    assert human_delay(0.1, 0.03) == 0.1
+    assert human_delay(0.001, 0.03) == 0.01
+
+
+def test_humanised_delay_is_deterministic():
+    assert humanised_delay(0.05, "gaussian") == 0.05
+    assert humanised_delay(0.05, "poisson") == 0.05
 
 # 3. Test Driver-level Interface and Delegation
 class MockInputDriver(InputDriver):
@@ -102,6 +118,18 @@ def test_randomize_coords_bounded_offset(mock_cfg, mock_screen):
         rx, ry = handler._randomize_coords(100, 200, radius=radius)
         assert 100 - radius <= rx <= 100 + radius, f"rx={rx} out of bounds"
         assert 200 - radius <= ry <= 200 + radius, f"ry={ry} out of bounds"
+
+
+@patch("module.automation.input_handlers.input.screen")
+@patch("module.automation.input_handlers.input.cfg")
+def test_randomize_coords_is_deterministic(mock_cfg, mock_screen):
+    mock_cfg.config.use_post_message = True
+    mock_screen.handle.hwnd = 12345
+    mock_screen.handle.isMinimized = False
+
+    handler = BackgroundInput()
+    assert handler._randomize_coords(100, 200) == (100, 200)
+    assert handler._randomize_coords(100, 200, radius=10) == (100, 200)
 
 # 5. Test BackgroundInput.mouse_click uses randomized coords and move_back defaults to False
 @patch("module.automation.input_handlers.input.screen")

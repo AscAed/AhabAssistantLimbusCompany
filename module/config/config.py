@@ -397,7 +397,7 @@ class Config(metaclass=SingletonMeta):
         else:
             try:
                 value = getattr(self.config, key, default)
-            except:
+            except Exception:
                 value = default
         return value
 

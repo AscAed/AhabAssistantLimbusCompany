@@ -268,7 +268,7 @@ def Buy_enkephalin():
     lunacy_to_enkephalin(times=times)
 
 
-def Mirror_task():
+def Mirror_task(thread=None):
     # 判断执行镜牢任务的次数
     mir_times = cfg.set_mirror_count
     if cfg.infinite_dungeons:
@@ -280,6 +280,8 @@ def Mirror_task():
     cfg.normalize_and_sync_team_state(persist=False)
     # 开始执行镜牢任务
     while mir_times > 0:
+        if thread and getattr(thread, "is_stop", False):
+            raise userStopError("用户主动终止程序")
         # 检测配置的队伍能否顺利执行
         useful = False
         hard = bool(cfg.hard_mirror)

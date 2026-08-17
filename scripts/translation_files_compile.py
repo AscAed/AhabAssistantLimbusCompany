@@ -1,3 +1,5 @@
+# ruff: noqa: T201  # CLI script intentionally prints translation output.
+
 import os
 import subprocess
 

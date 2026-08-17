@@ -46,6 +46,7 @@ from module.config.theme_pack_import_export import (
     import_theme_pack_weight,
     import_theme_pack_weight_from_base64,
 )
+from module.logger import log
 
 # 英文key到中文名称的映射表（普通模式）
 THEME_PACK_NAME_MAP = {
@@ -1066,30 +1067,20 @@ class ThemePackSettingDialog(FramelessDialog):
 
     def reset_to_default(self):
         """Reset current view (global or floor) to default values."""
+        default_cfg = theme_list.load_config(theme_list.theme_pack_list_path)
+        if not default_cfg:
+            log.warning("无法加载默认主题包配置，重置失败")
+            return
+
         if self.current_floor is None:
             # Reset global config to defaults (load from example)
-            default_cfg = theme_list.load_config(theme_list.theme_pack_list_path)
             self.config_data = copy.deepcopy(default_cfg)
         else:
-            normal_default = example_config.get("theme_pack_list", {})
-            hard_default = example_config.get("theme_pack_list_hard", {})
-
-        self.preferred_threshold_spinbox.spin_box.setValue(int(example_config.get("preferred_thresholds", 0)))
-
-        # 重置普通模式显示
-        for pack_key, weight in normal_default.items():
-            if pack_key in self.normal_cards:
-                self.normal_cards[pack_key].update_weight(weight)
-
-        # 重置困难模式显示
-        for pack_key, weight in hard_default.items():
-            if pack_key in self.hard_cards:
-                self.hard_cards[pack_key].update_weight(weight)
-
-        # 标记有未保存的修改
             # Reset specific floor overrides
             if "floors" in self.config_data:
                 self.config_data["floors"].pop(f"floor_{self.current_floor}", None)
+
+        self.preferred_threshold_spinbox.spin_box.setValue(int(default_cfg.get("preferred_thresholds", 0)))
         self._has_unsaved_changes = True
         self.reload_theme_packs()
 

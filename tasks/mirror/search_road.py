@@ -1,10 +1,13 @@
+import heapq
 import time
+from enum import Enum
 from time import sleep
 
 import cv2
 
 from module.automation import auto
 from module.config import cfg
+from module.game_and_screen import screen
 from module.logger import log
 from module.my_error.my_error import InputAttributeError
 from tasks.base.retry import retry
@@ -33,7 +36,11 @@ class MirrorMap:
             if self.floor_map is True and self.floor_nodes is True:
                 return True
             if not isinstance(self.floor_map, list):
-                self.floor_map = list(self.floor_map)
+                # search_road_from_road_map 可能返回 False；list(False) 会抛 TypeError
+                if isinstance(self.floor_map, bool) or self.floor_map is None:
+                    self.floor_map = []
+                else:
+                    self.floor_map = list(self.floor_map)
             self.map[f"floor{self.floor}"] = [self.floor_map[:], self.floor_nodes[:]]
 
         if len(self.floor_map) > 0:
@@ -56,11 +63,11 @@ class MirrorMap:
             elif next_step == "M":
                 auto.key_press("right")
             sleep(0.5)
-            # 发送进入确认按键 (Enter)
+            # 发送进入确认按键 (Enter / Space 均可，这里统一使用 Enter)
             auto.key_press("enter")
-            sleep(1.25)
-            if auto.click_element("mirror/road_in_mir/enter_assets.png", take_screenshot=True):
-                return True
+            sleep(0.8)
+            # 键盘模式下，确认按钮由回车直接触发，不再依赖图像识别。
+            # 若后续状态未切换成功，外层流程会继续走失败回收逻辑。
             return True
 
         if next_position := self._get_next_position(next_step):
@@ -238,30 +245,14 @@ def search_road_farthest_distance():
 
 
 def search_road_from_road_map(hard_mode=False):
-    import numpy as np
-
     scale = cfg.set_win_size / 1440
     h = cfg.set_win_size
     w = int(h * 16 / 9)
     cx, cy = int(w * 0.1), int(h * 0.8)
 
-    # 1. 自动缩小重试与扫描机制
-    if not hard_mode:
-        log.info("普通难度启动：开始尝试鼠标滚轮缩小地图以获得完整视野...")
-        auto.mouse_click_blank()
-        for i in range(2):
-            auto.mouse_scroll(-3)
-            sleep(0.5)
-
-        auto.mouse_click(cx, cy)
-        sleep(0.5)
-        for i in range(5):
-            auto.mouse_scroll(-3, cx, cy)
-            sleep(0.3)
-            
-    # 2. 地图定位与图像拼接（普通难度全局）/ 寻找身前一格（困难难度单步）
-    bus_position = None
+    # 困难难度 (有迷雾)：只做单步最优决策，无需滚动拼接
     if hard_mode:
+        bus_position = None
         for attempt in range(3):
             auto.take_screenshot(gray=False)
             bus_position = auto.find_element("mirror/mybus_default_distance.png", threshold=0.65)
@@ -270,24 +261,11 @@ def search_road_from_road_map(hard_mode=False):
             if bus_position is not None:
                 break
             sleep(0.5)
-            
+
         if bus_position is None:
-            bus_position = auto.find_element("mirror/mybus_maximum_distance.png", threshold=0.65)
-        if bus_position is not None:
-            break
-        sleep(0.5)
-
-    if bus_position is None:
-        log.warning("无法定位当前玩家（巴士）位置，寻路失败")
-        return False, []
-
-    bus_x, bus_y = bus_position[0], bus_position[1]
-
-    # 困难难度 (有迷雾)：只做单步最优决策，无需滚动拼接
-    if hard_mode:
             log.warning("无法定位当前玩家（巴士）位置，寻路失败")
             return False, []
-            
+
         bus_x, bus_y = bus_position[0], bus_position[1]
         
         log.info("困难难度启动：仅进行身前一格节点单步最优决策...")
@@ -319,123 +297,87 @@ def search_road_from_road_map(hard_mode=False):
         log.info(f"困难难度单步最优决策：选择 {best_class} 节点，方向为 {direction}")
         return [direction], [best_class]
 
-    # 普通难度：拼接多次平移的截图以获取全局地图
-    log.info("普通难度：开始平移扫描与地图拼接...")
-    all_screens_nodes = []
-    all_screens_roads = []
+    # ── 普通难度：自适应滚轮缩放方案（平移扫描已弃用） ────────────────────
+    #
+    # 设计要点：
+    #   1. 先做初始 10 次缩放滚动（进入函数时已做过 7 次，此处追加）
+    #   2. 循环判据：匹配 mybus_maximum_distance.png = 已达最大缩放
+    #   3. Bug I：过滤 x<200, y<200 的 bus_position（minimap 误匹配）
+    #   4. Bug J：前台用 mouse_event 硬件级滚轮，后台用 PostMessage（同 team_formation.py）
 
-    for scan_idx in range(3):
-        if scan_idx > 0:
-            if cfg.mirror_keyboard_navigation:
-                log.debug("使用键盘 'E' 键平移地图...")
-                for _ in range(6):
-                    auto.key_press("e")
-                    sleep(0.1)
-                sleep(0.5)
+    def _do_scroll_zoom_out(target_cx, target_cy, notches=3):
+        """向外缩放地图。优先前台硬件滚轮，后台降级 PostMessage。"""
+        try:
+            import win32api
+            import win32con
+            import win32gui
+            hwnd = screen.handle.hwnd
+            if not hwnd:
+                raise RuntimeError("no hwnd")
+            screen_x, screen_y = win32gui.ClientToScreen(hwnd, (int(target_cx), int(target_cy)))
+            if screen.handle.isActive:
+                win32api.SetCursorPos((screen_x, screen_y))
+                for _ in range(notches):
+                    win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, -120, 0)
+                    sleep(0.05)
             else:
-                log.debug("使用鼠标拖拽平移地图...")
-                auto.mouse_drag(int(900 * scale), int(540 * scale), drag_time=1.0, dx=int(-300 * scale), dy=0)
-                sleep(0.5)
-                auto.mouse_to_blank()
+                for _ in range(notches):
+                    wparam = (-120 << 16) & 0xFFFFFFFF
+                    lparam = win32api.MAKELONG(screen_x, screen_y)
+                    win32api.PostMessage(hwnd, win32con.WM_MOUSEWHEEL, wparam, lparam)
+                    sleep(0.05)
+        except Exception as exc:
+            log.debug(f"win32 滚轮失败，回退 auto.mouse_scroll: {exc}")
+            auto.mouse_scroll(-3, int(target_cx), int(target_cy))
 
-        auto.take_screenshot()
-        nodes = identify_nodes(bus_x if scan_idx == 0 else 0)
-        roads = identify_road(bus_x if scan_idx == 0 else 0)
+    def _is_minimap_pos(pos):
+        """返回 True 当且仅当坐标落在左上角 minimap 区域（误匹配排除）。"""
+        return pos[0] < 200 and pos[1] < 200
 
-        if nodes:
-            all_screens_nodes.append(nodes)
-        if roads:
-            all_screens_roads.append(roads)
+    # 初始缩放：在进入函数开头已做 7 次（2+5），追加若干次确保靠近最大档
+    log.info("普通难度：开始自适应滚轮缩放以获取完整路径视野...")
+    auto.mouse_click(cx, cy)
+    sleep(0.3)
+    for _ in range(8):
+        _do_scroll_zoom_out(cx, cy, notches=3)
+        sleep(0.15)
+    sleep(0.8)
 
-    merged_nodes = []
-    merged_roads = []
-
-    if len(all_screens_nodes) > 0:
-        merged_nodes = list(all_screens_nodes[0])
-
-    dx = 0
-    for scan_idx in range(1, len(all_screens_nodes)):
-        curr_nodes = all_screens_nodes[scan_idx]
-        dx_list = []
-        for c_class, (cx, cy) in curr_nodes:
-            for m_class, (mx, my) in merged_nodes:
-                if c_class == m_class and abs(cy - my) < 20 * scale:
-                    dx_list.append(mx - cx)
-
-        dx = np.median(dx_list) if len(dx_list) > 0 else (300 * scale * scan_idx)
-
-        for c_class, (cx, cy) in curr_nodes:
-            shifted_x = cx + dx
-            duplicate = False
-            for m_class, (mx, my) in merged_nodes:
-                if abs(shifted_x - mx) < 30 * scale and abs(cy - my) < 20 * scale:
-                    duplicate = True
-                    break
-            if not duplicate:
-                merged_nodes.append((c_class, (shifted_x, cy)))
-
-    if len(all_screens_roads) > 0:
-        merged_roads = list(all_screens_roads[0])
-
-    for scan_idx in range(1, len(all_screens_roads)):
-        curr_roads = all_screens_roads[scan_idx]
-        for c_dir, (cx, cy) in curr_roads:
-            shifted_x = cx + dx
-            duplicate = False
-            for m_dir, (mx, my) in merged_roads:
-                if abs(shifted_x - mx) < 40 * scale and abs(cy - my) < 20 * scale:
-                    duplicate = True
-                    break
-            if not duplicate:
-                merged_roads.append((c_dir, (shifted_x, cy)))
-
-    if cfg.mirror_keyboard_navigation:
-        log.debug("使用键盘 'Q' 键复位地图...")
-        for _ in range(12):
-            auto.key_press("q")
-            sleep(0.1)
-    # 普通难度：循环滚动缩小直到检测到完整地图（必须包含 boss_battle 或 shop 节点）
-    log.info("普通难度：对缩放后的完整地图进行识别...")
-    merged_nodes = []
-    merged_roads = []
-    
-    for attempt in range(5):
+    # 缩放确认循环：以匹配 mybus_maximum_distance.png 作为最大缩放判据
+    bus_position = None
+    reached_max_zoom = False
+    for attempt in range(8):
         auto.take_screenshot(gray=False)
-        bus_position = auto.find_element("mirror/mybus_default_distance.png", threshold=0.65)
-        if bus_position is None:
-            bus_position = auto.find_element("mirror/mybus_maximum_distance.png", threshold=0.65)
-        
-        if bus_position is not None:
-            bus_x, bus_y = bus_position[0], bus_position[1]
-            nodes = identify_nodes(bus_x)
-            has_end_node = any(class_name in ("boss_battle", "small_boss_battle", "shop") for class_name, _ in nodes)
-            if has_end_node:
-                log.info(f"成功定位完整地图（第 {attempt + 1} 次尝试，已检测到终点/商店节点）")
-                merged_nodes = nodes
-                merged_roads = identify_road(bus_x)
-                break
-            else:
-                log.warning(f"第 {attempt + 1} 次尝试：未检测到终点或商店节点，继续尝试滚动缩小...")
-        else:
-            log.warning(f"第 {attempt + 1} 次尝试：无法定位当前玩家（巴士）位置，继续尝试滚动缩小...")
-            
-        # Click bottom-left blank area and scroll again to ensure zoom-out is applied
+        # 先检查是否已达最大缩放（最小巴士图标）
+        max_pos = auto.find_element("mirror/mybus_maximum_distance.png", threshold=0.65)
+        if max_pos and not _is_minimap_pos(max_pos):
+            bus_position = max_pos
+            reached_max_zoom = True
+            log.info(f"已达最大缩放（第 {attempt + 1} 次检测），巴士位置：{bus_position}")
+            break
+        # 尚未达到最大缩放，继续滚动
+        log.debug(f"第 {attempt + 1} 次：未达最大缩放，继续滚动缩小...")
         auto.mouse_click(cx, cy)
+        sleep(0.2)
+        for _ in range(5):
+            _do_scroll_zoom_out(cx, cy, notches=3)
+            sleep(0.15)
         sleep(0.5)
-        for _ in range(3):
-            auto.mouse_scroll(-3, cx, cy)
-            sleep(0.2)
-    else:
-        # Fallback: if all attempts failed to find the end node, use the last detected nodes
-        log.warning("已达到最大重试次数，仍未检测到完整的终点节点，将使用当前检测到的节点进行规划")
-        if bus_position is not None:
-            bus_x, bus_y = bus_position[0], bus_position[1]
-            merged_nodes = identify_nodes(bus_x)
-            merged_roads = identify_road(bus_x)
-        else:
+
+    if not reached_max_zoom:
+        log.warning("未能确认最大缩放，尝试使用 mybus_default_distance.png 定位巴士...")
+        auto.take_screenshot(gray=False)
+        fallback_pos = auto.find_element("mirror/mybus_default_distance.png", threshold=0.65)
+        if fallback_pos and not _is_minimap_pos(fallback_pos):
+            bus_position = fallback_pos
+        elif not bus_position or _is_minimap_pos(bus_position):
             log.warning("无法定位当前玩家（巴士）位置，寻路失败")
             return False, []
-            
+
+    bus_x, bus_y = bus_position[0], bus_position[1]
+    merged_nodes = identify_nodes(bus_x) or []
+    merged_roads = identify_road(bus_x) or []
+
     if not merged_nodes:
         log.warning("未检测到任何节点，寻路失败")
         return False, []
@@ -444,15 +386,12 @@ def search_road_from_road_map(hard_mode=False):
         f"全局路网扫描完成。合并后共有节点 {len(merged_nodes)} 个，连线 {len(merged_roads)} 条。开始 Dijkstra 规划..."
     )
 
-    log.info(f"全局路网扫描完成。共有节点 {len(merged_nodes)} 个，连线 {len(merged_roads)} 条。开始 Dijkstra 规划...")
-    
     initial_bus_pos = Position.MID
     if bus_y < 540 * scale - 100 * scale:
         initial_bus_pos = Position.TOP
     elif bus_y > 540 * scale + 100 * scale:
         initial_bus_pos = Position.BOTTOM
 
-    y_area = divide_the_area_by_y(merged_nodes)
     all_layers_nodes = divide_the_area_by_x(merged_nodes)
     all_layers_nodes.sort(key=lambda layer: layer[0][1][0])
 
@@ -542,8 +481,8 @@ def identify_nodes(bus_x):
     for i in range(rows):
         # 提取类别置信度
         classes_scores = outputs[0][i][4:]
-        minScore, maxScore, minClassLoc, maxClassLoc = cv2.minMaxLoc(classes_scores)
-        maxClassIndex = maxClassLoc[0]
+        _, maxScore, _, maxClassLoc = cv2.minMaxLoc(classes_scores)
+        maxClassIndex = maxClassLoc[1] if len(maxClassLoc) > 1 else maxClassLoc[0]
 
         # 若最大置信度超过阈值（0.25），则保留该检测结果
         if maxScore >= 0.25:
@@ -565,7 +504,7 @@ def identify_nodes(bus_x):
 
     if len(result_boxes) > 0:  # 若有有效检测结果
         for i in range(len(result_boxes)):
-            index = result_boxes[i]  # 获取当前框在原始列表中的索引（NMS 输出为二维数组）
+            index = int(result_boxes[i])  # 强制转 int，兼容 OpenCV ≥4.7 返回 float32 索引
             box = boxes[index]  # 获取对应的边界框
 
             # 构造检测结果字典（包含类别、置信度、边界框等信息）
@@ -688,7 +627,7 @@ def identify_road(bus_x, min_length=160, merge_distance=230):
                     "dy": dy,  # y坐标差（原始值）
                 }
             )
-        except:
+        except Exception:
             continue  # 跳过格式错误的线段（异常处理）
 
     # 筛选长度大于min_length的线段
@@ -854,9 +793,6 @@ def divide_the_area_by_x(data):
 
     return groups
 
-
-import heapq
-from enum import Enum
 
 all_node_weight = {
     "event": 10,

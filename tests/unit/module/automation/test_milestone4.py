@@ -1,11 +1,12 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
 import numpy as np
+import pytest
 
 from tasks.mirror.in_shop import Shop
 from tasks.mirror.mirror import Mirror
-from tasks.mirror.search_road import identify_nodes, identify_road
-from module.config import TeamSetting
+from tasks.mirror.search_road import identify_nodes
+
 
 @pytest.fixture
 def mock_team_setting():
