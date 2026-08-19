@@ -101,3 +101,6 @@
 
 **Learning:** When developing screen simulation components (like minitouch), it's important to pass screen max coordinate limits downwards into the builder layer so that logic bounds logic can evaluate whether the `x` and `y` offsets exceed display parameters locally before commands are pushed onto device stacks and potentially crash.
 **Action:** Always retrieve and supply `max_x`, `max_y` limit configuration parameters into underlying structural components during their instantiation, and ensure explicit boundary exceptions are raised directly instead of silently clipping to improve failure visibility.
+## 2025-03-10 - Duplicate NMS code loops
+**Learning:** Found massive duplicate code blocks from a bad merge conflict in `match_template_with_multiple_targets` where the NMS algorithm was executed entirely using O(N^2) lists, and then subsequently overwritten by a second identical thresholding pass doing an O(N) Spatial Hash.
+**Action:** Always inspect the entire method before optimizing. Removing redundant arrays and dead loops entirely provides a massive performance boost over trying to micro-optimize the duplicate blocks.
