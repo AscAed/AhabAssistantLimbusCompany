@@ -1293,7 +1293,7 @@ class Mirror:
                 if retry() is False:
                     return False
             for _ in range(3):
-                if cfg.background_click:
+                if cfg.operation_mode == "background_window":
                     continue
                 wait_for_screenshot()
                 if search_road_farthest_distance():

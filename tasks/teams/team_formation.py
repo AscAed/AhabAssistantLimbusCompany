@@ -3,7 +3,6 @@ from time import sleep
 from module.automation import auto
 from module.config import cfg
 from module.decorator.decorator import begin_and_finish_time_log
-from module.game_and_screen import screen
 from module.logger import log
 
 
@@ -84,109 +83,81 @@ def select_battle_team(num):
 
         # screen imported at module level
 
-        def scroll_to_top(first_pos):
-            scroll_success = False
+        def scroll_once(direction, x, y, count=1):
             try:
-                # Use backend input handler (win32) only
-                input_type = auto.input_handler.__class__.__name__
-                if input_type == "BackgroundInput":
-                    import win32api
-                    import win32con
-                    import win32gui
-                    hwnd = screen.handle.hwnd
-                    # Convert logical position to screen coordinates
-                    screen_x, screen_y = win32gui.ClientToScreen(
-                        hwnd, (int(first_pos[0]), int(first_pos[1] + 150 * scale))
-                    )
-                    log.debug(f"尝试滚轮向上: hwnd={hwnd}, client_pos=({int(first_pos[0])}, {int(first_pos[1] + 150 * scale)}), screen_pos=({screen_x}, {screen_y})")
-                    
-                    # If game window is active, use win32api.mouse_event for reliable hardware wheel emulation
-                    if screen.handle.isActive:
-                        # Move physical cursor to target area to ensure Unity registers hover
-                        win32api.SetCursorPos((screen_x, screen_y))
-                        # Loop to send multiple small wheel events across frames (30 notches to fully scroll to top)
-                        for _ in range(30):
-                            win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, 120, 0)
-                            sleep(0.01)
-                        log.debug(f"前台系统滚轮向上完成: hwnd={hwnd}, notches=30")
-                        scroll_success = True
-                    else:
-                        # If game window is inactive, we try PostMessage but do not set scroll_success = True
-                        # to ensure that we still run the background drag fallback (which works unfocused)
-                        for _ in range(30):
-                            wparam = 120 << 16
-                            lparam = win32api.MAKELONG(screen_x, screen_y)
-                            win32api.PostMessage(hwnd, win32con.WM_MOUSEWHEEL, wparam, lparam)
-                            sleep(0.01)
-                        log.debug(f"后台WM_MOUSEWHEEL向上完成: hwnd={hwnd}, notches=30")
-                        scroll_success = False
-                else:
-                    raise RuntimeError("Non‑background input, fallback to drag")
-            except Exception as e:
-                log.warning(f"滚轮向上失败: {e}, 使用安全拖拽兜底")
-                scroll_success = False
+                # Use batch_mouse_scroll if available (WindowMoveInput mode)
+                if hasattr(auto, 'batch_mouse_scroll') and auto.batch_mouse_scroll is not None:
+                    return auto.batch_mouse_scroll(direction, count, x, y)
+                # Fallback to single scroll for other modes
+                elif hasattr(auto, 'mouse_scroll') and auto.mouse_scroll is not None:
+                    for _ in range(count):
+                        if not auto.mouse_scroll(direction, x, y):
+                            return False
+                    return True
+                return False
+            except Exception as exc:
+                log.warning("滚轮投递失败，将尝试窗口拖拽兜底: %s", exc)
+                return False
+
+        def drag_scroll(positions):
+            try:
+                for x, y, dy, drag_time, wait_time in positions:
+                    auto.mouse_drag(x, y, dy=dy, drag_time=drag_time)
+                    sleep(wait_time)
+            except Exception as exc:
+                log.error("队伍列表窗口拖拽兜底失败: %s", exc)
+                return False
+            return True
+
+        def scroll_to_top(first_pos):
+            # Use batch scroll for efficiency: 30 scrolls in one lease
+            scroll_success = scroll_once(
+                1,
+                int(first_pos[0]),
+                int(first_pos[1] + 150 * scale),
+                count=30
+            )
 
             if not scroll_success:
-                # Safe drag fallback
-                log.debug("使用安全范围拖拽滚动到顶部")
-                for _ in range(4):
+                # Optimized single-drag fallback: 1000px in one lease (~1.5s total)
+                log.debug("使用单次大拖拽滚动到顶部")
+                try:
                     auto.mouse_drag(
                         first_pos[0],
                         first_pos[1],
-                        dy=250 * scale,
-                        drag_time=0.3,
+                        dy=1000 * scale,  # Large upward drag
+                        drag_time=0.8  # Fast but smooth for Unity
                     )
                     sleep(0.2)
+                    log.debug("队伍列表已完成单次拖拽滚动到顶部")
+                except Exception as exc:
+                    log.error("队伍列表顶部拖拽失败: %s", exc)
+                    raise RuntimeError("队伍列表滚动到顶部失败，已安全停止")
 
         def scroll_down(first_pos, pages):
-            scroll_success = False
-            try:
-                input_type = auto.input_handler.__class__.__name__
-                if input_type == "BackgroundInput":
-                    import win32api
-                    import win32con
-                    import win32gui
-                    hwnd = screen.handle.hwnd
-                    screen_x, screen_y = win32gui.ClientToScreen(
-                        hwnd, (int(first_pos[0]), int(first_pos[1] + 150 * scale))
-                    )
-                    log.debug(f"尝试滚轮向下: hwnd={hwnd}, pages={pages}, client_pos=({int(first_pos[0])}, {int(first_pos[1] + 150 * scale)}), screen_pos=({screen_x}, {screen_y})")
-                    
-                    if screen.handle.isActive:
-                        # Move physical cursor to ensure hover
-                        win32api.SetCursorPos((screen_x, screen_y))
-                        # Loop to send multiple small wheel down events per page
-                        for _ in range(pages * 12):
-                            win32api.mouse_event(win32con.MOUSEEVENTF_WHEEL, 0, 0, -120, 0)
-                            sleep(0.01)
-                        log.debug(f"前台系统滚轮向下完成: hwnd={hwnd}, notches={pages * 12}")
-                        scroll_success = True
-                    else:
-                        # If game window is inactive, we try PostMessage but do not set scroll_success = True
-                        for _ in range(pages * 12):
-                            wparam = (-120 << 16) & 0xFFFFFFFF
-                            lparam = win32api.MAKELONG(screen_x, screen_y)
-                            win32api.PostMessage(hwnd, win32con.WM_MOUSEWHEEL, wparam, lparam)
-                            sleep(0.01)
-                        log.debug(f"后台WM_MOUSEWHEEL向下完成: hwnd={hwnd}, pages={pages}, notches={pages * 12}")
-                        scroll_success = False
-                else:
-                    raise RuntimeError("Non‑background input, fallback to drag")
-            except Exception as e:
-                log.warning(f"滚轮向下失败: {e}, 使用安全拖拽兜底")
-                scroll_success = False
+            # Use batch scroll for efficiency
+            scroll_success = scroll_once(
+                -1,
+                int(first_pos[0]),
+                int(first_pos[1] + 150 * scale),
+                count=pages * 12
+            )
 
             if not scroll_success:
-                # Safe drag fallback
-                log.debug("使用安全范围拖拽向下滚动")
-                for _ in range(pages):
+                # Optimized single-drag fallback per page
+                log.debug("使用单次拖拽向下滚动 %s 页", pages)
+                try:
                     auto.mouse_drag(
                         first_pos[0],
                         first_pos[1] + 375 * scale,
-                        dy=-375 * scale,
-                        drag_time=1.5,
+                        dy=-375 * scale * pages,  # Single large drag for all pages
+                        drag_time=0.6 * pages  # Scale duration with distance
                     )
-                    sleep(1)
+                    sleep(0.2)
+                    log.debug("队伍列表已完成单次拖拽向下滚动")
+                except Exception as exc:
+                    log.error("队伍列表向下拖拽失败: %s", exc)
+                    raise RuntimeError("队伍列表向下滚动失败，已安全停止")
 
         first_position = [position[0], position[1] + 70 * scale]
         scroll_to_top(first_position)

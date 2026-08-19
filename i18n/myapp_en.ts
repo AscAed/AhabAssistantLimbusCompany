@@ -1310,18 +1310,18 @@ Right-click to set as permanent</translation>
     </message>
     <message>
         <location filename="../app/__init__.py" line="226"/>
-        <source>前台模式 (pyautogui)</source>
-        <translation>Foreground mode (pyautogui)</translation>
+        <source>前台模式（移动鼠标）</source>
+        <translation>Foreground mode (move mouse)</translation>
     </message>
     <message>
         <location filename="../app/__init__.py" line="227"/>
-        <source>后台模式 (默认) (pywin32)</source>
-        <translation>Background mode (default) (pywin32)</translation>
+        <source>后台模式（移动窗口）</source>
+        <translation>Background mode (move window)</translation>
     </message>
     <message>
         <location filename="../app/__init__.py" line="228"/>
         <source>后台增强 (pywin32+set_window_pos)</source>
-        <translation>Background Mode Enhancement(pywin32+set win pos)</translation>
+        <translation type="vanished">Background Mode Enhancement(pywin32+set win pos)</translation>
     </message>
     <message>
         <location filename="../app/setting_interface.py" line="153"/>
@@ -1350,18 +1350,18 @@ Right-click to set as permanent</translation>
     </message>
     <message>
         <location filename="../app/setting_interface.py" line="642"/>
-        <source>后台模式，游戏可以在后台运行，但是&lt;font color=red&gt;游戏不能处于最小化状态!!&lt;/font&gt;</source>
-        <translation>Background mode: The game can run in the background, but &lt;font color=red&gt;the game cannot be minimized!!&lt;/font&gt;</translation>
+        <source>后台模式（移动窗口），不移动物理鼠标，尽量不干扰您使用电脑；游戏窗口不可最小化。</source>
+        <translation>Background mode (move window): does not move the physical mouse and minimizes interference; the game window must not be minimized.</translation>
     </message>
     <message>
         <location filename="../app/setting_interface.py" line="645"/>
-        <source>前台模式，游戏必须在显示在最上方</source>
-        <translation>In foreground mode, the game must be displayed at the top</translation>
+        <source>前台模式（移动鼠标），执行期间会移动物理鼠标，适合无人值守运行。</source>
+        <translation>Foreground mode (move mouse): moves the physical mouse while running and is intended for unattended use.</translation>
     </message>
     <message>
         <location filename="../app/setting_interface.py" line="651"/>
         <source>基于移动窗口的后台模式，有效规避了后台模式需要移动鼠标的情况，&lt;br/&gt;但是性能和稳定性较差，&lt;font color=red&gt;不推荐长时间无人使用&lt;/font&gt;</source>
-        <translation>Window-move BG mode. Avoids mouse syncing move.&lt;br/&gt; But has poor stability.&lt;font color=red&gt; Don&apos;t leave it unattended.&lt;/font&gt;</translation>
+        <translation type="vanished">Window-move BG mode. Avoids mouse syncing move.&lt;br/&gt; But has poor stability.&lt;font color=red&gt; Don&apos;t leave it unattended.&lt;/font&gt;</translation>
     </message>
     <message>
         <location filename="../app/setting_interface.py" line="655"/>

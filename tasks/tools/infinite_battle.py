@@ -39,13 +39,11 @@ class BattleWorker(QThread):
         self.choice_event_handling = choice_event_handling
         self.initialized = False
         self.battle = Battle(is_tool=True)  # 复用镜牢战斗逻辑
-        self.background_click = cfg.background_click
+        self.operation_mode = cfg.operation_mode
 
     def stop(self):
         """停止工作线程"""
         self.battle.running = False
-        if self.background_click is False:
-            cfg.set_value("background_click", False)
 
     def run(self):
         """工作线程的主循环"""
@@ -76,8 +74,6 @@ class BattleWorker(QThread):
         try:
             from module.game_and_screen import screen
 
-            if not self.background_click:
-                cfg.set_value("background_click", True)
             screen.set_win()
         except Exception as e:
             self.error_occurred.emit(f"窗口设置错误: {str(e)}")
@@ -197,8 +193,6 @@ class InfiniteBattles(QWidget):
         """停止战斗工作线程"""
         if self.worker.isRunning():
             self.log_text.append("中止：等待战斗线程停止...")
-            if self.worker.background_click is False:
-                cfg.set_value("background_click", False)
             self.worker.stop()
             self.worker.wait(1000)  # 等待1秒
             if self.worker.isRunning():

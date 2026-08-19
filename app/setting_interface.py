@@ -20,7 +20,7 @@ from qfluentwidgets import (
 )
 from qfluentwidgets import FluentIcon as FIF
 
-from app import win_input_type_options
+from app import operation_mode_options
 from app.base_combination import (
     BasePrimaryPushSettingCard,
     BasePushSettingCard,
@@ -149,12 +149,12 @@ class SettingInterface(QWidget):
             ),
             on_confirm=self._on_hard_mirror_chance_confirm,
         )
-        self.win_input_type_card = ComboBoxSettingCard(
-            "win_input_type",
+        self.operation_mode_card = ComboBoxSettingCard(
+            "operation_mode",
             FIF.CONNECT,
             QT_TRANSLATE_NOOP("ComboBoxSettingCard", "操控方式"),
             "  ",
-            texts=win_input_type_options,
+            texts=operation_mode_options,
             parent=self.game_setting_group,
         )
         self.memory_protection = SwitchSettingCard(
@@ -481,7 +481,7 @@ class SettingInterface(QWidget):
         self.game_setting_group.addSettingCard(self.auto_hard_mirror_card)
         self.game_setting_group.addSettingCard(self.last_auto_hard_mirror_card)
         self.game_setting_group.addSettingCard(self.hard_mirror_chance_card)
-        self.game_setting_group.addSettingCard(self.win_input_type_card)
+        self.game_setting_group.addSettingCard(self.operation_mode_card)
         self.game_setting_group.addSettingCard(self.memory_protection)
         self.game_setting_group.addSettingCard(self.screenshot_benchmark_card)
 
@@ -602,8 +602,8 @@ class SettingInterface(QWidget):
 
         # 再连接配置变更类交互，保证界面动作能同步刷新配置和主题。
         self.zoom_card.valueChanged.connect(self.__onZoomCardValueChanged)
-        self.win_input_type_card.valueChanged.connect(self.__onWinInputTypeChanged)
-        self.__onWinInputTypeChanged()
+        self.operation_mode_card.valueChanged.connect(self.__onOperationModeChanged)
+        self.__onOperationModeChanged()
         self.autostart_card.switchButton.checkedChanged.connect(
             self.__onAutostartCardChanged
         )
@@ -672,33 +672,25 @@ class SettingInterface(QWidget):
                 parent=self,
             )
 
-    def __onWinInputTypeChanged(self):
-        input_type = cfg.get_value("win_input_type")
-        if input_type == "background":
+    def __onOperationModeChanged(self):
+        operation_mode = cfg.get_value("operation_mode")
+        if operation_mode == "background_window":
             content = QT_TRANSLATE_NOOP(
                 "ComboBoxSettingCard",
-                "后台模式，游戏可以在后台运行，但是<font color=red>游戏不能处于最小化状态!!</font>",
+                "后台模式（移动窗口），不移动物理鼠标，尽量不干扰您使用电脑；游戏窗口不可最小化。",
             )
-            cfg.set_value("background_click", True)
-        elif input_type == "foreground":
+        elif operation_mode == "foreground_mouse":
             content = QT_TRANSLATE_NOOP(
-                "ComboBoxSettingCard", "前台模式，游戏必须在显示在最上方"
+                "ComboBoxSettingCard", "前台模式（移动鼠标），执行期间会移动物理鼠标，适合无人值守运行。"
             )
-            cfg.set_value("background_click", False)
-        elif input_type == "window_move":
-            content = QT_TRANSLATE_NOOP(
-                "ComboBoxSettingCard",
-                "基于移动窗口的后台模式，有效规避了后台模式需要移动鼠标的情况，<br/>但是性能和稳定性较差，<font color=red>不推荐长时间无人使用</font>",
-            )
-            cfg.set_value("background_click", True)
         else:
             content = QT_TRANSLATE_NOOP(
                 "ComboBoxSettingCard", "未知的输入模式，发生了错误"
             )
 
-        self.win_input_type_card.content = content
-        self.win_input_type_card.setContent(content)
-        self.win_input_type_card.retranslateUi()
+        self.operation_mode_card.content = content
+        self.operation_mode_card.setContent(content)
+        self.operation_mode_card.retranslateUi()
 
     def __onZoomCardValueChanged(self):
         BaseInfoBar.success(
@@ -739,7 +731,7 @@ class SettingInterface(QWidget):
         self.auto_hard_mirror_card.retranslateUi()
         self.last_auto_hard_mirror_card.retranslateUi()
         self.hard_mirror_chance_card.retranslateUi()
-        self.win_input_type_card.retranslateUi()
+        self.operation_mode_card.retranslateUi()
         self.minimize_to_tray_card.retranslateUi()
         self.memory_protection.retranslateUi()
         self.screenshot_benchmark_card.retranslateUi()
