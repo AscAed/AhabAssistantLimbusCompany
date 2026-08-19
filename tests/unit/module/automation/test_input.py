@@ -152,7 +152,9 @@ def test_background_input_randomized_click(mock_cfg, mock_screen):
     target_x, target_y = 50, 60
     radius = 4
 
-    with patch.object(bg_input, "get_mouse_position", return_value=(0, 0)):
+    with patch.object(bg_input, "get_mouse_position", return_value=(0, 0)), patch.object(
+        bg_input, "set_active"
+    ):
         # Default move_back=False; if it were True, get_mouse_position would be called
         bg_input.mouse_click(target_x, target_y, times=1)
 
@@ -183,7 +185,9 @@ def test_background_input_bezier_and_driver(mock_cfg, mock_screen):
     target_x, target_y = 50, 60
     radius = 4
 
-    with patch.object(bg_input, "get_mouse_position", return_value=(0, 0)):
+    with patch.object(bg_input, "get_mouse_position", return_value=(0, 0)), patch.object(
+        bg_input, "set_active"
+    ):
         bg_input.mouse_click(target_x, target_y, times=1, move_back=False)
 
     assert len(driver.moves) > 0
@@ -338,34 +342,24 @@ def test_background_drag_link_releases_when_move_fails(
     mock_mouse_up.assert_called_once_with(100, 200)
 
 
-# 7. Test WindowMoveInput.mouse_click uses randomized coords
+# 7. WindowMoveInput rejects physical input drivers
 @patch("module.automation.input_handlers.input.screen")
 @patch("module.automation.input_handlers.input.cfg")
-def test_window_move_input_randomized_click(mock_cfg, mock_screen):
+def test_window_move_input_rejects_driver(mock_cfg, mock_screen):
     mock_cfg.config.use_post_message = True
     mock_cfg.config.mouse_down_duration = 0
     mock_screen.handle.rect.return_value = (0, 0, 1920, 1080)
     mock_screen.handle.hwnd = 12345
     mock_screen.handle.isMinimized = False
 
-    driver = MockInputDriver()
-    wm_input = WindowMoveInput(driver=driver)
-    wm_input.set_driver(driver)
-
-    target_x, target_y = 300, 400
-    radius = 4
-
-    with patch.object(wm_input, "get_mouse_position", return_value=(960, 540)), \
-         patch.object(wm_input, "_set_window_pos", return_value=(0, 0)), \
-         patch.object(wm_input, "set_active"), \
-         patch("module.automation.input_handlers.input.screen.handle.set_window_pos"):
-        wm_input.mouse_click(target_x, target_y, times=1)
-
-    assert len(driver.downs) == 1
-    actual_x = driver.downs[0][0]
-    actual_y = driver.downs[0][1]
-    assert target_x - radius <= actual_x <= target_x + radius
-    assert target_y - radius <= actual_y <= target_y + radius
+    handler = WindowMoveInput(driver=object())
+    handler.is_pause = False
+    handler.restore_time = None
+    with patch.object(handler, "_set_window_pos", side_effect=RuntimeError("后台模式不支持物理输入驱动")), \
+        patch.object(handler, "_wait_for_user_idle", return_value=True), \
+        patch.object(handler, "get_mouse_position", return_value=(960, 540)):
+        with pytest.raises(RuntimeError, match="物理输入驱动"):
+            handler.mouse_click(300, 400)
 
 
 # 8. Test BackgroundInput.mouse_scroll uses descendant hwnd when found window is a child of game hwnd
@@ -374,7 +368,7 @@ def test_window_move_input_randomized_click(mock_cfg, mock_screen):
 def test_background_scroll_uses_descendant_hwnd(mock_cfg, mock_screen):
     """When WindowFromPoint returns a direct child of the game hwnd, the scroll message should
     be posted to that child (not the parent), so Unity's render sub-window receives the event.
-    Also verifies WM_SETFOCUS is sent before WM_MOUSEWHEEL so Unity's input system is active."""
+    Also verifies the wheel lands on the child hwnd that Unity is expected to read from."""
     import win32con
 
     game_hwnd = 1000
@@ -392,19 +386,14 @@ def test_background_scroll_uses_descendant_hwnd(mock_cfg, mock_screen):
          patch.object(bg_input, "_mouse_move_to"), \
          patch("win32gui.WindowFromPoint", return_value=child_hwnd), \
          patch("win32gui.GetParent", return_value=game_hwnd), \
-         patch("win32gui.SetForegroundWindow"), \
-         patch("win32api.PostMessage") as mock_post:
+        patch("win32api.PostMessage") as mock_post:
         result = bg_input.mouse_scroll(-3)
 
     assert result is True
     calls = mock_post.call_args_list
-    # Expect at least: WM_ACTIVATE (from set_active), WM_SETFOCUS, WM_MOUSEWHEEL
+    # Expect at least: WM_MOUSEMOVE and WM_MOUSEWHEEL
     messages = [c[0][1] for c in calls]
-    assert win32con.WM_SETFOCUS in messages, "WM_SETFOCUS not posted"
     assert win32con.WM_MOUSEWHEEL in messages, "WM_MOUSEWHEEL not posted"
-    # WM_SETFOCUS must come before WM_MOUSEWHEEL
-    assert messages.index(win32con.WM_SETFOCUS) < messages.index(win32con.WM_MOUSEWHEEL), \
-        "WM_SETFOCUS must be posted before WM_MOUSEWHEEL"
     # The final WM_MOUSEWHEEL must target the child hwnd
     wheel_call = next(c for c in reversed(calls) if c[0][1] == win32con.WM_MOUSEWHEEL)
     assert wheel_call[0][0] == child_hwnd, f"Expected child hwnd {child_hwnd}, got {wheel_call[0][0]}"
@@ -444,8 +433,7 @@ def test_background_scroll_resolves_child_for_foreign_hwnd(mock_cfg, mock_screen
          patch("win32gui.WindowFromPoint", return_value=foreign_hwnd), \
          patch("win32gui.GetParent", side_effect=fake_get_parent), \
          patch("win32gui.EnumChildWindows", side_effect=fake_enum_child), \
-         patch("win32gui.SetForegroundWindow"), \
-         patch("win32api.PostMessage") as mock_post:
+        patch("win32api.PostMessage") as mock_post:
         result = bg_input.mouse_scroll(-3)
 
     assert result is True

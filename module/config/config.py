@@ -21,6 +21,27 @@ from utils.singletonmeta import SingletonMeta
 
 from .config_typing import ConfigModel, TeamSetting
 
+OPERATION_MODES = frozenset({"foreground_mouse", "background_window"})
+
+
+def migrate_operation_mode(loaded_config: dict) -> str:
+    """Resolve the canonical operation mode from current or legacy settings."""
+    if "operation_mode" in loaded_config:
+        mode = loaded_config["operation_mode"]
+        if mode not in OPERATION_MODES:
+            raise ValueError(f"operation_mode 无效: {mode!r}")
+        return mode
+
+    legacy_type = loaded_config.get("win_input_type")
+    if legacy_type == "foreground":
+        return "foreground_mouse"
+    if legacy_type in {"background", "window_move"}:
+        return "background_window"
+
+    if loaded_config.get("background_click") is False:
+        return "foreground_mouse"
+    return "background_window"
+
 
 class Config(metaclass=SingletonMeta):
     def __init__(
@@ -128,11 +149,6 @@ class Config(metaclass=SingletonMeta):
         if saved_version < 1771413380:
             if self.get_value("set_win_position", True) is True:
                 loaded_config["set_win_position"] = "free"
-        if saved_version < 1771965838:
-            if self.get_value("background_click", True) is True:
-                loaded_config["win_input_type"] = "background"
-            else:
-                loaded_config["win_input_type"] = "foreground"
         if saved_version < 1772205660:
             # 迁移旧版结束后动作配置，按字段独立迁移，避免覆盖用户已设置的新字段
             # 映射表统一由 module.after_completion_types 维护；config 层只负责迁移与落盘。
@@ -270,6 +286,8 @@ class Config(metaclass=SingletonMeta):
                         loaded_config = ConfigModel(**self._defaults).model_dump()
                 if not isinstance(loaded_config.get("config_version", 0), int):
                     raise TypeError("配置文件版本号不是 int 类型")
+                if "operation_mode" not in loaded_config:
+                    loaded_config["operation_mode"] = migrate_operation_mode(loaded_config)
                 if loaded_config.get("config_version", 0) < self.config.config_version:
                     saved_version = loaded_config.get("config_version", 0)
                     loaded_config["config_version"] = self.config.config_version
@@ -605,6 +623,7 @@ class Config(metaclass=SingletonMeta):
             with open(path, "r", encoding="utf-8") as file:
                 loaded_config = self.yaml.load(file)
             if loaded_config:
+                loaded_config["operation_mode"] = migrate_operation_mode(loaded_config)
                 self.config = ConfigModel(**{**self._defaults, **loaded_config})
                 queue_in_loaded_config = loaded_config.get("teams_active_queue")
                 if queue_in_loaded_config is None:

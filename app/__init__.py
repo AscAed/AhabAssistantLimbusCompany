@@ -197,12 +197,9 @@ all_checkbox_config_name = [
     "observe_ego_gift",
 ]
 
-win_input_type_options = {
-    QT_TRANSLATE_NOOP("ComboBoxSettingCard", "前台模式 (pyautogui)"): "foreground",
-    QT_TRANSLATE_NOOP("ComboBoxSettingCard", "后台模式 (默认) (pywin32)"): "background",
-    QT_TRANSLATE_NOOP(
-        "ComboBoxSettingCard", "后台增强 (pywin32+set_window_pos)"
-    ): "window_move",
+operation_mode_options = {
+    QT_TRANSLATE_NOOP("ComboBoxSettingCard", "前台模式（移动鼠标）"): "foreground_mouse",
+    QT_TRANSLATE_NOOP("ComboBoxSettingCard", "后台模式（移动窗口）"): "background_window",
 }
 
 

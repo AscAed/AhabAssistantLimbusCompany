@@ -1,4 +1,7 @@
-from time import sleep
+import ctypes
+from contextlib import contextmanager
+from dataclasses import dataclass
+from time import monotonic, sleep
 from typing import Callable, overload
 
 import pyautogui
@@ -16,6 +19,46 @@ from . import AbstractInput
 from .bezier import generate_bezier_path
 from .delay import humanised_delay
 from .driver_interface import InputDriver
+
+INPUT_MOUSE = 0
+MOUSEEVENTF_MOVE = 0x0001
+MOUSEEVENTF_LEFTDOWN = 0x0002
+MOUSEEVENTF_LEFTUP = 0x0004
+MOUSEEVENTF_WHEEL = 0x0800
+WHEEL_DELTA = 120
+
+
+class _MouseInput(ctypes.Structure):
+    _fields_ = [
+        ("dx", ctypes.c_long),
+        ("dy", ctypes.c_long),
+        ("mouse_data", ctypes.c_ulong),
+        ("flags", ctypes.c_ulong),
+        ("time", ctypes.c_ulong),
+        ("extra_info", ctypes.c_void_p),
+    ]
+
+
+class _InputUnion(ctypes.Union):
+    _fields_ = [("mouse", _MouseInput)]
+
+
+class _Input(ctypes.Structure):
+    _anonymous_ = ("union",)
+    _fields_ = [("type", ctypes.c_ulong), ("union", _InputUnion)]
+
+
+class _LastInputInfo(ctypes.Structure):
+    _fields_ = [("cb_size", ctypes.c_uint), ("dw_time", ctypes.c_uint)]
+
+
+@dataclass(frozen=True)
+class _MouseLease:
+    game_hwnd: int
+    original_foreground: int
+    original_position: tuple[int, int]
+    original_cursor: tuple[int, int]
+    was_paused: bool
 
 key_list = {
     "a": 0x41,
@@ -308,15 +351,16 @@ class Input(WinAbstractInput, metaclass=SingletonMeta):
         Args:
             coordinate (tuple): 坐标元组 (x, y)
         """
-        start_pos = self.get_mouse_position()
-        target_pos = (coordinate[0], coordinate[1])
-        path = generate_bezier_path(start_pos, target_pos)
-        for px, py in path:
-            if self.driver:
+        target_pos = (int(coordinate[0]), int(coordinate[1]))
+        if self.driver:
+            start_pos = self.get_mouse_position()
+            path = generate_bezier_path(start_pos, target_pos, steps=12)
+            for px, py in path:
                 self.driver.mouse_move(px, py)
-            else:
-                pyautogui.moveTo(px, py)
-            sleep(humanised_delay(0.005, "gaussian"))
+        else:
+            # pyautogui's zero-duration move is synchronous and avoids a fixed
+            # per-point delay that made every long move visibly stutter.
+            pyautogui.moveTo(*target_pos)
         self.wait_pause()
 
     def mouse_drag_link(
@@ -945,37 +989,393 @@ class BackgroundInput(WinAbstractInput, metaclass=SingletonMeta):
 
 
 class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
-    """基于移动窗口位置改变光标相对位置的输入方式"""
+    """后台模式输入：移动游戏窗口，并为 Unity 建立短暂的输入焦点租约。"""
+
+    USER_IDLE_REQUIRED_MS = 500
+    USER_IDLE_TIMEOUT_SECONDS = 10.0
+    FOCUS_ACQUIRE_TIMEOUT_SECONDS = 0.5
+    INPUT_SETTLE_MS = 50  # Unity input event processing time
 
     def mouse_to_blank(self, coordinate=(1, 1), move_back=False) -> None:
         # FIXME: 移动窗口来防止遮蔽不是一个好选择
         return
 
-    def mouse_scroll(self, direction: int = 120, x: int = None, y: int = None) -> bool:
+    def _send_mouse_input(self, flags: int, mouse_data: int = 0) -> bool:
+        operation = {
+            MOUSEEVENTF_MOVE: "move",
+            MOUSEEVENTF_LEFTDOWN: "left_down",
+            MOUSEEVENTF_LEFTUP: "left_up",
+            MOUSEEVENTF_WHEEL: "wheel",
+        }.get(flags, f"flags_{flags}")
+        event = _Input(
+            type=INPUT_MOUSE,
+            mouse=_MouseInput(
+                dx=0,
+                dy=0,
+                mouse_data=mouse_data,
+                flags=flags,
+                time=0,
+                extra_info=None,
+            ),
+        )
+        sent = ctypes.windll.user32.SendInput(1, ctypes.byref(event), ctypes.sizeof(_Input))
+        success = sent == 1
+        log.debug(
+            "后台 SendInput: operation=%s flags=%s mouse_data=%s sent=%s success=%s",
+            operation,
+            flags,
+            mouse_data,
+            sent,
+            success,
+        )
+        return success
+
+    @staticmethod
+    def _get_last_input_elapsed_ms() -> int | None:
+        info = _LastInputInfo(cb_size=ctypes.sizeof(_LastInputInfo))
+        if not ctypes.windll.user32.GetLastInputInfo(ctypes.byref(info)):
+            return None
+        tick = ctypes.windll.kernel32.GetTickCount()
+        return max(0, int(tick - info.dw_time))
+
+    def _wait_for_user_idle(self) -> bool:
+        log.debug(
+            "lease_wait_start: required_ms=%s timeout_s=%s",
+            self.USER_IDLE_REQUIRED_MS,
+            self.USER_IDLE_TIMEOUT_SECONDS,
+        )
+        deadline = monotonic() + self.USER_IDLE_TIMEOUT_SECONDS
+        while monotonic() < deadline:
+            if self.is_pause:
+                self.wait_pause()
+            elapsed = self._get_last_input_elapsed_ms()
+            if elapsed is not None and elapsed >= self.USER_IDLE_REQUIRED_MS:
+                # Give Unity time to process input events before restoring foreground
+                sleep(self.INPUT_SETTLE_MS / 1000.0)
+                return True
+            sleep(0.05)
+        log.warning("后台输入等待用户空闲超时: timeout=%ss", self.USER_IDLE_TIMEOUT_SECONDS)
         return False
 
-    def mouse_drag(self, x, y, drag_time=0.1, dx=0, dy=0, move_back=True) -> None:
-        rx, ry = self._randomize_coords(x, y)
-        pos = self._set_window_pos(rx, ry)
-        self.set_active()
-        self.mouse_down(rx, ry)
-        self._window_move_to(rx + dx, ry + dy, duration=drag_time)
-        # 注入随机拖拽延迟
-        sleep(humanised_delay(drag_time * 0.3 if drag_time * 0.3 > 0.2 else 0.2, "gaussian"))
-        self.mouse_up(rx + dx, ry + dy)
-        screen.handle.set_window_pos(*pos)
+    def _activate_for_lease(self, hwnd: int) -> bool:
+        # Windows may reject cross-process activation while another thread owns
+        # the foreground lock. Temporarily attach input queues for this single
+        # transaction, then detach immediately after the activation attempt.
+        try:
+            win32gui.SetForegroundWindow(hwnd)
+        except Exception as exc:
+            log.warning("后台输入焦点租约获取失败: hwnd=%s error=%s", hwnd, exc)
+            return False
 
-    def mouse_drag_down(self, x, y, reverse=1, move_back=True) -> None:
+        deadline = monotonic() + self.FOCUS_ACQUIRE_TIMEOUT_SECONDS
+        while monotonic() < deadline:
+            if win32gui.GetForegroundWindow() == hwnd:
+                return True
+            sleep(0.01)
+
+        try:
+            user32 = ctypes.windll.user32
+            foreground = int(user32.GetForegroundWindow())
+            target_thread = int(user32.GetWindowThreadProcessId(hwnd, None))
+            foreground_thread = int(user32.GetWindowThreadProcessId(foreground, None)) if foreground else 0
+            current_thread = int(user32.GetCurrentThreadId())
+            attached = bool(
+                foreground_thread
+                and foreground_thread != current_thread
+                and foreground_thread != target_thread
+                and user32.AttachThreadInput(current_thread, foreground_thread, True)
+            )
+            try:
+                win32gui.SetForegroundWindow(hwnd)
+                if target_thread != current_thread:
+                    user32.AttachThreadInput(current_thread, target_thread, True)
+                deadline = monotonic() + self.FOCUS_ACQUIRE_TIMEOUT_SECONDS
+                while monotonic() < deadline:
+                    if win32gui.GetForegroundWindow() == hwnd:
+                        return True
+                    sleep(0.01)
+            finally:
+                if target_thread != current_thread:
+                    user32.AttachThreadInput(current_thread, target_thread, False)
+                if attached:
+                    user32.AttachThreadInput(current_thread, foreground_thread, False)
+        except Exception as exc:
+            log.debug("后台输入焦点租约附加线程尝试失败: hwnd=%s error=%s", hwnd, exc)
+        log.warning("后台输入焦点租约验证失败: hwnd=%s", hwnd)
+        return False
+
+    def _restore_foreground(self, hwnd: int) -> bool:
+        if not hwnd:
+            return True
+        try:
+            if not win32gui.IsWindow(hwnd):
+                log.warning("后台输入恢复原前台窗口失败：句柄已失效 hwnd=%s", hwnd)
+                return False
+            win32gui.SetForegroundWindow(hwnd)
+        except Exception as exc:
+            log.warning("后台输入恢复原前台窗口失败: hwnd=%s error=%s", hwnd, exc)
+            return False
+
+        deadline = monotonic() + self.FOCUS_ACQUIRE_TIMEOUT_SECONDS
+        while monotonic() < deadline:
+            if win32gui.GetForegroundWindow() == hwnd:
+                return True
+            sleep(0.01)
+
+        # The worker thread may not own the foreground lock. Attach only for
+        # this bounded restoration attempt, then detach before returning.
+        try:
+            user32 = ctypes.windll.user32
+            current_thread = int(user32.GetCurrentThreadId())
+            target_thread = int(user32.GetWindowThreadProcessId(hwnd, None))
+            foreground = int(user32.GetForegroundWindow())
+            foreground_thread = int(user32.GetWindowThreadProcessId(foreground, None)) if foreground else 0
+            attached_foreground = bool(
+                foreground_thread
+                and foreground_thread != current_thread
+                and foreground_thread != target_thread
+                and user32.AttachThreadInput(current_thread, foreground_thread, True)
+            )
+            attached_target = False
+            try:
+                if target_thread != current_thread:
+                    attached_target = bool(user32.AttachThreadInput(current_thread, target_thread, True))
+                win32gui.SetForegroundWindow(hwnd)
+                deadline = monotonic() + self.FOCUS_ACQUIRE_TIMEOUT_SECONDS
+                while monotonic() < deadline:
+                    if win32gui.GetForegroundWindow() == hwnd:
+                        return True
+                    sleep(0.01)
+            finally:
+                if attached_target:
+                    user32.AttachThreadInput(current_thread, target_thread, False)
+                if attached_foreground:
+                    user32.AttachThreadInput(current_thread, foreground_thread, False)
+        except Exception as exc:
+            log.debug("后台输入恢复前台附加线程尝试失败: hwnd=%s error=%s", hwnd, exc)
+        log.warning("后台输入恢复原前台窗口未通过验证: hwnd=%s", hwnd)
+        return False
+
+    def _begin_mouse_lease(self, x: int, y: int) -> _MouseLease | None:
+        game_hwnd = screen.handle.hwnd
+        if not game_hwnd:
+            log.warning("后台输入无法建立焦点租约：游戏窗口句柄为空")
+            return None
+        original_foreground = win32gui.GetForegroundWindow()
+        original_cursor = tuple(self.get_mouse_position())
+        was_paused = bool(self.is_pause)
+        if not self._wait_for_user_idle():
+            return None
+
+        original_position = self._set_window_pos(int(x), int(y))
+        if not self._activate_for_lease(game_hwnd):
+            try:
+                self._restore_window_position(original_position)
+            finally:
+                self._restore_foreground(original_foreground)
+            return None
+        log.debug(
+            "lease_acquired: game_hwnd=%s original_foreground=%s cursor=%s paused=%s",
+            game_hwnd,
+            original_foreground,
+            original_cursor,
+            was_paused,
+        )
+        return _MouseLease(
+            game_hwnd,
+            original_foreground,
+            original_position,
+            original_cursor,
+            was_paused,
+        )
+
+    def _restore_window_position(self, position: tuple[int, int]) -> bool:
+        hwnd = screen.handle.hwnd
+        if not hwnd or not win32gui.IsWindow(hwnd):
+            log.warning("后台输入恢复游戏窗口失败：句柄无效 hwnd=%s", hwnd)
+            return False
+        try:
+            win32gui.SetWindowPos(
+                hwnd,
+                None,
+                int(position[0]),
+                int(position[1]),
+                0,
+                0,
+                win32con.SWP_NOSIZE
+                | win32con.SWP_NOZORDER
+                | win32con.SWP_NOACTIVATE
+                | win32con.SWP_NOSENDCHANGING,
+            )
+            restored = tuple(screen.handle.rect()[:2]) == tuple(position)
+        except Exception as exc:
+            log.warning("后台输入恢复游戏窗口位置失败: error=%s", exc)
+            return False
+        if not restored:
+            log.warning("后台输入恢复游戏窗口位置校验失败: expected=%s", position)
+        return restored
+
+    def _end_mouse_lease(self, lease: _MouseLease) -> bool:
+        restored = True
+        restored = self._restore_window_position(lease.original_position)
+        restored = self._restore_foreground(lease.original_foreground) and restored
+        log.debug(
+            "lease_released: game_hwnd=%s original_foreground=%s cursor=%s paused=%s restored=%s",
+            lease.game_hwnd,
+            lease.original_foreground,
+            lease.original_cursor,
+            lease.was_paused,
+            restored,
+        )
+        return restored
+
+    @contextmanager
+    def _mouse_lease(self, x: int, y: int):
+        lease = self._begin_mouse_lease(x, y)
+        operation_error = None
+        try:
+            yield lease
+        except BaseException as exc:
+            operation_error = exc
+            raise
+        finally:
+            if lease is not None:
+                if not self._end_mouse_lease(lease):
+                    restore_error = RuntimeError("后台输入租约释放失败，窗口或前台恢复未通过验证")
+                    if operation_error is None:
+                        raise restore_error
+                    log.error("后台输入租约释放失败，保留原始操作异常: %s", operation_error)
+
+    def _mouse_move_heartbeat(self) -> bool:
+        return self._send_mouse_input(MOUSEEVENTF_MOVE)
+
+    def mouse_scroll(self, direction: int = -3, x: int = None, y: int = None) -> bool:
+        if x is None or y is None:
+            height = cfg.set_win_size
+            x, y = int(height * 16 / 9) // 2, height // 2
+
+        with self._mouse_lease(int(x), int(y)) as lease:
+            if lease is None:
+                return False
+            if not self._mouse_move_heartbeat():
+                log.warning("后台滚轮鼠标位置心跳投递失败: game=%s", lease.game_hwnd)
+                return False
+            if not self._send_mouse_input(MOUSEEVENTF_WHEEL, int(direction * WHEEL_DELTA)):
+                log.warning(
+                    "后台滚轮 SendInput 失败: game=%s direction=%s",
+                    lease.game_hwnd,
+                    direction,
+                )
+                return False
+            log.debug(
+                "后台滚轮已通过焦点租约投递: game=%s direction=%s",
+                lease.game_hwnd,
+                direction,
+            )
+            # Give Unity time to process wheel events
+            sleep(self.INPUT_SETTLE_MS / 1000.0)
+            return True
+
+
+    def batch_mouse_scroll(self, direction: int = -3, count: int = 1, x: int = None, y: int = None) -> bool:
+        """在单个焦点租约内发送多个滚轮事件，提高效率。"""
+        if x is None or y is None:
+            height = cfg.set_win_size
+            x, y = int(height * 16 / 9) // 2, height // 2
+
+        with self._mouse_lease(int(x), int(y)) as lease:
+            if lease is None:
+                return False
+            if not self._mouse_move_heartbeat():
+                log.warning("后台批量滚轮鼠标位置心跳失败: game=%s", lease.game_hwnd)
+                return False
+            
+            # Send multiple wheel events in the same lease
+            for i in range(count):
+                if not self._send_mouse_input(MOUSEEVENTF_WHEEL, int(direction * WHEEL_DELTA)):
+                    log.warning(
+                        "后台批量滚轮 SendInput 失败: game=%s direction=%s index=%s/%s",
+                        lease.game_hwnd,
+                        direction,
+                        i+1,
+                        count,
+                    )
+                    return False
+                # Small delay between wheel events for Unity to process
+                if i < count - 1:
+                    sleep(0.01)
+            
+            log.debug(
+                "后台批量滚轮已通过焦点租约投递: game=%s direction=%s count=%s",
+                lease.game_hwnd,
+                direction,
+                count,
+            )
+            # Give Unity time to process all wheel events
+            sleep(self.INPUT_SETTLE_MS / 1000.0)
+            return True
+
+
+    def mouse_drag(self, x, y, drag_time=0.1, dx=0, dy=0, move_back=True) -> bool:
+        rx, ry = self._randomize_coords(x, y)
+        with self._mouse_lease(rx, ry) as lease:
+            if lease is None:
+                return False
+            pressed = False
+            try:
+                if not self._mouse_move_heartbeat():
+                    log.warning("后台拖拽鼠标位置心跳失败: game=%s", lease.game_hwnd)
+                    return False
+                if not self._send_mouse_input(MOUSEEVENTF_LEFTDOWN):
+                    log.warning("后台拖拽按下失败: game=%s", lease.game_hwnd)
+                    return False
+                pressed = True
+                if not self._window_move_to(rx + dx, ry + dy, duration=drag_time):
+                    log.warning("后台拖拽窗口移动失败")
+                    return False
+                if not self._mouse_move_heartbeat():
+                    log.warning("后台拖拽移动心跳失败: game=%s", lease.game_hwnd)
+                    return False
+                sleep(humanised_delay(drag_time))
+                if not self._send_mouse_input(MOUSEEVENTF_LEFTUP):
+                    log.warning("后台拖拽抬起失败: game=%s", lease.game_hwnd)
+                    return False
+                pressed = False
+                return True
+            finally:
+                if pressed:
+                    self._send_mouse_input(MOUSEEVENTF_LEFTUP)
+
+    def mouse_drag_down(self, x, y, reverse=1, move_back=True) -> bool:
         scale = cfg.set_win_size / 1080
-        self.set_active()
         rx, ry = self._randomize_coords(x, y)
-        pos = self._set_window_pos(rx, ry)
-        self.mouse_down(rx, ry)
-        end_y = ry + int(500 * scale * reverse)
-        self._window_move_to(rx, end_y, duration=0.6)
-        self.mouse_up(rx, end_y)
-
-        screen.handle.set_window_pos(*pos)
+        with self._mouse_lease(rx, ry) as lease:
+            if lease is None:
+                return False
+            pressed = False
+            try:
+                if not self._mouse_move_heartbeat():
+                    log.warning("后台向下拖拽鼠标位置心跳失败: game=%s", lease.game_hwnd)
+                    return False
+                if not self._send_mouse_input(MOUSEEVENTF_LEFTDOWN):
+                    log.warning("后台向下拖拽按下失败: game=%s", lease.game_hwnd)
+                    return False
+                pressed = True
+                end_y = ry + int(500 * scale * reverse)
+                if not self._window_move_to(rx, end_y, duration=0.6):
+                    log.warning("后台向下拖拽窗口移动失败")
+                    return False
+                if not self._mouse_move_heartbeat():
+                    log.warning("后台向下拖拽移动心跳失败: game=%s", lease.game_hwnd)
+                    return False
+                if not self._send_mouse_input(MOUSEEVENTF_LEFTUP):
+                    log.warning("后台向下拖拽抬起失败: game=%s", lease.game_hwnd)
+                    return False
+                pressed = False
+                return True
+            finally:
+                if pressed:
+                    self._send_mouse_input(MOUSEEVENTF_LEFTUP)
 
     def mouse_drag_link(
         self,
@@ -983,21 +1383,47 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
         drag_time=0.1,
         move_back=False,
         resolve_last_position: Callable[[], tuple[int, int] | list[int] | None] | None = None,
-    ) -> None:
+    ) -> bool:
         start_x, start_y = self._randomize_coords(position[0][0], position[0][1])
-        raw_pos = self._set_window_pos(start_x, start_y)
-        self.set_active()
-        self.mouse_down(start_x, start_y)
-        for pos in position:
-            tx, ty = self._randomize_coords(pos[0], pos[1])
-            self._window_move_to(tx, ty, duration=drag_time)
+        with self._mouse_lease(start_x, start_y) as lease:
+            if lease is None:
+                return False
+            pressed = False
+            try:
+                if not self._mouse_move_heartbeat():
+                    log.warning("后台连线鼠标位置心跳失败: game=%s", lease.game_hwnd)
+                    return False
+                if not self._send_mouse_input(MOUSEEVENTF_LEFTDOWN):
+                    log.warning("后台连线按下失败: game=%s", lease.game_hwnd)
+                    return False
+                pressed = True
+                for pos in position:
+                    tx, ty = self._randomize_coords(pos[0], pos[1])
+                    if not self._window_move_to(tx, ty, duration=drag_time):
+                        log.warning("后台连线窗口移动失败")
+                        return False
+                    if not self._mouse_move_heartbeat():
+                        log.warning("后台连线移动心跳失败: game=%s", lease.game_hwnd)
+                        return False
 
-        last = resolve_last_position() if resolve_last_position is not None else position[-1]
-        if last is None:
-            last = position[-1]
-        last_x, last_y = self._randomize_coords(last[0], last[1])
-        self.mouse_up(last_x, last_y)
-        screen.handle.set_window_pos(*raw_pos)
+                last = resolve_last_position() if resolve_last_position is not None else position[-1]
+                if last is None:
+                    last = position[-1]
+                last_x, last_y = self._randomize_coords(last[0], last[1])
+                if not self._window_move_to(last_x, last_y, duration=drag_time):
+                    log.warning("后台连线末端窗口移动失败")
+                    return False
+                if not self._mouse_move_heartbeat():
+                    log.warning("后台连线末端移动心跳失败: game=%s", lease.game_hwnd)
+                    return False
+                if not self._send_mouse_input(MOUSEEVENTF_LEFTUP):
+                    log.warning("后台连线抬起失败: game=%s", lease.game_hwnd)
+                    return False
+                pressed = False
+                return True
+            finally:
+                if pressed:
+                    self._send_mouse_input(MOUSEEVENTF_LEFTUP)
 
     def mouse_click_blank(self, coordinate=(1, 1), times=1, move_back=False) -> bool:
         msg = "点击（1，1）空白位置"
@@ -1005,21 +1431,20 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
         x = coordinate[0] + 5
         y = coordinate[1] + 5
         # _randomize_coords is applied inside mouse_click for WindowMoveInput
-        self.mouse_click(x, y, times=times)
-        return True
+        return self.mouse_click(x, y, times=times)
 
     def _window_move_to(
         self, x_or_pos: int | tuple[int, int], y: int = -32000, duration: float = 0
-    ) -> tuple[int, int]:
+    ) -> bool:
         if duration <= 0:
-            return self._set_window_pos(x_or_pos, y)
+            self._set_window_pos(x_or_pos, y)
+            return True
         else:
             if isinstance(x_or_pos, tuple):
                 target_x, target_y = x_or_pos
             else:
                 target_x = x_or_pos
                 target_y = y
-        raw_pos = screen.handle.rect()[:2]
         current_x, current_y = screen.handle.mouse_pos_to_client_mouse(
             *self.get_mouse_position()
         )
@@ -1027,10 +1452,16 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
         step_time = duration / max(1, len(path))
         for px, py in path:
             self._set_window_pos(px, py)
+            if not self._mouse_move_heartbeat():
+                log.warning("后台拖拽窗口移动心跳失败，中止路径")
+                return False
             sleep(humanised_delay(step_time, "gaussian"))
 
         self._set_window_pos(target_x, target_y)
-        return raw_pos
+        if not self._mouse_move_heartbeat():
+            log.warning("后台拖拽窗口末端心跳失败")
+            return False
+        return True
 
     @overload
     def _set_window_pos(self, x_or_pos: int, y: int) -> tuple[int, int]: ...
@@ -1048,9 +1479,7 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
         else:
             x = x_or_pos
         if screen.handle.isMinimized:
-            screen.handle.set_window_transparent()
-            screen.handle.restore()
-            sleep(0.1)  # 先恢复窗口,防止被放在左上角
+            raise RuntimeError("后台模式不支持最小化游戏窗口")
         original_rect = screen.handle.rect()
         mouse_pos = self.get_mouse_position()
         x = int(x)
@@ -1063,41 +1492,29 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
             dy = 0
 
         if self.driver:
-            self.driver.mouse_move(mouse_pos[0] + x, mouse_pos[1] + y)
-        else:
-            win32gui.SetWindowPos(
-                hwnd,
-                None,
-                mouse_pos[0] - x + dx,
-                mouse_pos[1] - y + dy,
-                0,
-                0,
-                win32con.SWP_NOSIZE
-                | win32con.SWP_NOZORDER
-                | win32con.SWP_NOACTIVATE
-                | win32con.SWP_NOSENDCHANGING
-                | win32con.SWP_NOREDRAW,
-            )
+            raise RuntimeError("后台模式不支持物理输入驱动")
+        if not hwnd or not win32gui.IsWindow(hwnd):
+            raise RuntimeError("后台模式游戏窗口句柄无效")
+        moved = win32gui.SetWindowPos(
+            hwnd,
+            None,
+            mouse_pos[0] - x + dx,
+            mouse_pos[1] - y + dy,
+            0,
+            0,
+            win32con.SWP_NOSIZE
+            | win32con.SWP_NOZORDER
+            | win32con.SWP_NOACTIVATE
+            | win32con.SWP_NOSENDCHANGING,
+        )
+        if moved is False:
+            raise RuntimeError("后台模式移动游戏窗口失败")
 
         return original_rect[:2]
 
     def set_active(self):
-        """将游戏窗口设置为输入焦点以让 Unity 接受输入事件"""
-        hwnd = screen.handle.hwnd
-        if hwnd:
-            # 如果最小化则显示
-            if screen.handle.isMinimized:
-                screen.handle.set_window_transparent()
-                screen.handle.restore()
-                sleep(0.5)
-
-            # 发送激活消息（但不改变Z序）
-            if self.use_post_message:
-                win32api.PostMessage(hwnd, win32con.WM_ACTIVATE, win32con.WA_ACTIVE, 0)
-            else:
-                win32gui.SendMessage(hwnd, win32con.WM_ACTIVATE, win32con.WA_ACTIVE, 0)
-        else:
-            log.error("未初始化hwnd")
+        """后台模式不抢占前台焦点，保留接口以兼容旧调用方。"""
+        return
 
     def key_down(self, key: str):
         """键盘按键按下
@@ -1138,7 +1555,6 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
         Args:
             key (str): 按键名称
         """
-        self.set_active()
         self.key_down(key)
         sleep(humanised_delay(0.05, "gaussian"))
         self.key_up(key)
@@ -1179,16 +1595,9 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
         if self.driver:
             self.driver.mouse_down(int(x), int(y))
             return
-        x = int(x)
-        y = int(y)
-        hwnd = screen.handle.hwnd
-        long_positon = win32api.MAKELONG(x, y)
-        if self.use_post_message:
-            win32api.PostMessage(hwnd, win32con.WM_LBUTTONDOWN, 0, long_positon)
-            sleep(0.02 + cfg.config.mouse_down_duration)
-        else:
-            win32api.SendMessage(hwnd, win32con.WM_LBUTTONDOWN, 0, long_positon)
-            sleep(0.01)
+        if not self._send_mouse_input(MOUSEEVENTF_LEFTDOWN):
+            raise RuntimeError("后台鼠标按下失败")
+        sleep(0.02 + cfg.config.mouse_down_duration)
 
     def mouse_up(self, x, y):
         """鼠标左键抬起
@@ -1199,33 +1608,47 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
         if self.driver:
             self.driver.mouse_up(int(x), int(y))
             return
-        x = int(x)
-        y = int(y)
-        hwnd = screen.handle.hwnd
-        long_positon = win32api.MAKELONG(x, y)
-        if self.use_post_message:
-            win32api.PostMessage(hwnd, win32con.WM_LBUTTONUP, 0, long_positon)
-            sleep(0.02)
-        else:
-            win32api.SendMessage(hwnd, win32con.WM_LBUTTONUP, 0, long_positon)
-            sleep(0.01)
+        if not self._send_mouse_input(MOUSEEVENTF_LEFTUP):
+            raise RuntimeError("后台鼠标抬起失败")
+        sleep(0.02)
 
     def mouse_click(self, x, y, times=1, move_back=False) -> bool:
         rx, ry = self._randomize_coords(x, y)
         msg = f"点击位置:({x},{y}) -> 随机偏移后:({rx},{ry})"
         log.debug(msg, stacklevel=2)
-        pos = None
-        for _ in range(times):
-            if not pos:
-                pos = self._set_window_pos(rx, ry)
-            else:
-                rx, ry = self._randomize_coords(x, y)
-                self._set_window_pos(rx, ry)
-            self.set_active()
-            self.mouse_down(rx, ry)
-            sleep(humanised_delay(0.05, "gaussian"))
-            self.mouse_up(rx, ry)
-        assert pos is not None
-        screen.handle.set_window_pos(*pos)
-        self.wait_pause()
-        return True
+        with self._mouse_lease(rx, ry) as lease:
+            if lease is None:
+                return False
+            pressed = False
+            try:
+                for index in range(times):
+                    if index:
+                        rx, ry = self._randomize_coords(x, y)
+                        self._set_window_pos(rx, ry)
+                    # SendInput uses the unchanged physical cursor position.
+                    # A zero-distance move refreshes Unity's current hit-test
+                    # target after the game window is aligned beneath it.
+                    if not self._mouse_move_heartbeat():
+                        log.warning("后台点击鼠标位置心跳失败: game=%s", lease.game_hwnd)
+                        return False
+                    if not self._send_mouse_input(MOUSEEVENTF_LEFTDOWN):
+                        log.warning("后台点击按下失败: game=%s", lease.game_hwnd)
+                        return False
+                    pressed = True
+                    sleep(humanised_delay(0.05, "gaussian"))
+                    if not self._send_mouse_input(MOUSEEVENTF_LEFTUP):
+                        log.warning("后台点击抬起失败: game=%s", lease.game_hwnd)
+                        return False
+                    pressed = False
+                    if times > 1 and index < times - 1:
+                        sleep(humanised_delay(0.1, "gaussian"))
+                self.wait_pause()
+                # Give Unity time to process input events before restoring foreground
+                sleep(self.INPUT_SETTLE_MS / 1000.0)
+                return True
+            finally:
+                if pressed:
+                    self._send_mouse_input(MOUSEEVENTF_LEFTUP)
+
+
+BackgroundWindowInput = WindowMoveInput

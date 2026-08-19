@@ -67,39 +67,84 @@ class Automation(metaclass=SingletonMeta):
                 log.debug("使用基于PyMiniTouch的通用模拟器输入模块")
                 self.input_handler = SimulatorControl.connection_device
         else:
-            input_type = cfg.win_input_type
-            if input_type == "background":
-                from .input_handlers.input import BackgroundInput
-
-                log.debug("使用后台点击模块")
-                self.input_handler = BackgroundInput()
-            elif input_type == "foreground":
+            operation_mode = cfg.operation_mode
+            if operation_mode == "foreground_mouse":
                 from .input_handlers.input import Input
 
-                log.debug("使用前台点击模块")
+                log.debug("使用前台模式（移动鼠标）")
                 self.input_handler = Input()
-            elif input_type == "window_move":
-                from .input_handlers.input import WindowMoveInput
+            elif operation_mode == "background_window":
+                from .input_handlers.input import BackgroundWindowInput
 
-                log.debug("使用基于窗口移动的后台点击模块")
-                self.input_handler = WindowMoveInput()
+                log.debug("使用后台模式（移动窗口）")
+                self.input_handler = BackgroundWindowInput()
         if self.input_handler is None:
-            from .input_handlers.input import BackgroundInput
+            from .input_handlers.input import BackgroundWindowInput
 
-            self.input_handler = BackgroundInput()
+            self.input_handler = BackgroundWindowInput()
         assert isinstance(self.input_handler, AbstractInput), "输入处理器必须是AbstractInput的实例"
-        self.mouse_click = self.input_handler.mouse_click
-        self.mouse_click_blank = self.input_handler.mouse_click_blank
-        self.mouse_drag = self.input_handler.mouse_drag
-        self.mouse_drag_down = self.input_handler.mouse_drag_down
-        self.mouse_scroll = self.input_handler.mouse_scroll
+        self._input_mouse_click = self.input_handler.mouse_click
+        self._input_mouse_click_blank = self.input_handler.mouse_click_blank
+        self._input_mouse_drag = self.input_handler.mouse_drag
+        self._input_mouse_drag_down = self.input_handler.mouse_drag_down
+        self._input_mouse_drag_link = self.input_handler.mouse_drag_link
+        self._input_mouse_scroll = self.input_handler.mouse_scroll
+        # Batch scroll binding for WindowMoveInput efficiency
+        self._input_batch_mouse_scroll = getattr(self.input_handler, 'batch_mouse_scroll', None)
+        self.mouse_click = self._mouse_click
+        self.mouse_click_blank = self._mouse_click_blank
+        self.mouse_drag = self._mouse_drag
+        self.mouse_drag_down = self._mouse_drag_down
+        self.mouse_drag_link = self._mouse_drag_link
+        self.mouse_scroll = self._mouse_scroll
+        self.batch_mouse_scroll = self._batch_mouse_scroll if self._input_batch_mouse_scroll else None
         self.set_pause = self.input_handler.set_pause
         self.wait_pause = self.input_handler.wait_pause
         self.mouse_to_blank = self.input_handler.mouse_to_blank
-        self.mouse_drag_link = self.input_handler.mouse_drag_link
         self.key_press = self.input_handler.key_press
         self.input_text = self.input_handler.input_text
         self.memory_protection = cfg.memory_protection
+
+    @staticmethod
+    def _require_input_success(operation: str, result):
+        if result is False:
+            raise RuntimeError(f"后台输入操作失败: {operation}")
+        return result
+
+    def _mouse_click(self, *args, **kwargs):
+        return self._require_input_success(
+            "mouse_click", self._input_mouse_click(*args, **kwargs)
+        )
+
+    def _mouse_click_blank(self, *args, **kwargs):
+        return self._require_input_success(
+            "mouse_click_blank", self._input_mouse_click_blank(*args, **kwargs)
+        )
+
+    def _mouse_drag(self, *args, **kwargs):
+        return self._require_input_success(
+            "mouse_drag", self._input_mouse_drag(*args, **kwargs)
+        )
+
+    def _mouse_drag_down(self, *args, **kwargs):
+        return self._require_input_success(
+            "mouse_drag_down", self._input_mouse_drag_down(*args, **kwargs)
+        )
+
+    def _mouse_drag_link(self, *args, **kwargs):
+        return self._require_input_success(
+            "mouse_drag_link", self._input_mouse_drag_link(*args, **kwargs)
+        )
+
+    def _mouse_scroll(self, *args, **kwargs):
+        return self._require_input_success(
+            "mouse_scroll", self._input_mouse_scroll(*args, **kwargs)
+        )
+
+    def _batch_mouse_scroll(self, *args, **kwargs):
+        return self._require_input_success(
+            "batch_mouse_scroll", self._input_batch_mouse_scroll(*args, **kwargs)
+        )
 
     def check_pause(self) -> bool:
         """
@@ -275,6 +320,7 @@ class Automation(metaclass=SingletonMeta):
         start_time = time.time()
         screenshot_interval_time = cfg.screenshot_interval if cfg.screenshot_interval else 0.85
         is_game_die = False
+        failed_attempts = 0
         while True:
             try:
                 if time.time() - self.last_screenshot_time < screenshot_interval_time:
@@ -291,14 +337,21 @@ class Automation(metaclass=SingletonMeta):
                     self.last_screenshot_time = time.time()
                     return result
                 else:
-                    return None
+                    failed_attempts += 1
             except withOutGameWinError as e:
                 log.error(f"截图失败: {e}")
                 is_game_die = True
             except Exception as e:
                 log.error(f"截图失败:{e}")
+                failed_attempts += 1
+                if cfg.operation_mode == "background_window" and failed_attempts >= 3:
+                    raise RuntimeError("后台模式连续截图失败，已安全停止") from e
             time.sleep(1)
+            if cfg.operation_mode == "background_window" and failed_attempts >= 3:
+                raise RuntimeError("后台模式连续截图失败，已安全停止")
             if time.time() - start_time > 60 or is_game_die:
+                if cfg.operation_mode == "background_window":
+                    raise RuntimeError("后台模式截图超时，已安全停止")
                 log.error("截图超时，尝试重启游戏")
                 import win32process
 
