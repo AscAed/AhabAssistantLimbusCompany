@@ -78,7 +78,7 @@ def import_team_settings(
         - missing_fields: 缺失的必需字段列表，如果所有字段都存在则为空列表
     """
     try:
-        yaml = YAML()
+        yaml = YAML(typ="safe")
         with open(file_path, "r", encoding="utf-8") as f:
             data = yaml.load(f)
 
