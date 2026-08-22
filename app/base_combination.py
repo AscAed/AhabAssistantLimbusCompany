@@ -1735,6 +1735,7 @@ class ObserveGiftSelectionRow(QFrame):
         self.row_label.setText(labels["row"])
         self.col_label.setText(labels["col"])
         self.remove_button.setToolTip(self.tr("移除或清空当前控件组"))
+        self.remove_button.setAccessibleName(self.tr("移除或清空当前控件组"))
 
         current_selection = self.get_selection()
         self.system_combo.blockSignals(True)
