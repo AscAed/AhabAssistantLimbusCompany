@@ -34,3 +34,7 @@
 ## 2025-02-12 - MessageBox Default Buttons Affordance
 **Learning:** In `qfluentwidgets`, the default `yesButton` and `cancelButton` provided by the base `MessageBox` class do not automatically use a pointing hand cursor. When creating custom dialogs by subclassing `MessageBox`, failing to explicitly set the cursor for these buttons leads to inconsistent interaction cues compared to other UI elements.
 **Action:** Always explicitly set `self.yesButton.setCursor(Qt.CursorShape.PointingHandCursor)` and `self.cancelButton.setCursor(Qt.CursorShape.PointingHandCursor)` (if not hidden) in the `__init__` of any custom `MessageBox` subclass to ensure consistent visual affordance.
+
+## 2025-02-12 - Upgrading translation with accessible name
+**Learning:** When updating UI translations in PySide6 with qfluentwidgets, particularly for icon-only buttons, translating just the tooltip is insufficient for screen readers. The `setAccessibleName` must also be dynamically updated during translation updates (e.g., in `retranslateUi` or similar methods).
+**Action:** When adding or updating translation logic for UI components, always ensure that `setAccessibleName` is updated alongside `setToolTip` to maintain accessibility when language settings change.
