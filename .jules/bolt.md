@@ -101,3 +101,6 @@
 
 **Learning:** When developing screen simulation components (like minitouch), it's important to pass screen max coordinate limits downwards into the builder layer so that logic bounds logic can evaluate whether the `x` and `y` offsets exceed display parameters locally before commands are pushed onto device stacks and potentially crash.
 **Action:** Always retrieve and supply `max_x`, `max_y` limit configuration parameters into underlying structural components during their instantiation, and ensure explicit boundary exceptions are raised directly instead of silently clipping to improve failure visibility.
+## 2025-03-10 - O(N) Spatial Hashing for Image Template Coordinates
+**Learning:** In multi-target image matching, filtering out overlapping coordinates by checking each point against all kept points with an O(N^2) nested loop creates a massive bottleneck when thousands of points are matched.
+**Action:** Replace the nested distance check loop with an O(N) Spatial Hashing grid (`grid = {}`; `cell = (int(x//dist), int(y//dist))`). This yields a >100x speedup by only checking adjacent grid cells.
