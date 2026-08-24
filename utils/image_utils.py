@@ -341,70 +341,17 @@ class ImageUtils:
 
         center_points = []
         min_dist_sq = min_dist**2
-
-        # 遍历排序后的匹配位置执行非极大值抑制（NMS）
-        for i in range(len(x_sorted)):
-            pt_x, pt_y = x_sorted[i], y_sorted[i]
-
-            # 检查当前匹配点是否与已保留的匹配点太近
-            # ⚡ Bolt: 使用简单的标量算术（平方欧氏距离）和 early break 来代替 np.linalg.norm 的 O(n^2) 内存分配，提升性能。
-            keep = True
-            for kept_pt in center_points:
-                if (pt_x - kept_pt[0]) ** 2 + (pt_y - kept_pt[1]) ** 2 <= min_dist_sq:
-                    keep = False
-                    break
-            if keep:
-                # 如果没有太近的匹配点，保留当前匹配点
-                center_points.append((pt_x, pt_y))
-
-        # 计算每个匹配点的中心坐标
-        center_points = [(int(pt_x + w / 2), int(pt_y + h / 2)) for pt_x, pt_y in center_points]
-        # 遍历所有超过阈值的区域
-        loc_y, loc_x = np.where(res >= threshold)
-        if len(loc_y) == 0:
-            log.debug(f"未找到匹配项，最高匹配度为：{np.max(res)}")
-            return []
-
-        # 使用向量化 argsort 替代 Python 的 sorted 和 lambda，大幅提升多目标匹配的性能
-        scores = res[loc_y, loc_x]
-        sort_idx = np.argsort(scores)[::-1]
-
-        # 提取排序后的坐标
-        x_sorted = loc_x[sort_idx]
-        y_sorted = loc_y[sort_idx]
-
-        center_points = []
-        min_dist_sq = min_dist**2
-        # ⚡ Bolt Optimization: Use Spatial Hashing (O(N)) instead of O(N^2) nested loop for filtering overlaps
         cell_size = int(max(1, min_dist))
-        grid = {}
 
         # ⚡ Bolt: Replace O(N^2) nested loop with O(N) Spatial Hashing grid
         # for filtering out overlapping targets, improving multi-target search speed by >100x.
         grid = {}
         for pt_x, pt_y in zip(x_sorted, y_sorted):
-            cell_x, cell_y = int(pt_x // min_dist), int(pt_y // min_dist)
+            pt_x, pt_y = int(pt_x), int(pt_y)
+            cell_x, cell_y = pt_x // cell_size, pt_y // cell_size
+
             keep = True
-
-            for dx in (-1, 0, 1):
-                for dy in (-1, 0, 1):
-                    cell = (cell_x + dx, cell_y + dy)
-                    if cell in grid:
-                        for kept_pt in grid[cell]:
-                            if (pt_x - kept_pt[0]) ** 2 + (pt_y - kept_pt[1]) ** 2 <= min_dist_sq:
-                                keep = False
-                                break
-                    if not keep:
-                        break
-        # 遍历排序后的匹配位置
-        for i in range(len(x_sorted)):
-            pt_x = int(x_sorted[i])
-            pt_y = int(y_sorted[i])
-            cell_x = pt_x // cell_size
-            cell_y = pt_y // cell_size
-
             # 检查当前匹配点是否与已保留的匹配点太近，只检查当前和周围一圈(3x3)网格
-            keep = True
             for cx in range(cell_x - 1, cell_x + 2):
                 for cy in range(cell_y - 1, cell_y + 2):
                     if (cx, cy) in grid:
@@ -412,15 +359,14 @@ class ImageUtils:
                             if (pt_x - kept_pt[0]) ** 2 + (pt_y - kept_pt[1]) ** 2 <= min_dist_sq:
                                 keep = False
                                 break
+                    if not keep:
+                        break
                 if not keep:
                     break
 
             if keep:
                 grid.setdefault((cell_x, cell_y), []).append((pt_x, pt_y))
                 center_points.append((pt_x, pt_y))
-                if (cell_x, cell_y) not in grid:
-                    grid[(cell_x, cell_y)] = []
-                grid[(cell_x, cell_y)].append((pt_x, pt_y))
 
         # 计算每个匹配点的中心坐标
         center_points = [(int(pt[0] + w / 2), int(pt[1] + h / 2)) for pt in center_points]
