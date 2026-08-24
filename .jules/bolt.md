@@ -101,3 +101,6 @@
 
 **Learning:** When developing screen simulation components (like minitouch), it's important to pass screen max coordinate limits downwards into the builder layer so that logic bounds logic can evaluate whether the `x` and `y` offsets exceed display parameters locally before commands are pushed onto device stacks and potentially crash.
 **Action:** Always retrieve and supply `max_x`, `max_y` limit configuration parameters into underlying structural components during their instantiation, and ensure explicit boundary exceptions are raised directly instead of silently clipping to improve failure visibility.
+## 2026-08-24 - O(N) Spatial Hashing for multi-target matching
+**Learning:** Using an O(N^2) nested loop to filter out overlapping multi-target template matches can drastically bottleneck execution when match count is large. The previous implementation contained three nested looping structures for NMS.
+**Action:** Always use an O(N) Spatial Hashing grid algorithm to replace O(N^2) NMS filtering in multi-target template matching.
