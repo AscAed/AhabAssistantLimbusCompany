@@ -34,3 +34,6 @@
 ## 2025-02-12 - MessageBox Default Buttons Affordance
 **Learning:** In `qfluentwidgets`, the default `yesButton` and `cancelButton` provided by the base `MessageBox` class do not automatically use a pointing hand cursor. When creating custom dialogs by subclassing `MessageBox`, failing to explicitly set the cursor for these buttons leads to inconsistent interaction cues compared to other UI elements.
 **Action:** Always explicitly set `self.yesButton.setCursor(Qt.CursorShape.PointingHandCursor)` and `self.cancelButton.setCursor(Qt.CursorShape.PointingHandCursor)` (if not hidden) in the `__init__` of any custom `MessageBox` subclass to ensure consistent visual affordance.
+## 2025-02-12 - Line constraints and auto-formatters
+**Learning:** When working under strict line constraints (e.g., < 50 lines for micro-UX tasks), running global auto-formatters like `ruff format .` or `ruff check --fix .` can drastically alter unrelated code across the repository, resulting in PRs with thousands of lines changed and failing the core constraints.
+**Action:** When working with strict line constraints (e.g., < 50 lines), avoid running global auto-formatters across the entire repository. Instead, target only the specific files modified (e.g., `ruff format path/to/file.py`) to prevent polluting the git history with massive unrelated formatting changes.
