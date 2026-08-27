@@ -90,7 +90,7 @@ class Automation(metaclass=SingletonMeta):
         self._input_mouse_drag_link = self.input_handler.mouse_drag_link
         self._input_mouse_scroll = self.input_handler.mouse_scroll
         # Batch scroll binding for WindowMoveInput efficiency
-        self._input_batch_mouse_scroll = getattr(self.input_handler, 'batch_mouse_scroll', None)
+        self._input_batch_mouse_scroll = getattr(self.input_handler, "batch_mouse_scroll", None)
         self.mouse_click = self._mouse_click
         self.mouse_click_blank = self._mouse_click_blank
         self.mouse_drag = self._mouse_drag
@@ -112,39 +112,25 @@ class Automation(metaclass=SingletonMeta):
         return result
 
     def _mouse_click(self, *args, **kwargs):
-        return self._require_input_success(
-            "mouse_click", self._input_mouse_click(*args, **kwargs)
-        )
+        return self._require_input_success("mouse_click", self._input_mouse_click(*args, **kwargs))
 
     def _mouse_click_blank(self, *args, **kwargs):
-        return self._require_input_success(
-            "mouse_click_blank", self._input_mouse_click_blank(*args, **kwargs)
-        )
+        return self._require_input_success("mouse_click_blank", self._input_mouse_click_blank(*args, **kwargs))
 
     def _mouse_drag(self, *args, **kwargs):
-        return self._require_input_success(
-            "mouse_drag", self._input_mouse_drag(*args, **kwargs)
-        )
+        return self._require_input_success("mouse_drag", self._input_mouse_drag(*args, **kwargs))
 
     def _mouse_drag_down(self, *args, **kwargs):
-        return self._require_input_success(
-            "mouse_drag_down", self._input_mouse_drag_down(*args, **kwargs)
-        )
+        return self._require_input_success("mouse_drag_down", self._input_mouse_drag_down(*args, **kwargs))
 
     def _mouse_drag_link(self, *args, **kwargs):
-        return self._require_input_success(
-            "mouse_drag_link", self._input_mouse_drag_link(*args, **kwargs)
-        )
+        return self._require_input_success("mouse_drag_link", self._input_mouse_drag_link(*args, **kwargs))
 
     def _mouse_scroll(self, *args, **kwargs):
-        return self._require_input_success(
-            "mouse_scroll", self._input_mouse_scroll(*args, **kwargs)
-        )
+        return self._require_input_success("mouse_scroll", self._input_mouse_scroll(*args, **kwargs))
 
     def _batch_mouse_scroll(self, *args, **kwargs):
-        return self._require_input_success(
-            "batch_mouse_scroll", self._input_batch_mouse_scroll(*args, **kwargs)
-        )
+        return self._require_input_success("batch_mouse_scroll", self._input_batch_mouse_scroll(*args, **kwargs))
 
     def check_pause(self) -> bool:
         """
@@ -437,7 +423,9 @@ class Automation(metaclass=SingletonMeta):
             if take_screenshot:
                 while self.take_screenshot() is None:
                     continue
-            res = self._find_element_by_type(target, find_type, threshold, model, my_crop or roi, min_dist, additional_stack)
+            res = self._find_element_by_type(
+                target, find_type, threshold, model, my_crop or roi, min_dist, additional_stack
+            )
             if res:
                 return res
             for bus_template in ("mirror/mybus_default_distance.png", "mirror/mybus_maximum_distance.png"):
@@ -446,7 +434,7 @@ class Automation(metaclass=SingletonMeta):
                     threshold=0.78,  # Increased from 0.65 to 0.78 to prevent false positives
                     model=model,
                     my_crop=None,
-                    additional_stack=additional_stack + 1
+                    additional_stack=additional_stack + 1,
                 )
                 if res_bus:
                     log.debug(f"Legend panel is closed, detected roadmap screen via bus: {bus_template} at {res_bus}")
@@ -727,7 +715,7 @@ class Automation(metaclass=SingletonMeta):
             else:
                 screenshot_gray = screenshot
 
-            scales = [0.85, 1.0, 1.15]
+            scales = [1.0, 0.85, 1.15]
             best_match_val = -1
             best_center = None
             threshold = 0.70
@@ -761,6 +749,10 @@ class Automation(metaclass=SingletonMeta):
                         int(max_loc[0]) + w_st // 2 + crop_offset[0],
                         int(max_loc[1]) + h_st // 2 + crop_offset[1],
                     )
+
+                # ⚡ Bolt: Fast-path early exit for multi-scale matching
+                if best_match_val >= threshold:
+                    break
 
             threshold = 0.70
             matched = best_match_val >= threshold
@@ -812,7 +804,7 @@ class Automation(metaclass=SingletonMeta):
                         # ⚡ Bolt: Fast-path early exit for Canny edge matching too
                         if best_edge_match_val >= 0.30:
                             break
-                    
+
                     if best_edge_match_val >= 0.30:
                         log.debug(
                             f"通过 Canny 边缘匹配成功定位特征 {target.replace('./assets/images/', '')}，边缘相似度: {best_edge_match_val:.3f}",
