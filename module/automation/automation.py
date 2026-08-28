@@ -727,7 +727,7 @@ class Automation(metaclass=SingletonMeta):
             else:
                 screenshot_gray = screenshot
 
-            scales = [0.85, 1.0, 1.15]
+            scales = [1.0, 0.85, 1.15]  # 优先匹配 1.0 比例，加快匹配速度
             best_match_val = -1
             best_center = None
             threshold = 0.70
@@ -761,6 +761,10 @@ class Automation(metaclass=SingletonMeta):
                         int(max_loc[0]) + w_st // 2 + crop_offset[0],
                         int(max_loc[1]) + h_st // 2 + crop_offset[1],
                     )
+
+                # ⚡ Bolt Optimization: Early exit if native/current scale already matches threshold
+                if best_match_val >= threshold:
+                    break
 
             threshold = 0.70
             matched = best_match_val >= threshold
@@ -809,7 +813,7 @@ class Automation(metaclass=SingletonMeta):
                                 int(max_loc[1]) + h_st // 2 + crop_offset[1],
                             )
 
-                        # ⚡ Bolt: Fast-path early exit for Canny edge matching too
+                        # ⚡ Bolt Optimization: Early exit for edge matching
                         if best_edge_match_val >= 0.30:
                             break
                     
