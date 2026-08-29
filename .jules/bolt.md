@@ -101,3 +101,6 @@
 
 **Learning:** When developing screen simulation components (like minitouch), it's important to pass screen max coordinate limits downwards into the builder layer so that logic bounds logic can evaluate whether the `x` and `y` offsets exceed display parameters locally before commands are pushed onto device stacks and potentially crash.
 **Action:** Always retrieve and supply `max_x`, `max_y` limit configuration parameters into underlying structural components during their instantiation, and ensure explicit boundary exceptions are raised directly instead of silently clipping to improve failure visibility.
+## 2025-03-10 - Fast path multi-scale feature matching
+**Learning:** In `find_feature_element`, running `cv2.resize` and `cv2.matchTemplate` sequentially across scales `[0.85, 1.0, 1.15]` performs unnecessary and extremely costly computations if the element already natively matches at the 1.0 scale (which it does 90%+ of the time).
+**Action:** Reorder scales to prioritize `[1.0, 0.85, 1.15]` and implement an early exit `break` when the match threshold is met. This skips massive image resizing overhead when the native scale is sufficient.
