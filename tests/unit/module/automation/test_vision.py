@@ -8,12 +8,12 @@ from module.automation.automation import Automation
 
 @pytest.fixture
 def mock_automation():
-    with patch("module.automation.automation.cfg") as mock_cfg, \
-         patch("module.automation.automation.ocr"):
+    with patch("module.automation.automation.cfg") as mock_cfg, patch("module.automation.automation.ocr"):
         mock_cfg.set_win_size = 1440
         mock_cfg.memory_protection = False
 
         from utils.path_manager import path_manager
+
         path_manager.current_theme = "default"
         path_manager.current_language = "zh_cn"
 
@@ -49,6 +49,7 @@ def test_get_default_roi(mock_automation):
     # Test unknown element
     assert mock_automation.get_default_roi("unknown_target.png") is None
 
+
 @patch("module.automation.automation.ImageUtils")
 def test_location_matching_cache(mock_image_utils, mock_automation):
     target = "test_button.png"
@@ -57,7 +58,6 @@ def test_location_matching_cache(mock_image_utils, mock_automation):
     # work reliably with Singleton instances because Python resolves method calls through
     # the class MRO, not the instance __dict__ for bound methods.
     with patch.object(Automation, "_find_element_by_type", autospec=True) as mock_dispatch:
-
         # First call: cache miss → dispatch returns (100, 200), cache populated.
         mock_dispatch.return_value = (100, 200)
         pos = mock_automation.find_element(target, find_type="image", threshold=0.8)
@@ -82,25 +82,24 @@ def test_location_matching_cache(mock_image_utils, mock_automation):
         assert pos4 is None
         assert target not in mock_automation.location_cache
 
+
 @patch("module.automation.automation.ImageUtils")
 def test_find_feature_element_optimization(mock_image_utils, mock_automation):
     target = "mirror/road_in_mir/shop.png"
     # Mock template image load
     mock_image_utils.load_image.return_value = np.zeros((20, 20), dtype=np.uint8)
-    
+
     # We patch cv2.matchTemplate inside the test
-    with patch("cv2.matchTemplate") as mock_match, \
-         patch("cv2.minMaxLoc") as mock_min_max:
-        
+    with patch("cv2.matchTemplate") as mock_match, patch("cv2.minMaxLoc") as mock_min_max:
         # Mock max correlation value above threshold (e.g., 0.85)
         mock_match.return_value = np.zeros((5, 5))
         mock_min_max.return_value = (0.1, 0.85, (0, 0), (2, 2))
-        
+
         # Should return the center coordinate
         pos = mock_automation.find_feature_element(target)
         assert pos is not None
-        # Center = max_loc (2,2) + half-template size (10, 10) = (12, 12) but scale 0.85 is evaluated first
-        assert pos == (10, 10)
+        # Center = max_loc (2,2) + half-template size (10, 10) = (12, 12) since native scale 1.0 is evaluated first
+        assert pos == (12, 12)
 
         # If match value is below threshold (e.g., 0.5) and Canny matching also fails
         mock_min_max.side_effect = [(0.1, 0.5, (0, 0), (2, 2))] * 3 + [(0.1, 0.2, (0, 0), (2, 2))] * 3
