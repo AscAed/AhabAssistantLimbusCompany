@@ -727,7 +727,8 @@ class Automation(metaclass=SingletonMeta):
             else:
                 screenshot_gray = screenshot
 
-            scales = [0.85, 1.0, 1.15]
+            # ⚡ Bolt: Evaluate the native scale first to enable early exit
+            scales = [1.0, 0.85, 1.15]
             best_match_val = -1
             best_center = None
             threshold = 0.70
@@ -761,6 +762,11 @@ class Automation(metaclass=SingletonMeta):
                         int(max_loc[0]) + w_st // 2 + crop_offset[0],
                         int(max_loc[1]) + h_st // 2 + crop_offset[1],
                     )
+
+                # ⚡ Bolt: Fast-path early exit for standard template matching
+                # Prevents expensive resize and matching if a good enough match is already found
+                if best_match_val >= threshold:
+                    break
 
             threshold = 0.70
             matched = best_match_val >= threshold

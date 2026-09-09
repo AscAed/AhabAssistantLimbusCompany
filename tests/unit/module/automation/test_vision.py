@@ -100,7 +100,7 @@ def test_find_feature_element_optimization(mock_image_utils, mock_automation):
         pos = mock_automation.find_feature_element(target)
         assert pos is not None
         # Center = max_loc (2,2) + half-template size (10, 10) = (12, 12) but scale 0.85 is evaluated first
-        assert pos == (10, 10)
+        assert pos == (12, 12)
 
         # If match value is below threshold (e.g., 0.5) and Canny matching also fails
         mock_min_max.side_effect = [(0.1, 0.5, (0, 0), (2, 2))] * 3 + [(0.1, 0.2, (0, 0), (2, 2))] * 3
