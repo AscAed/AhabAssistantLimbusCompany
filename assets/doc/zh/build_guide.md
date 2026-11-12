@@ -1,30 +1,17 @@
 # 构建指南
 
-## 配置python环境
+使用 Windows 和 Python 3.12 环境，先按锁文件安装依赖：
 
-依赖python3.12版本
-
-python库依赖见[requirements.txt](/requirements.txt)
-
-```bash
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-pip install pyinstaller
+```powershell
+uv sync --frozen
 ```
 
-## 构建可执行文件
+Release 路径会同时构建主程序和更新器、复制资源并生成压缩包：
 
-```bash
-pyinstaller main.spec
+```powershell
+uv run python scripts/build.py --version 1.0.9
 ```
 
-## 添加其他附属文件
+构建脚本启动时会递归删除 `dist/`。运行前确认该目录不存在，或使用不含用户制品的隔离副本。脚本还需要系统可用的 `7z`。构建结果保留为本地产物，不提交到 Git。
 
-```bash
-mkdir dist_release
-mv dist/* dist_release/
-cp -r 3rdparty dist_release/AALC/
-cp -r assets dist_release/AALC/
-cp LICENSE dist_release/AALC/
-cp README.md dist_release/AALC/
-```
+配置与验证边界见[开发指南](develop_guide.md)和[项目文档索引](../../../docs/INDEX.md)。

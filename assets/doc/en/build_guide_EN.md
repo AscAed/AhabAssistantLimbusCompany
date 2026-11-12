@@ -1,30 +1,17 @@
 ## Build Guide
 
-## Configuring the python environment
+Use Windows with the Python 3.12 CI baseline and install the locked dependencies:
 
-Dependencies on python version 3.12
-
-See [requirements.txt](/requirements.txt) for python library dependencies.
-
-```bash
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-pip install pyinstaller
+```powershell
+uv sync --frozen
 ```
 
-## Build executables
+The release build creates both the application and updater, copies assets, and writes an archive:
 
-```bash
-pyinstaller main.spec
+```powershell
+uv run python scripts/build.py --version 1.0.9
 ```
 
-## Add other subsidiary documents
+The build script recursively removes `dist/` at startup. Verify that directory is absent, or build in a disposable copy without user artifacts. The script also requires `7z` on `PATH`. Keep generated build outputs out of Git.
 
-```bash
-mkdir dist_release
-mv dist/* dist_release/
-cp -r 3rdparty dist_release/AALC/
-cp -r assets dist_release/AALC/
-cp LICENSE dist_release/AALC/
-cp README.md dist_release/AALC/
-```
+See the [development guide](../zh/develop_guide.md) and [documentation index](../../../docs/INDEX.md) for validation and project boundaries.

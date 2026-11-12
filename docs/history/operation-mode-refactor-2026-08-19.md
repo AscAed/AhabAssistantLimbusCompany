@@ -1,4 +1,6 @@
-# Operation Mode Refactor Audit
+# Historical Operation Mode Refactor Audit
+
+> This report records the August 2026 implementation and verification. It does not establish the current behavior of the maintenance fork; use the [2026-11-12 audit](../audits/2026-11-12-self-audit.md) and current source instead.
 
 ## Purpose
 
