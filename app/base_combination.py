@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 15735)
-Total output lines: 1751
-
 import base64
 import datetime
 from typing import Callable, Union
@@ -700,7 +697,401 @@ class ComboBoxSettingCard(SettingCard):
 
     def __init__(
         self,
-        …3735 tokens truncated…           if cb.check_box is not clicked_cb:
+        config_name: str,
+        icon: Union[str, QIcon, FluentIconBase],
+        title,
+        content=None,
+        texts=None,
+        parent=None,
+    ):
+        super().__init__(icon, title, content, parent)
+        self.config_name = config_name
+
+        self.title = title
+        self.content = content
+        self.texts = texts
+
+        self.comboBox = ComboBox(self)
+        self.hBoxLayout.addWidget(self.comboBox, 0, Qt.AlignRight)
+        self.hBoxLayout.addSpacing(16)
+
+        for key, value in texts.items():
+            self.comboBox.addItem(key, userData=value)
+            if value == cfg.get_value(config_name):
+                self.comboBox.setCurrentText(key)
+
+        self.comboBox.currentIndexChanged.connect(self._onCurrentIndexChanged)
+        self.comboBox.currentIndexChanged.connect(self.valueChanged)
+
+    def _onCurrentIndexChanged(self, index: int):
+        cfg.set_value(self.config_name, self.comboBox.itemData(index))
+        if self.config_name == "language_in_program":
+            LanguageManager().set_language(self.comboBox.itemData(index))
+
+    def retranslateUi(self):
+        self.setTitle(self.tr(self.title))
+        self.setContent(self.tr(self.content))
+        if self.texts:
+            index = 0
+            for key in self.texts:
+                self.comboBox.setItemText(index, self.tr(key))
+                index += 1
+
+
+class BaseSettingCardGroup(SettingCardGroup):
+    def __init__(self, title: str, parent=None):
+        super().__init__(title, parent)
+        self.text = title
+
+    def retranslateUi(self):
+        self.titleLabel.setText(self.tr(self.text))
+
+
+class BasePushSettingCard(PushSettingCard):
+    def __init__(self, text, icon: str | QIcon | FluentIconBase, title, content=None, parent=None):
+        super().__init__(text, icon, title, content, parent)
+        self.text = text
+        self.title = title
+        self.content = content
+
+        lt_qss = """
+        QPushButton[isRunning="true"] {
+            background-color: --ThemeColorPrimary;
+            color: white;
+        }"""
+        dk_qss = """
+        QPushButton[isRunning="true"] {
+            background-color: --ThemeColorPrimary;
+            color: black;
+        }"""
+        self.button.setProperty("isRunning", "false")
+        self.button.setCursor(Qt.CursorShape.PointingHandCursor)
+        setCustomStyleSheet(self, lt_qss, dk_qss)
+
+    def update_button(self, is_running: bool):
+        self.button.setProperty("isRunning", "true" if is_running else "false")
+        self.text = self.button.text()
+        self.button.setText(self.tr(self.text))
+        self.button.style().unpolish(self.button)
+        self.button.style().polish(self.button)
+        self.button.update()
+
+    def retranslateUi(self):
+        self.titleLabel.setText(self.tr(self.title))
+        self.contentLabel.setText(self.tr(self.content))
+        self.button.setText(self.tr(self.text))
+
+
+class BasePrimaryPushSettingCard(PrimaryPushSettingCard):
+    def __init__(self, text, icon, title, content=None, parent=None):
+        super().__init__(text, icon, title, content, parent)
+        self.text = text
+        self.title = title
+        self.content = content
+        self.button.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def retranslateUi(self):
+        self.titleLabel.setText(self.tr(self.title))
+        self.contentLabel.setText(self.tr(self.content))
+        self.button.setText(self.tr(self.text))
+
+
+class PushSettingCardMirrorchyan(SettingCard):
+    def __init__(
+        self,
+        text,
+        icon: Union[str, QIcon, FluentIconBase],
+        title,
+        update_callback,
+        config_name,
+        parent: QObject | None = None,
+    ):
+        self.config_value = decrypt_string(str(cfg.get_value(config_name)))
+        self.update_callback = update_callback
+        super().__init__(icon, title, "", parent)
+
+        self.title = title
+        self.button_text = text
+        self.config_name = config_name
+
+        self.button2 = QPushButton("获取 CDK", self)
+        self.button2.setObjectName("primaryButton")
+        self.button2.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.hBoxLayout.addWidget(self.button2, 0, Qt.AlignRight)
+        self.hBoxLayout.addSpacing(10)
+        self.button2.clicked.connect(self.__onclicked2)
+
+        self.button = QPushButton(text, self)
+        self.button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.hBoxLayout.addWidget(self.button, 0, Qt.AlignRight)
+        self.hBoxLayout.addSpacing(16)
+        self.button.clicked.connect(self.__onclicked)
+
+    def __onclicked(self):
+        """保存 Mirror 酱 CDK，并立即触发一次更新检查刷新结果。"""
+        message_box = MessageBoxEdit(self.tr(self.title), self.config_value, self.window())
+        if message_box.exec():
+            # 先写回新的 CDK 配置，再主动触发更新检查，便于立即验证下载源状态。
+            base64_cdk = encrypt_string(message_box.getText())
+            cfg.set_value(self.config_name, base64_cdk)
+            self.contentLabel.setText(message_box.getText())
+            self.config_value = message_box.getText()
+            parent = self._find_parent(self)
+            check_update(parent, flag=True)
+
+    def __onclicked2(self):
+        QDesktopServices.openUrl(QUrl("https://mirrorchyan.com/?source=aalc_app"))
+
+    def _find_parent(self, widget):
+        while widget.parent() is not None:
+            widget = widget.parent()
+        return widget
+
+    def retranslateUi(self):
+        self.button2.setText(self.tr("获取 CDK"))
+        self.titleLabel.setText(self.tr(self.title))
+        self.button.setText(self.tr(self.button_text))
+
+
+class SwitchSettingCard(SettingCard):
+    """Setting card with switch button"""
+
+    checkedChanged = Signal(bool)
+
+    def __init__(
+        self,
+        icon: Union[str, QIcon, FluentIconBase],
+        title,
+        content=None,
+        config_name: str = None,
+        parent=None,
+    ):
+        super().__init__(icon, title, content, parent)
+        self.config_name = config_name
+        self.switchButton = SwitchButton(self.tr("关"), self, IndicatorPosition.RIGHT)
+
+        self.setValue(cfg.get_value(self.config_name, False))
+
+        self.title = title
+        self.content = content
+
+        # add switch button to layout
+        self.hBoxLayout.addWidget(self.switchButton, 0, Qt.AlignRight)
+        self.hBoxLayout.addSpacing(16)
+
+        self.switchButton.checkedChanged.connect(self.__onCheckedChanged)
+
+    def __onCheckedChanged(self, isChecked: bool):
+        """switch button checked state changed slot"""
+        self.setValue(isChecked)
+        cfg.set_value(self.config_name, isChecked)
+
+    def setValue(self, isChecked: bool):
+        self.switchButton.setChecked(isChecked)
+        self.switchButton.setText(self.tr("开") if isChecked else self.tr("关"))
+
+    def retranslateUi(self):
+        self.switchButton.setText(self.tr("开") if self.switchButton.checked else self.tr("关"))
+        self.titleLabel.setText(self.tr(self.title))
+        self.contentLabel.setText(self.tr(self.content))
+
+
+class PushSettingCardDate(BasePushSettingCard):
+    # clicked = pyqtSignal()
+    def __init__(
+        self,
+        text,
+        icon: Union[str, QIcon, FluentIconBase],
+        title,
+        config_name,
+        parent=None,
+    ):
+        self.config_name = config_name
+        self.config_value = datetime.datetime.fromtimestamp(cfg.get_value(config_name))
+        super().__init__(text, icon, title, self.config_value.strftime("%Y-%m-%d %H:%M"), parent)
+        self.button.clicked.connect(self.__onclicked)
+
+    def __onclicked(self):
+        message_box = MessageBoxDate(self.tr(self.title), self.config_value, self.window())
+        if message_box.exec():
+            self.config_value = message_box.getDateTime()
+            cfg.set_value(self.config_name, self.config_value.timestamp())
+            self.contentLabel.setText(self.config_value.strftime("%Y-%m-%d %H:%M"))
+
+
+class PushSettingCardChance(BasePushSettingCard):
+    def __init__(
+        self,
+        text,
+        icon: Union[str, QIcon, FluentIconBase],
+        title,
+        config_name: str,
+        max_value=3,
+        content=None,
+        on_confirm: Callable[[int], None] | None = None,
+        parent=None,
+    ):
+        super().__init__(text, icon, title, content, parent)
+        self.config_name = config_name
+        self.max_value = max_value
+        self.on_confirm = on_confirm
+        self.line_text = LineEdit()
+        self.line_text.setAlignment(Qt.AlignCenter)
+        self.line_text.setReadOnly(True)
+        self.line_text.setMaximumWidth(100)
+        self.line_text.setText(str(cfg.get_value(self.config_name)))
+        current_count = self.hBoxLayout.count()
+        self.hBoxLayout.insertWidget(current_count - 2, self.line_text)
+        self.button.clicked.connect(self.__onclicked)
+
+    def __onclicked(self):
+        message_box = MessageBoxSpinbox(
+            self.tr(self.title),
+            config_name=self.config_name,
+            parent=self.window(),
+            max_value=self.max_value,
+        )
+        if message_box.exec():
+            new_value = int(message_box.getValue())
+            cfg.set_value(f"{self.config_name}", new_value)
+            self.line_text.setText(str(new_value))
+            if self.on_confirm:
+                self.on_confirm(new_value)
+
+
+class AutoDailyView(FlyoutViewBase):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.config_name = None
+
+        self.vBoxLayout = QVBoxLayout(self)
+        self.line_1_box = QWidget(self)
+        self.line_1 = QHBoxLayout(self.line_1_box)
+        self.label_text = QT_TRANSLATE_NOOP("AutoDailyView", "选择执行的行动")
+        self.label = BodyLabel(self.label_text)
+        self.task_name = [
+            "autodaily_daily",
+            "autodaily_get_reward",
+            "autodaily_buy_enkephalin",
+            "autodaily_mirror",
+        ]
+        self.box_daily = BaseCheckBox("autodaily_daily", None, QT_TRANSLATE_NOOP("BaseCheckBox", "自动执行日常"))
+        self.box_get_reward = BaseCheckBox(
+            "autodaily_get_reward",
+            None,
+            QT_TRANSLATE_NOOP("BaseCheckBox", "自动获取奖励"),
+        )
+        self.box_buy_enkephalin = BaseCheckBox(
+            "autodaily_buy_enkephalin",
+            None,
+            QT_TRANSLATE_NOOP("BaseCheckBox", "自动狂气换体"),
+        )
+        self.box_mirror = BaseCheckBox("autodaily_mirror", None, QT_TRANSLATE_NOOP("BaseCheckBox", "自动镜牢"))
+        self.line_1.addWidget(self.box_daily)
+        self.line_1.addWidget(self.box_get_reward)
+        self.line_1.addWidget(self.box_buy_enkephalin)
+        self.line_1.addWidget(self.box_mirror)
+
+        self.label2_text = QT_TRANSLATE_NOOP("AutoDailyView", "运行结束后")
+        self.label2 = BodyLabel(self.label2_text)
+        self.line_2_box = QWidget(self)
+        self.line_2 = QHBoxLayout(self.line_2_box)
+        self.exit_task_name = [
+            "autodaily_exit_game",
+            "autodaily_exit_aalc",
+            "autodaily_sleep",
+            "autodaily_hibernate",
+            "autodaily_shutdown",
+            "autodaily_lock",
+            "autodaily_exit_emulator",
+        ]
+        self.box_exit_game = BaseCheckBox("autodaily_exit_game", None, QT_TRANSLATE_NOOP("BaseCheckBox", "退出游戏"))
+        self.box_exit_emulator = BaseCheckBox(
+            "autodaily_exit_emulator",
+            None,
+            QT_TRANSLATE_NOOP("BaseCheckBox", "退出模拟器"),
+        )
+        self.box_exit_aalc = BaseCheckBox("autodaily_exit_aalc", None, QT_TRANSLATE_NOOP("BaseCheckBox", "退出AALC"))
+        self.box_sleep = BaseCheckBox("autodaily_sleep", None, QT_TRANSLATE_NOOP("BaseCheckBox", "睡眠"))
+        self.box_hibernate = BaseCheckBox("autodaily_hibernate", None, QT_TRANSLATE_NOOP("BaseCheckBox", "休眠"))
+        self.box_shutdown = BaseCheckBox("autodaily_shutdown", None, QT_TRANSLATE_NOOP("BaseCheckBox", "关机"))
+        self.box_lock = BaseCheckBox("autodaily_lock", None, QT_TRANSLATE_NOOP("BaseCheckBox", "锁屏"))
+        self.line_2.addWidget(self.box_exit_game)
+        self.line_2.addWidget(self.box_exit_emulator)
+        self.line_2.addWidget(self.box_exit_aalc)
+        self.line_2.addWidget(self.box_sleep)
+        self.line_2.addWidget(self.box_hibernate)
+        self.line_2.addWidget(self.box_shutdown)
+        self.line_2.addWidget(self.box_lock)
+
+        self.line_3_box = QWidget(self)
+        self.line_3 = QHBoxLayout(self.line_3_box)
+
+        self.save_button_text = QT_TRANSLATE_NOOP("AutoDailyView", "保存")
+        self.save_button = PrimaryPushButton(self.save_button_text)
+        self.save_button.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        self.line_3.addWidget(self.save_button)
+
+        self.checkboxes = [
+            self.box_sleep,
+            self.box_hibernate,
+            self.box_shutdown,
+            self.box_lock,
+        ]
+        for cb in self.checkboxes:
+            cb.check_box.clicked.connect(self.__on_checkbox_clicked)
+
+        self.vBoxLayout.setSpacing(12)
+        self.vBoxLayout.setContentsMargins(20, 16, 20, 16)
+        self.vBoxLayout.addWidget(self.label)
+        self.vBoxLayout.addWidget(self.line_1_box)
+        self.vBoxLayout.addWidget(self.label2)
+        self.vBoxLayout.addWidget(self.line_2_box)
+        self.vBoxLayout.addWidget(self.line_3_box)
+
+        self.__get_init()
+
+        mediator.autodaily_setting.connect(self.__autodaily_setting)
+        self.save_button.clicked.connect(self.__save)
+        self.retranslateUi()
+
+    def __get_init(self):
+        while self.config_name is None:
+            self.config_name = self.__search_parent_class().config_name
+        self.setting = cfg.get_value(self.config_name + "_task")
+        self.exit_setting = cfg.get_value(self.config_name + "_task_exit")
+        exit_old_len = len(self.exit_setting)
+        if exit_old_len < 7:
+            self.exit_setting = list(self.exit_setting) + [False] * (7 - exit_old_len)
+            if exit_old_len > 0 and self.exit_setting[0]:
+                self.exit_setting[6] = True
+
+        task = [
+            self.box_daily,
+            self.box_get_reward,
+            self.box_buy_enkephalin,
+            self.box_mirror,
+        ]
+        for i in range(len(task)):
+            task[i].set_checked(self.setting[i])
+        exit_task = [
+            self.box_exit_game,
+            self.box_exit_aalc,
+            self.box_sleep,
+            self.box_hibernate,
+            self.box_shutdown,
+            self.box_lock,
+            self.box_exit_emulator,
+        ]
+        for i in range(len(exit_task)):
+            exit_task[i].set_checked(self.exit_setting[i])
+
+    def __on_checkbox_clicked(self):
+        clicked_cb = self.sender()
+        # 如果当前点击的被勾选了，则把其他的都取消勾选
+        for cb in self.checkboxes:
+            if cb.check_box is not clicked_cb:
                 cb.blockSignals(True)
                 cb.set_checked(False)
                 cb.blockSignals(False)
