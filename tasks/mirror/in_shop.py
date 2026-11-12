@@ -12,6 +12,32 @@ from tasks.base.retry import retry
 from tasks.mirror import fusion_result, must_be_abandoned, must_purchase
 from utils.image_utils import ImageUtils
 
+_SCREENSHOT_MAX_ATTEMPTS = 300
+
+
+def wait_for_screenshot(max_attempts: int = _SCREENSHOT_MAX_ATTEMPTS):
+    """Block until a non-empty screenshot is available, with a bounded retry limit."""
+    for _ in range(max_attempts):
+        screenshot = auto.take_screenshot()
+        if screenshot is not None:
+            return screenshot
+    log.error("等待截图超时")
+    raise RuntimeError("等待截图超时")
+
+
+def _is_protected_coordinate(
+    gift,
+    coordinates,
+    scale,
+    threshold=50,
+    x_offset=0,
+):
+    """Return True when the gift coordinate is within a protected area."""
+    return (
+        abs(gift[0] - x_offset - coordinates[0]) <= threshold * scale
+        and abs(gift[1] - coordinates[1]) <= threshold * scale
+    )
+
 
 class Shop:
     def __init__(self, team_setting: TeamSetting):
@@ -78,6 +104,29 @@ class Shop:
         # 用于记录已升级的ego饰品
         self.enhance_gifts_list = []
         self.first_gift_enhance = False
+
+    def _processing_coordinates(self, my_gift_list):
+        """Sort gift coordinates, remove near-duplicates, and filter active aggressive rows."""
+        scale = cfg.set_win_size / 1440
+        sorted_list = sorted(my_gift_list, key=lambda x: (x[1], x[0]))
+
+        unique_list = []
+        for coord in sorted_list:
+            if not any(
+                abs(coord[0] - x[0]) <= 40 * scale
+                and abs(coord[1] - x[1]) <= 40 * scale
+                for x in unique_list
+            ):
+                unique_list.append(coord)
+
+        if self.fuse_aggressive_switch:
+            unique_list = [
+                items
+                for items in unique_list
+                if items[1] >= self.the_first_line_position
+            ]
+
+        return unique_list
 
     class RestartGame(Exception):
         pass
@@ -182,8 +231,7 @@ class Shop:
                             auto.click_element("mirror/shop/purchase_assets.png")
                             is False
                         ):
-                            while auto.take_screenshot() is None:
-                                continue
+                            wait_for_screenshot()
                             if retry() is False:
                                 raise self.RestartGame()
                             if auto.click_element(
@@ -202,8 +250,7 @@ class Shop:
                             "mirror/road_in_mir/ego_gift_get_confirm_assets.png",
                             take_screenshot=True,
                         )
-                        while auto.take_screenshot() is None:
-                            continue
+                        wait_for_screenshot()
 
             if self.fuse_aggressive_switch:
                 log.debug("开始购买强化素材")
@@ -215,12 +262,10 @@ class Shop:
                         "mirror/shop/level_IV_to_buy.png", threshold=0.82
                     ):
                         sleep(1)
-                        while auto.take_screenshot() is None:
-                            continue
+                        wait_for_screenshot()
                         if auto.click_element("mirror/shop/purchase_assets.png"):
                             sleep(1)
-                            while auto.take_screenshot() is None:
-                                continue
+                            wait_for_screenshot()
                             if retry() is False:
                                 raise self.RestartGame()
                             auto.click_element(
@@ -266,8 +311,7 @@ class Shop:
                     gift = system_gift.pop(0)
                     auto.mouse_action_with_pos((gift[0], gift[1]), offset=True)
                     sleep(1)
-                    while auto.take_screenshot() is None:
-                        continue
+                    wait_for_screenshot()
                     if self.system == "bleed" and not cfg.not_skip_whitegossypium:
                         if auto.find_language_text(
                             "白棉花", ["white", "gossypium"], all_text=True
@@ -309,8 +353,7 @@ class Shop:
                         gift = system_gift.pop(0)
                         auto.mouse_action_with_pos((gift[0], gift[1]), offset=True)
                         sleep(1)
-                        while auto.take_screenshot() is None:
-                            continue
+                        wait_for_screenshot()
                         if self.system == "bleed" and not cfg.not_skip_whitegossypium:
                             if auto.find_language_text(
                                 "白棉花", ["white", "gossypium"], all_text=True
@@ -608,40 +651,11 @@ class Shop:
 
         def protect_coordinates(my_gift_list, coordinates, threshold=50):
             """将需要保护的坐标移除出列表"""
-            for position in my_gift_list:
-                if (
-                    abs(position[0] - 50 - coordinates[0]) <= threshold * scale
-                    and abs(position[1] - 50 - coordinates[1]) <= threshold * scale
-                ):
-                    my_gift_list.pop(my_gift_list.index(position))
-
-            return my_gift_list
-
-        def processing_coordinates(my_gift_list):
-            """将列表从左上到右下排序，然后去重"""
-
-            # 排序
-            sorted_list = sorted(my_gift_list, key=lambda x: (x[1], x[0]))
-
-            # 去除重复坐标
-            unique_list = []
-            for coord in sorted_list:
-                if not any(
-                    abs(coord[0] - x[0]) <= 40 * scale
-                    and abs(coord[1] - x[1]) <= 40 * scale
-                    for x in unique_list
-                ):
-                    unique_list.append(coord)
-
-            # 如果激活激进模式，则过滤第一行的饰品
-            if self.fuse_aggressive_switch:
-                unique_list = [
-                    items
-                    for items in unique_list
-                    if items[1] >= self.the_first_line_position
-                ]
-
-            return unique_list
+            return [
+                gift
+                for gift in my_gift_list
+                if not _is_protected_coordinate(gift, coordinates, scale, threshold, x_offset=50)
+            ]
 
         log.debug("开始执行普通合成模块")
         block = True
@@ -679,7 +693,7 @@ class Shop:
                         log.debug(f"识别到1个{sell_system}饰品")
                         gift_list.append(gift)
             # 对饰品位置列表进行排序、去重处理
-            my_list = processing_coordinates(gift_list)
+            my_list = self._processing_coordinates(gift_list)
 
             if self.second_system and self.second_system_action[0]:
                 if protect_gift := auto.find_element(
@@ -776,8 +790,7 @@ class Shop:
                 )
                 continue
 
-            while auto.take_screenshot() is None:
-                continue
+            wait_for_screenshot()
             list_block = auto.find_element("mirror/shop/gifts_list_block.png")
             if list_block is not None and block:
                 block = False
@@ -899,13 +912,7 @@ class Shop:
 
         def protect_coordinates(my_gift, coordinates, threshold=50):
             """将需要保护的坐标移除出列表"""
-            if (
-                abs(my_gift[0] - coordinates[0]) <= threshold * scale
-                and abs(my_gift[1] - coordinates[1]) <= threshold * scale
-            ):
-                return True
-
-            return False
+            return _is_protected_coordinate(my_gift, coordinates, scale, threshold)
 
         list_block = False
         system_sell = True
@@ -1011,8 +1018,7 @@ class Shop:
                 if auto.click_element(
                     f"mirror/shop/keyword/keyword_{self.second_system_select}.png"
                 ):
-                    while auto.take_screenshot() is None:
-                        continue
+                    wait_for_screenshot()
                     if auto.click_element(
                         "mirror/shop/fuse_gift_confirm_assets.png", model="normal"
                     ):
@@ -1020,8 +1026,7 @@ class Shop:
                         break
             else:
                 if auto.click_element(f"mirror/shop/keyword/keyword_{self.system}.png"):
-                    while auto.take_screenshot() is None:
-                        continue
+                    wait_for_screenshot()
                     if auto.click_element(
                         "mirror/shop/fuse_gift_confirm_assets.png", model="normal"
                     ):

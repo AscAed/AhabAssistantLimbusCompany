@@ -1,15 +1,15 @@
-import pytest
 from unittest.mock import MagicMock, patch
-import numpy as np
+
+import pytest
 
 from module.automation.automation import Automation, GameState, PageStateDispatcher
 from tasks.mirror.mirror import Mirror
-from module.config import TeamSetting
+
 
 @pytest.fixture
 def mock_automation():
     with patch("module.automation.automation.cfg") as mock_cfg, \
-         patch("module.automation.automation.ocr") as mock_ocr:
+         patch("module.automation.automation.ocr"):
         mock_cfg.set_win_size = 1440
         mock_cfg.memory_protection = False
         

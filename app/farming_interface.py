@@ -3,7 +3,15 @@ from typing import Callable
 
 from PySide6.QtCore import QT_TRANSLATE_NOOP, Qt
 from PySide6.QtGui import QTextCursor
-from PySide6.QtWidgets import QApplication, QDialog, QTextEdit
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QFrame,
+    QHBoxLayout,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 from qfluentwidgets import (
     BodyLabel,
     CheckBox,
@@ -12,6 +20,7 @@ from qfluentwidgets import (
     PopUpAniStackedWidget,
     PrimaryPushButton,
     PushButton,
+    SpinBox,
     TextEdit,
     ToolTipFilter,
     ToolTipPosition,
@@ -20,8 +29,9 @@ from qfluentwidgets import (
     setCustomStyleSheet,
 )
 
-from app.base_combination import *
-from app.base_tools import *
+from app import mediator, page_name_and_index, task_check_box, toggle_button_group
+from app.base_combination import CheckBoxWithButton
+from app.base_tools import BaseLabel, BaseSettingLayout, NormalTextButton, ToSettingButton
 from app.common.ui_config import get_log_text_edit_qss, set_border_style
 from app.language_manager import LanguageManager
 from app.page_card import (
@@ -55,6 +65,15 @@ from module.system_actions import (
 )
 from tasks.base.script_task_scheme import my_script_task
 from utils.utils import check_hard_mirror_time
+
+_FARMING_TASK_DEFINITIONS = [
+    ("set_windows", "set_windows", "窗口设置"),
+    ("daily_task", "daily_task", "日常任务"),
+    ("get_reward", "get_reward", "领取奖励"),
+    ("buy_enkephalin", "buy_enkephalin", "狂气换体"),
+    ("mirror", "mirror", "坐牢设置"),
+    ("resonate_with_Ahab", "resonate_with_Ahab", "亚哈共鸣"),
+]
 
 
 class AfterCompletionActionEditor(FlyoutViewBase):
@@ -441,46 +460,18 @@ class FarmingInterfaceLeft(QWidget):
         self.setting_box.setLayout(self.setting_layout)
 
     def __init_card(self):
-        self.set_windows = CheckBoxWithButton(
-            "set_windows",
-            QT_TRANSLATE_NOOP("CheckBoxWithButton", "窗口设置"),
-            None,
-            "set_windows",
-        )
+        for attr, key, text in _FARMING_TASK_DEFINITIONS:
+            setattr(
+                self,
+                attr,
+                CheckBoxWithButton(
+                    key,
+                    QT_TRANSLATE_NOOP("CheckBoxWithButton", text),
+                    None,
+                    key,
+                ),
+            )
         self.set_windows.set_box_enabled(False)
-
-        self.daily_task = CheckBoxWithButton(
-            "daily_task",
-            QT_TRANSLATE_NOOP("CheckBoxWithButton", "日常任务"),
-            None,
-            "daily_task",
-        )
-
-        self.get_reward = CheckBoxWithButton(
-            "get_reward",
-            QT_TRANSLATE_NOOP("CheckBoxWithButton", "领取奖励"),
-            None,
-            "get_reward",
-        )
-        self.buy_enkephalin = CheckBoxWithButton(
-            "buy_enkephalin",
-            QT_TRANSLATE_NOOP("CheckBoxWithButton", "狂气换体"),
-            None,
-            "buy_enkephalin",
-        )
-        self.mirror = CheckBoxWithButton(
-            "mirror",
-            QT_TRANSLATE_NOOP("CheckBoxWithButton", "坐牢设置"),
-            None,
-            "mirror",
-        )
-        self.resonate_with_Ahab = CheckBoxWithButton(
-            "resonate_with_Ahab",
-            QT_TRANSLATE_NOOP("CheckBoxWithButton", "亚哈共鸣"),
-            None,
-            "resonate_with_Ahab",
-        )
-
         self.resonate_with_Ahab.button.setEnabled(False)
 
         self.select_all = NormalTextButton(QT_TRANSLATE_NOOP("NormalTextButton", "全选"), "select_all")
@@ -508,12 +499,8 @@ class FarmingInterfaceLeft(QWidget):
         self.pause_resume_button.button.setFont(font)
 
     def __init_layout(self):
-        self.setting_options.addWidget(self.set_windows)
-        self.setting_options.addWidget(self.daily_task)
-        self.setting_options.addWidget(self.get_reward)
-        self.setting_options.addWidget(self.buy_enkephalin)
-        self.setting_options.addWidget(self.mirror)
-        self.setting_options.addWidget(self.resonate_with_Ahab)
+        for attr, _, _ in _FARMING_TASK_DEFINITIONS:
+            self.setting_options.addWidget(getattr(self, attr))
         self.setting_layout.addLayout(self.setting_options)
 
         self.hbox_button = QHBoxLayout()
@@ -749,8 +736,7 @@ class FarmingInterfaceLeft(QWidget):
             self.my_script.is_stop = True
             # 等待最多 2000 毫秒让其协同停止
             if not self.my_script.wait(2000):
-                log.warning("脚本线程未能在规定时间内停止，执行强制终止。")
-                self.my_script.terminate()  # 强制终止线程
+                log.warning("脚本线程未能在 2000 毫秒内停止，继续等待其协同退出。")
 
     def my_stop_shortcut(self):
         current_text = self.link_start_button.get_text()

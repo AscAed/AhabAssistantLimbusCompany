@@ -38,6 +38,7 @@ class Automation(metaclass=SingletonMeta):
     def __init__(self, windows_title):
         self.windows_title = windows_title
         self.screenshot = None
+        self.screenshot_np = None
         self.input_handler = AbstractInput()
 
         self.init_input()
@@ -66,41 +67,84 @@ class Automation(metaclass=SingletonMeta):
                 log.debug("使用基于PyMiniTouch的通用模拟器输入模块")
                 self.input_handler = SimulatorControl.connection_device
         else:
-            input_type = cfg.win_input_type
-            if input_type == "background":
-                from .input_handlers.input import BackgroundInput
-
-                log.debug("使用后台点击模块")
-                self.input_handler = BackgroundInput()
-            elif input_type == "foreground":
+            operation_mode = cfg.operation_mode
+            if operation_mode == "foreground_mouse":
                 from .input_handlers.input import Input
 
-                log.debug("使用前台点击模块")
+                log.debug("使用前台模式（移动鼠标）")
                 self.input_handler = Input()
-            elif input_type == "window_move":
-                from .input_handlers.input import WindowMoveInput
+            elif operation_mode == "background_window":
+                from .input_handlers.input import BackgroundWindowInput
 
-                log.debug("使用基于窗口移动的后台点击模块")
-                self.input_handler = WindowMoveInput()
+                log.debug("使用后台模式（移动窗口）")
+                self.input_handler = BackgroundWindowInput()
         if self.input_handler is None:
-            from .input_handlers.input import BackgroundInput
+            from .input_handlers.input import BackgroundWindowInput
 
-            self.input_handler = BackgroundInput()
-        assert isinstance(
-            self.input_handler, AbstractInput
-        ), "输入处理器必须是AbstractInput的实例"
-        self.mouse_click = self.input_handler.mouse_click
-        self.mouse_click_blank = self.input_handler.mouse_click_blank
-        self.mouse_drag = self.input_handler.mouse_drag
-        self.mouse_drag_down = self.input_handler.mouse_drag_down
-        self.mouse_scroll = self.input_handler.mouse_scroll
+            self.input_handler = BackgroundWindowInput()
+        assert isinstance(self.input_handler, AbstractInput), "输入处理器必须是AbstractInput的实例"
+        self._input_mouse_click = self.input_handler.mouse_click
+        self._input_mouse_click_blank = self.input_handler.mouse_click_blank
+        self._input_mouse_drag = self.input_handler.mouse_drag
+        self._input_mouse_drag_down = self.input_handler.mouse_drag_down
+        self._input_mouse_drag_link = self.input_handler.mouse_drag_link
+        self._input_mouse_scroll = self.input_handler.mouse_scroll
+        # Batch scroll binding for WindowMoveInput efficiency
+        self._input_batch_mouse_scroll = getattr(self.input_handler, 'batch_mouse_scroll', None)
+        self.mouse_click = self._mouse_click
+        self.mouse_click_blank = self._mouse_click_blank
+        self.mouse_drag = self._mouse_drag
+        self.mouse_drag_down = self._mouse_drag_down
+        self.mouse_drag_link = self._mouse_drag_link
+        self.mouse_scroll = self._mouse_scroll
+        self.batch_mouse_scroll = self._batch_mouse_scroll if self._input_batch_mouse_scroll else None
         self.set_pause = self.input_handler.set_pause
         self.wait_pause = self.input_handler.wait_pause
         self.mouse_to_blank = self.input_handler.mouse_to_blank
-        self.mouse_drag_link = self.input_handler.mouse_drag_link
         self.key_press = self.input_handler.key_press
         self.input_text = self.input_handler.input_text
         self.memory_protection = cfg.memory_protection
+
+    @staticmethod
+    def _require_input_success(operation: str, result):
+        if result is False:
+            raise RuntimeError(f"后台输入操作失败: {operation}")
+        return result
+
+    def _mouse_click(self, *args, **kwargs):
+        return self._require_input_success(
+            "mouse_click", self._input_mouse_click(*args, **kwargs)
+        )
+
+    def _mouse_click_blank(self, *args, **kwargs):
+        return self._require_input_success(
+            "mouse_click_blank", self._input_mouse_click_blank(*args, **kwargs)
+        )
+
+    def _mouse_drag(self, *args, **kwargs):
+        return self._require_input_success(
+            "mouse_drag", self._input_mouse_drag(*args, **kwargs)
+        )
+
+    def _mouse_drag_down(self, *args, **kwargs):
+        return self._require_input_success(
+            "mouse_drag_down", self._input_mouse_drag_down(*args, **kwargs)
+        )
+
+    def _mouse_drag_link(self, *args, **kwargs):
+        return self._require_input_success(
+            "mouse_drag_link", self._input_mouse_drag_link(*args, **kwargs)
+        )
+
+    def _mouse_scroll(self, *args, **kwargs):
+        return self._require_input_success(
+            "mouse_scroll", self._input_mouse_scroll(*args, **kwargs)
+        )
+
+    def _batch_mouse_scroll(self, *args, **kwargs):
+        return self._require_input_success(
+            "batch_mouse_scroll", self._input_batch_mouse_scroll(*args, **kwargs)
+        )
 
     def check_pause(self) -> bool:
         """
@@ -176,7 +220,9 @@ class Automation(metaclass=SingletonMeta):
         """
         # TODO:后续适配无需窗口设置模式
         x, y = coordinates
-        screenshot = np.array(self.screenshot)
+        if self.screenshot_np is None and self.screenshot is not None:
+            self.screenshot_np = np.array(self.screenshot)
+        screenshot = self.screenshot_np
         if offset:
             # 使用正态分布生成点击偏移，使其更聚集在中心区域，符合人类点击习惯
             offset_x = int(np.clip(np.random.normal(0, 4), -10, 10))
@@ -272,16 +318,14 @@ class Automation(metaclass=SingletonMeta):
             Image: 截取当前屏幕的图像对象
         """
         start_time = time.time()
-        screenshot_interval_time = (
-            cfg.screenshot_interval if cfg.screenshot_interval else 0.85
-        )
+        screenshot_interval_time = cfg.screenshot_interval if cfg.screenshot_interval else 0.85
         is_game_die = False
+        failed_attempts = 0
         while True:
             try:
                 if time.time() - self.last_screenshot_time < screenshot_interval_time:
                     wait_time = max(
-                        screenshot_interval_time
-                        - (time.time() - self.last_screenshot_time),
+                        screenshot_interval_time - (time.time() - self.last_screenshot_time),
                         0,
                     )
                     time.sleep(wait_time)
@@ -289,17 +333,25 @@ class Automation(metaclass=SingletonMeta):
                 result = ScreenShot.take_screenshot(gray)
                 if result:
                     self.screenshot = result
+                    self.screenshot_np = np.array(result)
                     self.last_screenshot_time = time.time()
                     return result
                 else:
-                    return None
+                    failed_attempts += 1
             except withOutGameWinError as e:
                 log.error(f"截图失败: {e}")
                 is_game_die = True
             except Exception as e:
                 log.error(f"截图失败:{e}")
+                failed_attempts += 1
+                if cfg.operation_mode == "background_window" and failed_attempts >= 3:
+                    raise RuntimeError("后台模式连续截图失败，已安全停止") from e
             time.sleep(1)
+            if cfg.operation_mode == "background_window" and failed_attempts >= 3:
+                raise RuntimeError("后台模式连续截图失败，已安全停止")
             if time.time() - start_time > 60 or is_game_die:
+                if cfg.operation_mode == "background_window":
+                    raise RuntimeError("后台模式截图超时，已安全停止")
                 log.error("截图超时，尝试重启游戏")
                 import win32process
 
@@ -337,9 +389,7 @@ class Automation(metaclass=SingletonMeta):
 
         return None
 
-    def _find_element_by_type(
-        self, target, find_type, threshold, model, crop_area, min_dist, additional_stack
-    ):
+    def _find_element_by_type(self, target, find_type, threshold, model, crop_area, min_dist, additional_stack):
         if find_type == "image":
             return self.find_image_element(
                 target,
@@ -349,13 +399,9 @@ class Automation(metaclass=SingletonMeta):
                 additional_stack=additional_stack + 1,
             )
         elif find_type == "text":
-            return self.find_text_element(
-                target, crop_area, additional_stack=additional_stack + 1
-            )
+            return self.find_text_element(target, crop_area, additional_stack=additional_stack + 1)
         elif find_type == "feature":
-            return self.find_feature_element(
-                target, crop_area, additional_stack=additional_stack + 1
-            )
+            return self.find_feature_element(target, crop_area, additional_stack=additional_stack + 1)
         elif find_type == "image_with_multiple_targets":
             return self.find_image_with_multiple_targets(
                 target,
@@ -433,7 +479,7 @@ class Automation(metaclass=SingletonMeta):
                 h = cfg.set_win_size
                 w = int(h * 16 / 9)
                 x, y = cached_pos
-                
+
                 # Dynamically set padding to prevent template mismatch size errors
                 padding = 100
                 if find_type == "image":
@@ -444,7 +490,7 @@ class Automation(metaclass=SingletonMeta):
                             template = self.img_cache[cache_key]["template"]
                             if template is not None:
                                 padding = max(template.shape[1] // 2 + 30, template.shape[0] // 2 + 30, 50)
-                
+
                 x1 = max(0, int(x - padding))
                 y1 = max(0, int(y - padding))
                 x2 = min(w, int(x + padding))
@@ -488,7 +534,9 @@ class Automation(metaclass=SingletonMeta):
                 template = ImageUtils.crop(template, bbox)
             if template is None:
                 raise ValueError("读取图片失败")
-            screenshot = np.array(self.screenshot)
+            if self.screenshot_np is None and self.screenshot is not None:
+                self.screenshot_np = np.array(self.screenshot)
+            screenshot = self.screenshot_np
             crop_offset = (0, 0)
             if my_crop:
                 crop_offset = (int(round(my_crop[0])), int(round(my_crop[1])))
@@ -501,9 +549,7 @@ class Automation(metaclass=SingletonMeta):
             if crop_offset != (0, 0):
                 matches = [(x + crop_offset[0], y + crop_offset[1]) for x, y in matches]
             if len(matches) == 0:
-                log.debug(
-                    f"未找到任何目标图像{target}", stacklevel=additional_stack + 3
-                )
+                log.debug(f"未找到任何目标图像{target}", stacklevel=additional_stack + 3)
                 return []
             else:
                 log.debug(
@@ -551,9 +597,7 @@ class Automation(metaclass=SingletonMeta):
             y = (box[0][1] + box[2][1]) / 2 + crop_offset[1]
             ocr_position_list.append([x, y])
 
-        ocr_dict = {
-            text: position for text, position in zip(ocr_text_list, ocr_position_list)
-        }
+        ocr_dict = {text: position for text, position in zip(ocr_text_list, ocr_position_list)}
         log.debug(f"识别到文本及其坐标：{ocr_dict}", stacklevel=additional_stack + 3)
         return ocr_dict
 
@@ -575,9 +619,7 @@ class Automation(metaclass=SingletonMeta):
         elif isinstance(target, dict):
             for key, value in target.items():
                 if position := self.find_str_in_text(str(key), ocr_dict):
-                    return TextMatchResult(
-                        value=value, text=str(key), position=position
-                    )
+                    return TextMatchResult(value=value, text=str(key), position=position)
             return None
         return False
 
@@ -608,9 +650,7 @@ class Automation(metaclass=SingletonMeta):
         Returns:
             文本命中结果，返回格式同 find_text_element；未命中返回 False。
         """
-        ocr_dict = self._run_ocr_for_text(
-            my_crop=my_crop, additional_stack=additional_stack
-        )
+        ocr_dict = self._run_ocr_for_text(my_crop=my_crop, additional_stack=additional_stack)
         if ocr_dict == {}:
             return False
 
@@ -633,17 +673,13 @@ class Automation(metaclass=SingletonMeta):
 
         return False
 
-    def find_text_element(
-        self, target, my_crop=None, all_text=False, only_text=False, additional_stack=0
-    ):
+    def find_text_element(self, target, my_crop=None, all_text=False, only_text=False, additional_stack=0):
         """
         寻找文本元素所在的坐标位置。
 
         str/list 目标返回坐标；dict 目标返回 TextMatchResult。
         """
-        ocr_result = self._run_ocr_for_text(
-            my_crop=my_crop, only_text=only_text, additional_stack=additional_stack
-        )
+        ocr_result = self._run_ocr_for_text(my_crop=my_crop, only_text=only_text, additional_stack=additional_stack)
         if only_text:
             return ocr_result
         return self._find_target_in_ocr_dict(target, ocr_result, all_text=all_text)
@@ -665,9 +701,7 @@ class Automation(metaclass=SingletonMeta):
 
         return ocr_text_list
 
-    def find_feature_element(
-        self, target, pic_crop=None, min_matches=8, additional_stack=0
-    ):
+    def find_feature_element(self, target, pic_crop=None, min_matches=8, additional_stack=0):
         """
         寻找特征元素所在的坐标位置（优化为使用多尺度模板匹配）
         """
@@ -675,7 +709,9 @@ class Automation(metaclass=SingletonMeta):
             template = ImageUtils.load_image(target, resize=False)
             if template is None:
                 return None
-            screenshot = np.array(self.screenshot)
+            if self.screenshot_np is None and self.screenshot is not None:
+                self.screenshot_np = np.array(self.screenshot)
+            screenshot = self.screenshot_np
             crop_offset = (0, 0)
             if pic_crop:
                 scaled_crop = list(pic_crop)
@@ -685,7 +721,7 @@ class Automation(metaclass=SingletonMeta):
                     scaled_crop = [int(i * cfg.set_win_size / 1440) for i in scaled_crop]
                 crop_offset = (scaled_crop[0], scaled_crop[1])
                 screenshot = ImageUtils.crop(screenshot, scaled_crop)
-            
+
             if len(screenshot.shape) == 3:
                 screenshot_gray = cv2.cvtColor(screenshot, cv2.COLOR_RGB2GRAY)
             else:
@@ -694,6 +730,8 @@ class Automation(metaclass=SingletonMeta):
             scales = [0.85, 1.0, 1.15]
             best_match_val = -1
             best_center = None
+            threshold = 0.70
+            matched = False
 
             for scale in scales:
                 if scale == 1.0:
@@ -703,9 +741,14 @@ class Automation(metaclass=SingletonMeta):
                     new_h, new_w = int(h_t * scale), int(w_t * scale)
                     if new_h <= 0 or new_w <= 0 or new_h > screenshot_gray.shape[0] or new_w > screenshot_gray.shape[1]:
                         continue
-                    scaled_template = cv2.resize(template, (new_w, new_h), interpolation=cv2.INTER_AREA if scale < 1.0 else cv2.INTER_LINEAR)
+                    scaled_template = cv2.resize(
+                        template, (new_w, new_h), interpolation=cv2.INTER_AREA if scale < 1.0 else cv2.INTER_LINEAR
+                    )
 
-                if scaled_template.shape[0] > screenshot_gray.shape[0] or scaled_template.shape[1] > screenshot_gray.shape[1]:
+                if (
+                    scaled_template.shape[0] > screenshot_gray.shape[0]
+                    or scaled_template.shape[1] > screenshot_gray.shape[1]
+                ):
                     continue
 
                 res = cv2.matchTemplate(screenshot_gray, scaled_template, cv2.TM_CCOEFF_NORMED)
@@ -716,43 +759,59 @@ class Automation(metaclass=SingletonMeta):
                     h_st, w_st = scaled_template.shape[:2]
                     best_center = (
                         int(max_loc[0]) + w_st // 2 + crop_offset[0],
-                        int(max_loc[1]) + h_st // 2 + crop_offset[1]
+                        int(max_loc[1]) + h_st // 2 + crop_offset[1],
                     )
 
             threshold = 0.70
             matched = best_match_val >= threshold
-            
+
             if not matched:
                 try:
                     template_edges = cv2.Canny(template, 50, 200)
                     screenshot_gray_edges = cv2.Canny(screenshot_gray, 50, 200)
-                    
+
                     best_edge_match_val = -1
                     best_edge_center = None
-                    
+
                     for scale in scales:
                         if scale == 1.0:
                             scaled_edge_template = template_edges
                         else:
                             h_t, w_t = template_edges.shape[:2]
                             new_h, new_w = int(h_t * scale), int(w_t * scale)
-                            if new_h <= 0 or new_w <= 0 or new_h > screenshot_gray_edges.shape[0] or new_w > screenshot_gray_edges.shape[1]:
+                            if (
+                                new_h <= 0
+                                or new_w <= 0
+                                or new_h > screenshot_gray_edges.shape[0]
+                                or new_w > screenshot_gray_edges.shape[1]
+                            ):
                                 continue
-                            scaled_edge_template = cv2.resize(template_edges, (new_w, new_h), interpolation=cv2.INTER_AREA if scale < 1.0 else cv2.INTER_LINEAR)
-                        
-                        if scaled_edge_template.shape[0] > screenshot_gray_edges.shape[0] or scaled_edge_template.shape[1] > screenshot_gray_edges.shape[1]:
+                            scaled_edge_template = cv2.resize(
+                                template_edges,
+                                (new_w, new_h),
+                                interpolation=cv2.INTER_AREA if scale < 1.0 else cv2.INTER_LINEAR,
+                            )
+
+                        if (
+                            scaled_edge_template.shape[0] > screenshot_gray_edges.shape[0]
+                            or scaled_edge_template.shape[1] > screenshot_gray_edges.shape[1]
+                        ):
                             continue
-                            
+
                         res = cv2.matchTemplate(screenshot_gray_edges, scaled_edge_template, cv2.TM_CCOEFF_NORMED)
                         _, max_val, _, max_loc = cv2.minMaxLoc(res)
-                        
+
                         if max_val > best_edge_match_val:
                             best_edge_match_val = max_val
                             h_st, w_st = scaled_edge_template.shape[:2]
                             best_edge_center = (
                                 int(max_loc[0]) + w_st // 2 + crop_offset[0],
-                                int(max_loc[1]) + h_st // 2 + crop_offset[1]
+                                int(max_loc[1]) + h_st // 2 + crop_offset[1],
                             )
+
+                        # ⚡ Bolt: Fast-path early exit for Canny edge matching too
+                        if best_edge_match_val >= 0.30:
+                            break
                     
                     if best_edge_match_val >= 0.30:
                         log.debug(
@@ -812,22 +871,12 @@ class Automation(metaclass=SingletonMeta):
 
     MATCH_GAP = 0.15
 
-    def _update_path_state_from_match_results(
-        self, results, additional_stack: int = 0
-    ) -> None:
-        dark_results = [
-            result for result in results if path_manager.is_path_dark(result["path"])
-        ]
-        default_results = [
-            result for result in results if path_manager.is_path_default(result["path"])
-        ]
-        zh_cn_results = [
-            result for result in results if path_manager.is_path_zh_cn(result["path"])
-        ]
+    def _update_path_state_from_match_results(self, results, additional_stack: int = 0) -> None:
+        dark_results = [result for result in results if path_manager.is_path_dark(result["path"])]
+        default_results = [result for result in results if path_manager.is_path_default(result["path"])]
+        zh_cn_results = [result for result in results if path_manager.is_path_zh_cn(result["path"])]
         en_results = [result for result in results if result["path"].endswith("/en")]
-        share_results = [
-            result for result in results if result["path"].endswith("/share")
-        ]
+        share_results = [result for result in results if result["path"].endswith("/share")]
 
         dark_matched = any(result["matched"] for result in dark_results)
         default_matched = any(result["matched"] for result in default_results)
@@ -872,10 +921,7 @@ class Automation(metaclass=SingletonMeta):
 
     @staticmethod
     def _path_state_is_known() -> bool:
-        return (
-            path_manager.current_theme is not None
-            and path_manager.current_language is not None
-        )
+        return path_manager.current_theme is not None and path_manager.current_language is not None
 
     def find_image_element(
         self,
@@ -908,7 +954,9 @@ class Automation(metaclass=SingletonMeta):
                 log.debug(f"无法加载图片: {target}", stacklevel=additional_stack + 3)
                 return None
 
-            screenshot = np.array(self.screenshot)
+            if self.screenshot_np is None and self.screenshot is not None:
+                self.screenshot_np = np.array(self.screenshot)
+            screenshot = self.screenshot_np
             crop_offset = (0, 0)
             if my_crop:
                 crop_offset = (int(round(my_crop[0])), int(round(my_crop[1])))
@@ -916,14 +964,10 @@ class Automation(metaclass=SingletonMeta):
 
             results = []
             for loaded_path in existing_paths:
-                template, bbox = self._load_template_for_path(
-                    target, loaded_path, cacheable
-                )
+                template, bbox = self._load_template_for_path(target, loaded_path, cacheable)
                 if template is None:
                     continue
-                center, matchVal = ImageUtils.match_template(
-                    screenshot, template, bbox, model
-                )
+                center, matchVal = ImageUtils.match_template(screenshot, template, bbox, model)
                 matched = self._is_valid_match(matchVal, threshold)
                 if 0.70 < matchVal < 0.90 and int(matchVal * 1000 + 1e-9) % 10 >= 5:
                     match_fmt = ".3f"
@@ -948,9 +992,7 @@ class Automation(metaclass=SingletonMeta):
                 log.debug(f"无法加载图片: {target}", stacklevel=additional_stack + 3)
                 return None
 
-            self._update_path_state_from_match_results(
-                results, additional_stack=additional_stack
-            )
+            self._update_path_state_from_match_results(results, additional_stack=additional_stack)
             for result in results:
                 if result["matched"]:
                     return result["center"]
@@ -963,7 +1005,9 @@ class Automation(metaclass=SingletonMeta):
         获取指定区域的彩色截图
         """
         self.take_screenshot(False)
-        screenshot = np.array(self.screenshot)
+        if self.screenshot_np is None and self.screenshot is not None:
+            self.screenshot_np = np.array(self.screenshot)
+        screenshot = self.screenshot_np
         screenshot = screenshot[:, :, ::-1]
         screenshot = ImageUtils.crop(screenshot, crop)
         return screenshot
@@ -1021,6 +1065,7 @@ class PageStateDispatcher:
 
     def __init__(self, automation_instance=None):
         from module.automation.automation import Automation
+
         self.auto = automation_instance if automation_instance else Automation("AhabAssistant")
 
     def detect_state(self) -> str:
@@ -1034,14 +1079,17 @@ class PageStateDispatcher:
             self.auto.take_screenshot()
 
         # Priority order checks (using take_screenshot=False to use the cached frame)
-        if (self.auto.find_element("battle/more_information_assets.png", take_screenshot=False) or
-            self.auto.find_element("battle/in_mirror_assets.png", take_screenshot=False) or
-            self.auto.find_element("battle/win_rate_card.png", take_screenshot=False) or
-            self.auto.find_element("battle/turn_assets.png", take_screenshot=False)):
+        if (
+            self.auto.find_element("battle/more_information_assets.png", take_screenshot=False)
+            or self.auto.find_element("battle/in_mirror_assets.png", take_screenshot=False)
+            or self.auto.find_element("battle/win_rate_card.png", take_screenshot=False)
+            or self.auto.find_element("battle/turn_assets.png", take_screenshot=False)
+        ):
             return GameState.BATTLE
 
-        if (self.auto.find_element("mirror/road_to_mir/select_team_stars_assets.png", take_screenshot=False) or
-            self.auto.find_element("mirror/road_to_mir/select_team_confirm_assets.png", take_screenshot=False)):
+        if self.auto.find_element(
+            "mirror/road_to_mir/select_team_stars_assets.png", take_screenshot=False
+        ) or self.auto.find_element("mirror/road_to_mir/select_team_confirm_assets.png", take_screenshot=False):
             return GameState.MIRROR_TEAM_SELECT
 
         if self.auto.find_element("teams/identify_assets.png", take_screenshot=False):
@@ -1050,65 +1098,46 @@ class PageStateDispatcher:
         if self.auto.find_element("mirror/shop/shop_coins_assets.png", take_screenshot=False):
             return GameState.SHOP
 
-        if (self.auto.find_element("mirror/road_in_mir/legend_assets.png", take_screenshot=False) or
-                self.auto.find_element("mirror/road_in_mir/to_window_assets.png", take_screenshot=False)):
-            return GameState.ROAD_MAP
-
-        if self.auto.find_element("mirror/theme_pack/feature_theme_pack_assets.png", take_screenshot=False):
+        if (
+            self.auto.find_element("mirror/theme_pack/feature_theme_pack_assets.png", take_screenshot=False)
+            or self.auto.find_element("mirror/theme_pack/normal_assets.png", take_screenshot=False)
+            or self.auto.find_element("mirror/theme_pack/hard_assets.png", take_screenshot=False)
+        ):
             return GameState.THEME_PACK
 
-        if (self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_card.png", take_screenshot=False) or
-            self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_box_assets.png", take_screenshot=False) or
-            self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_refuse_assets.png", take_screenshot=False)):
+        if self.auto.find_element(
+            "mirror/road_in_mir/legend_assets.png", take_screenshot=False
+        ) or self.auto.find_element("mirror/road_in_mir/to_window_assets.png", take_screenshot=False):
+            return GameState.ROAD_MAP
+
+        if (
+            self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_card.png", take_screenshot=False)
+            or self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_box_assets.png", take_screenshot=False)
+            or self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_refuse_assets.png", take_screenshot=False)
+        ):
             return GameState.EGO_GIFT_SELECT
 
-        if (self.auto.find_element("mirror/claim_reward/battle_statistics_assets.png", take_screenshot=False) or
-            self.auto.find_element("mirror/claim_reward/claim_rewards_assets.png", take_screenshot=False) or
-            self.auto.find_element("mirror/claim_reward/complete_mirror_100%_assets.png", take_screenshot=False) or
-            self.auto.find_element("mirror/claim_reward/use_enkephalin_assets.png", take_screenshot=False)):
+        if (
+            self.auto.find_element("mirror/claim_reward/battle_statistics_assets.png", take_screenshot=False)
+            or self.auto.find_element("mirror/claim_reward/claim_rewards_assets.png", take_screenshot=False)
+            or self.auto.find_element("mirror/claim_reward/complete_mirror_100%_assets.png", take_screenshot=False)
+            or self.auto.find_element("mirror/claim_reward/use_enkephalin_assets.png", take_screenshot=False)
+        ):
             return GameState.CLAIM_REWARD
 
         if self.auto.find_element("event/skip_assets.png", take_screenshot=False):
             return GameState.EVENT
 
-        if (self.auto.find_element("mirror/road_to_mir/enter_assets.png", take_screenshot=False) or
-            self.auto.find_element("mirror/road_to_mir/resume_assets.png", take_screenshot=False) or
-            self.auto.find_element("mirror/road_to_mir/enter_mirror_assets.png", take_screenshot=False)):
-        # Check Theme Pack before Road Map
-        if (self.auto.find_element("mirror/theme_pack/feature_theme_pack_assets.png") or
-            self.auto.find_element("mirror/theme_pack/normal_assets.png") or
-            self.auto.find_element("mirror/theme_pack/hard_assets.png")):
-            return GameState.THEME_PACK
-
-        # Check EGO Gift Selection before Road Map
-        if (self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_card.png") or
-            self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_box_assets.png") or
-            self.auto.find_element("mirror/road_in_mir/acquire_ego_gift_refuse_assets.png")):
-            return GameState.EGO_GIFT_SELECT
-
-        # Check Event skip before Road Map
-        if self.auto.find_element("event/skip_assets.png"):
-            return GameState.EVENT
-
-        # Check Road Map after overlay/menu screens to prevent closed-panel bus fallback false positives
-        if (self.auto.find_element("mirror/road_in_mir/legend_assets.png") or
-                self.auto.find_element("mirror/road_in_mir/to_window_assets.png")):
-            return GameState.ROAD_MAP
-
-        if (self.auto.find_element("mirror/claim_reward/battle_statistics_assets.png") or
-            self.auto.find_element("mirror/claim_reward/claim_rewards_assets.png") or
-            self.auto.find_element("mirror/claim_reward/complete_mirror_100%_assets.png") or
-            self.auto.find_element("mirror/claim_reward/use_enkephalin_assets.png")):
-            return GameState.CLAIM_REWARD
-
-        if (self.auto.find_element("mirror/road_to_mir/enter_assets.png") or
-            self.auto.find_element("mirror/road_to_mir/resume_assets.png") or
-            self.auto.find_element("mirror/road_to_mir/enter_mirror_assets.png")):
+        if (
+            self.auto.find_element("mirror/road_to_mir/enter_assets.png", take_screenshot=False)
+            or self.auto.find_element("mirror/road_to_mir/resume_assets.png", take_screenshot=False)
+            or self.auto.find_element("mirror/road_to_mir/enter_mirror_assets.png", take_screenshot=False)
+        ):
             return GameState.MIRROR_ENTRANCE
 
-        if (self.auto.find_element("home/drive_assets.png", take_screenshot=False) or
-            self.auto.find_element("home/window_assets.png", take_screenshot=False)):
+        if self.auto.find_element("home/drive_assets.png", take_screenshot=False) or self.auto.find_element(
+            "home/window_assets.png", take_screenshot=False
+        ):
             return GameState.MAIN_MENU
 
         return GameState.UNKNOWN
-

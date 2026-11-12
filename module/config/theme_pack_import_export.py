@@ -31,7 +31,7 @@ def export_theme_pack_weight(team_num: int, file_path: str) -> bool:
             log.error(f"队伍 {team_num} 的主题包权重文件未找到")
             return False
 
-        yaml = YAML(typ="safe")
+        yaml = YAML()
         with open(theme_pack_weight_path, "r", encoding="utf-8") as file:
             theme_pack_data = yaml.load(file)
 
@@ -62,7 +62,7 @@ def _deep_merge_dicts(existing: dict, import_data: dict) -> dict:
 
 def _load_existing_theme_pack_weight(team_num: int) -> tuple[Path, dict]:
     """加载队伍当前的主题包权重数据。"""
-    yaml = YAML(typ="safe")
+    yaml = YAML()
     target_path = Path(theme_list.build_team_weight_path(team_num))
 
     if not target_path.exists():
@@ -86,7 +86,7 @@ def _import_theme_pack_weight_data(
         log.error(invalid_data_message or f"队伍 {team_num} 的导入数据不是字典")
         return False
 
-    yaml = YAML(typ="safe")
+    yaml = YAML()
     target_path, existing_data = _load_existing_theme_pack_weight(team_num)
     merged_data = _deep_merge_dicts(existing_data, import_data)
 

@@ -24,9 +24,9 @@ def get_the_timing(return_time=False):
                 for ocr in ocr_result:
                     s += str(ocr)
                 if ":" in s:
-                    l = s.split(":")
-                    minute = int(l[0][-2:])
-                    seconds = int(l[1][:2])
+                    parts = s.split(":")
+                    minute = int(parts[0][-2:])
+                    seconds = int(parts[1][:2])
                     if return_time:
                         return minute * 60 + seconds
                     if minute >= 5 and seconds >= 20:
@@ -34,7 +34,7 @@ def get_the_timing(return_time=False):
                             f"生成下一点体力的时间为{minute}分{seconds}秒，符合葛朗台模式操作"
                         )
                         return True
-            except:
+            except Exception:
                 return False
         return False
 
@@ -63,7 +63,7 @@ def get_current_enkephalin():
                 ocr_result = ocr_result.split("/")
                 current_enkephalin = int(ocr_result[0])
                 return current_enkephalin
-        except:
+        except Exception:
             continue
     try:
         sc = ImageUtils.crop(np.array(auto.screenshot), enkephalin_bbox)
@@ -73,7 +73,7 @@ def get_current_enkephalin():
         ocr_result = "".join(ocr_result)
         current_enkephalin = int(ocr_result[0])
         return current_enkephalin
-    except:
+    except Exception:
         pass
     return None
 

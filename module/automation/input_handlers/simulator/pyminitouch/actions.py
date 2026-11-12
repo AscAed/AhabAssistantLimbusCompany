@@ -29,10 +29,18 @@ class CommandBuilder(object):
     use `d.connection` to get `connection` from device
     """
 
-    # TODO (x, y) can not beyond the screen size
-    def __init__(self):
+    def __init__(self, max_x=None, max_y=None):
         self._content = ""
         self._delay = 0
+        self.max_x = max_x
+        self.max_y = max_y
+
+    def _check_bounds(self, x, y):
+        if self.max_x is not None and (x < 0 or x > self.max_x):
+            raise ValueError(f"x coordinate {x} is out of bounds (0, {self.max_x})")
+        if self.max_y is not None and (y < 0 or y > self.max_y):
+            raise ValueError(f"y coordinate {y} is out of bounds (0, {self.max_y})")
+
 
     def append(self, new_content):
         self._content += new_content + "\n"
@@ -52,10 +60,12 @@ class CommandBuilder(object):
 
     def down(self, contact_id, x, y, pressure):
         """add minitouch command: 'd <contact_id> <x> <y> <pressure>\n'"""
+        self._check_bounds(x, y)
         self.append("d {} {} {} {}".format(contact_id, x, y, pressure))
 
     def move(self, contact_id, x, y, pressure):
         """add minitouch command: 'm <contact_id> <x> <y> <pressure>\n'"""
+        self._check_bounds(x, y)
         self.append("m {} {} {} {}".format(contact_id, x, y, pressure))
 
     def publish(self, connection):
@@ -142,7 +152,7 @@ class MNTDevice(object):
 
             adbutils.adb.kill_server()
             self.start()
-        except:
+        except Exception:
             self.start()
         # real connection
         self.connection = MNTConnection(self.server.port)
@@ -163,7 +173,9 @@ class MNTDevice(object):
         """
         points = [list(map(int, each_point)) for each_point in points]
 
-        _builder = CommandBuilder()
+        max_x = int(self.connection.max_x) if self.connection and getattr(self.connection, 'max_x', None) else None
+        max_y = int(self.connection.max_y) if self.connection and getattr(self.connection, 'max_y', None) else None
+        _builder = CommandBuilder(max_x=max_x, max_y=max_y)
         for point_id, each_point in enumerate(points):
             x, y = each_point
             _builder.down(point_id, x, y, pressure)
@@ -207,7 +219,9 @@ class MNTDevice(object):
 
         points = [list(map(int, each_point)) for each_point in points]
 
-        _builder = CommandBuilder()
+        max_x = int(self.connection.max_x) if self.connection and getattr(self.connection, 'max_x', None) else None
+        max_y = int(self.connection.max_y) if self.connection and getattr(self.connection, 'max_y', None) else None
+        _builder = CommandBuilder(max_x=max_x, max_y=max_y)
         point_id = 0
 
         # tap the first point
@@ -243,7 +257,9 @@ class MNTDevice(object):
 
         :param contact_id: 触点 id，默认 0
         """
-        _builder = CommandBuilder()
+        max_x = int(self.connection.max_x) if self.connection and getattr(self.connection, 'max_x', None) else None
+        max_y = int(self.connection.max_y) if self.connection and getattr(self.connection, 'max_y', None) else None
+        _builder = CommandBuilder(max_x=max_x, max_y=max_y)
         _builder.up(contact_id)
         _builder.publish(self.connection)
 
@@ -313,9 +329,6 @@ class MNTDevice(object):
             all_points.append(last_target)
 
         total = len(all_points)
-        unique = len(set(all_points))
-        head = all_points[:10]
-        tail = all_points[-10:] if total > 10 else []
 
         # 统计连续重复点数量
         consecutive_dups = 0

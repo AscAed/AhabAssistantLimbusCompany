@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# ruff: noqa: T201  # CLI script intentionally prints CI version output.
 import argparse
 import json
 import os

@@ -3,7 +3,7 @@ from enum import Enum
 from PySide6.QtCore import QT_TRANSLATE_NOOP
 
 from app.mediator import Mediator
-from module.config import cfg
+from module.domain_constants import ALL_SINNERS_NAME, ALL_SYSTEMS
 
 mediator = Mediator()
 
@@ -131,33 +131,8 @@ refresh_count_options = {
 blank_team_setting = {}
 
 
-all_sinners_name = [
-    "YiSang",
-    "Faust",
-    "DonQuixote",
-    "Ryoshu",
-    "Meursault",
-    "HongLu",
-    "Heathcliff",
-    "Ishmael",
-    "Rodion",
-    "Sinclair",
-    "Outis",
-    "Gregor",
-]
-
-all_systems_name = {
-    0: "burn",
-    1: "bleed",
-    2: "tremor",
-    3: "rupture",
-    4: "poise",
-    5: "sinking",
-    6: "charge",
-    7: "slash",
-    8: "pierce",
-    9: "blunt",
-}
+all_sinners_name = ALL_SINNERS_NAME
+all_systems_name = ALL_SYSTEMS
 
 second_system_mode = [
     "second_system_fuse_IV",
@@ -222,12 +197,9 @@ all_checkbox_config_name = [
     "observe_ego_gift",
 ]
 
-win_input_type_options = {
-    QT_TRANSLATE_NOOP("ComboBoxSettingCard", "前台模式 (pyautogui)"): "foreground",
-    QT_TRANSLATE_NOOP("ComboBoxSettingCard", "后台模式 (默认) (pywin32)"): "background",
-    QT_TRANSLATE_NOOP(
-        "ComboBoxSettingCard", "后台增强 (pywin32+set_window_pos)"
-    ): "window_move",
+operation_mode_options = {
+    QT_TRANSLATE_NOOP("ComboBoxSettingCard", "前台模式（移动鼠标）"): "foreground_mouse",
+    QT_TRANSLATE_NOOP("ComboBoxSettingCard", "后台模式（移动窗口）"): "background_window",
 }
 
 

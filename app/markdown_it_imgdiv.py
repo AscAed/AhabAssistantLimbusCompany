@@ -26,6 +26,8 @@ Usage:
     # <div class="figure"><img src="image.jpg" alt="Alt text" tabindex="0" /></div>
 """
 
+# ruff: noqa: T201  # prints only live inside the optional __main__ demo.
+
 from typing import TYPE_CHECKING, Optional, Sequence
 
 from markdown_it import MarkdownIt

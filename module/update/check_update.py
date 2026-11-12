@@ -75,10 +75,26 @@ class UpdateThread(QThread):
         当前版本对象与最新版本对象组成的二元组
         """
         self.new_version = version
-        current_version = parse(cfg.version.lstrip("Vv"))
-        latest_version = parse(version.lstrip("Vv"))
+        current_version = self._parse_version(cfg.version)
+        latest_version = self._parse_version(version)
         self.is_current_version_latest = current_version == latest_version
         return current_version, latest_version
+
+    @staticmethod
+    def _parse_version(version: str):
+        """解析带或不带 v/V 前缀的语义化版本号。"""
+        return parse(str(version).strip().lstrip("Vv"))
+
+    def _validate_local_version(self) -> bool:
+        """校验本地版本号，避免用非法哨兵进入版本比较链。"""
+        raw_version = str(cfg.version).strip()
+        if not raw_version or raw_version.upper() == "DEFAULT VERSION":
+            return False
+        try:
+            self._parse_version(raw_version)
+            return True
+        except Exception:
+            return False
 
     def _build_release_note_content(self, raw_content: str) -> str:
         """
@@ -137,6 +153,12 @@ class UpdateThread(QThread):
         检查是否有新版本，如果有则发送更新可用信号；否则发送成功信号。
         """
         try:
+            if not self._validate_local_version():
+                self.error_msg = f"本地版本号无效：{cfg.version!r}，已跳过更新检查"
+                log.error(self.error_msg)
+                self.updateSignal.emit(UpdateStatus.FAILURE)
+                return
+
             # 如果标志位为 False 且配置中的检查更新标志也为 False，则直接返回
             if self.flag and not cfg.get_value("check_update"):
                 return
@@ -502,8 +524,8 @@ def update(assets_url):
                     safe_unpack_archive(download_file_path, destination)
                 log.info("OCR解压完成，请重启AALC")
                 return True
-            except Exception:
-                input("解压失败，按回车键重新解压. . .多次失败请手动下载更新")
+            except Exception as e:
+                log.error(f"OCR 解压失败：{e}")
                 return False
         else:
             mediator.download_complete.emit(file_name)

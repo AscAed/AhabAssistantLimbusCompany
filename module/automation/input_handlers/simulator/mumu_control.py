@@ -1130,7 +1130,12 @@ class MumuControl(AbstractInput):
         return 0, 0
 
     def mouse_drag_link(
-        self, position: list, drag_time=0.25, min_distance=10, move_back=False
+        self,
+        position: list,
+        drag_time=0.25,
+        min_distance=10,
+        move_back=False,
+        resolve_last_position=None,
     ) -> None:
         """鼠标从指定位置拖动到指定位置
         Args:
@@ -1139,6 +1144,11 @@ class MumuControl(AbstractInput):
             position (list): 目标位置列表
             drag_time (float): 拖动时间
         """
+        if resolve_last_position is not None:
+            resolved = resolve_last_position()
+            if resolved is not None:
+                position = [*position, resolved]
+
         self.down(position[0][0], position[0][1])
         p = (position[0][0], position[0][1])
         for pos in position[1:]:

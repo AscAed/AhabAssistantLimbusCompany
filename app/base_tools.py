@@ -32,7 +32,7 @@ from qfluentwidgets import (
 from qfluentwidgets import FluentIcon as FIF
 from qfluentwidgets.components.settings.setting_card import SettingIconWidget
 
-from app import *
+from app import all_sinners_name, mediator, team_toggle_button_group, toggle_button_group
 from app.common.ui_config import get_setting_layout_style
 from module.config import cfg
 
@@ -497,6 +497,7 @@ class BaseLineEdit(BaseLayout):
         self.config_name = config_name
         self.setObjectName(config_name)
         self.line_edit = LineEdit(self)
+        self.line_edit.setClearButtonEnabled(True)
         self.hBoxLayout.addWidget(self.line_edit, stretch=1)
         self.line_edit.textChanged.connect(self.text_changed)
 

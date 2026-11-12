@@ -268,7 +268,7 @@ def Buy_enkephalin():
     lunacy_to_enkephalin(times=times)
 
 
-def Mirror_task():
+def Mirror_task(thread=None):
     # 判断执行镜牢任务的次数
     mir_times = cfg.set_mirror_count
     if cfg.infinite_dungeons:
@@ -280,6 +280,8 @@ def Mirror_task():
     cfg.normalize_and_sync_team_state(persist=False)
     # 开始执行镜牢任务
     while mir_times > 0:
+        if thread and getattr(thread, "is_stop", False):
+            raise userStopError("用户主动终止程序")
         # 检测配置的队伍能否顺利执行
         useful = False
         hard = bool(cfg.hard_mirror)
@@ -455,13 +457,33 @@ class my_script_task(QThread):
             withOutAdminError,
         ) as e:
             self.exception = e
+            self._notify_failure(e)
         except Exception as e:
             self.exception = e
             log.exception("脚本线程执行失败")
+            self._notify_failure(e)
         finally:
             self.mutex.unlock()
 
         mediator.script_finished.emit()
+
+    @staticmethod
+    def _notify_failure(error: Exception) -> None:
+        """Surface terminal task errors without blocking the worker thread."""
+        message = f"{type(error).__name__}: {error}"[:180]
+        try:
+            mediator.warning.emit(f"AALC 运行失败：{message}")
+        except Exception:
+            log.debug("发送任务失败 UI 提醒失败", exc_info=True)
+        if cfg.operation_mode == "background_window":
+            try:
+                send_toast(
+                    "AALC 运行失败",
+                    ["后台模式已安全停止", message],
+                    template=TemplateToast.NormalTemplate,
+                )
+            except Exception:
+                log.debug("发送后台模式失败通知失败", exc_info=True)
 
     """def stop(self):
         self.running=False

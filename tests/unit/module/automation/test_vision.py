@@ -1,13 +1,15 @@
-import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
+
 import numpy as np
+import pytest
 
 from module.automation.automation import Automation
+
 
 @pytest.fixture
 def mock_automation():
     with patch("module.automation.automation.cfg") as mock_cfg, \
-         patch("module.automation.automation.ocr") as mock_ocr:
+         patch("module.automation.automation.ocr"):
         mock_cfg.set_win_size = 1440
         mock_cfg.memory_protection = False
 

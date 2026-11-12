@@ -1,4 +1,3 @@
-import random
 import re
 from time import sleep, time
 from typing import Callable, TypeVar
@@ -373,8 +372,8 @@ class SimulatorControl(AbstractInput):
 
         msg = "点击（1，1）空白位置"
         log.debug(msg)
-        x = coordinate[0] + random.randint(0, 10)
-        y = coordinate[1] + random.randint(0, 10)
+        x = coordinate[0] + 5
+        y = coordinate[1] + 5
         for i in range(times):
             self.mouse_click(x, y)
 
@@ -487,7 +486,13 @@ class SimulatorControl(AbstractInput):
             return False
         return True
 
-    def mouse_drag_link(self, position: list, drag_time=0.15, move_back=False) -> None:
+    def mouse_drag_link(
+        self,
+        position: list,
+        drag_time=0.15,
+        move_back=False,
+        resolve_last_position=None,
+    ) -> None:
         """
         拖动鼠标经过多个中间点（折线），最后松开
         """
@@ -495,6 +500,11 @@ class SimulatorControl(AbstractInput):
             self.get_simulator()
         msg = f"开始拉链，列表{position}"
         log.debug(msg)
+
+        if resolve_last_position is not None:
+            resolved = resolve_last_position()
+            if resolved is not None:
+                position = [*position, resolved]
 
         position_conversion = []
         for pos in position:

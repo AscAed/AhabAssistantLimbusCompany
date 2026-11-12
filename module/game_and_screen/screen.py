@@ -317,7 +317,7 @@ class Handle:
         hwnd = self.hwnd
         if hwnd == 0:
             return
-        if not cfg.background_click:
+        if cfg.operation_mode != "background_window":
             transparent = False
 
         ex_style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
@@ -367,12 +367,14 @@ class Screen(metaclass=SingletonMeta):
 
         def _set_win():
             # 如果窗口最小化或不可见，先将其恢复
+            if self.handle.isMinimized and cfg.operation_mode == "background_window":
+                raise RuntimeError("后台模式不支持最小化游戏窗口")
             if self.handle.isMinimized or (
-                not self.handle.isActive and not cfg.background_click
+                not self.handle.isActive and cfg.operation_mode != "background_window"
             ):
                 self.handle.restore()
             # 将窗口设为活动窗口
-            if not cfg.background_click:
+            if cfg.operation_mode != "background_window":
                 self.handle.setForeground()
             self.set_win_size = cfg.set_win_size
             self.set_win_position = cfg.set_win_position
@@ -406,7 +408,7 @@ class Screen(metaclass=SingletonMeta):
         hwnd = self.handle.hwnd
 
         # 设置窗口始终置顶
-        if not cfg.background_click:
+        if cfg.operation_mode != "background_window":
             win32gui.SetWindowPos(
                 hwnd,
                 win32con.HWND_TOPMOST,
@@ -486,7 +488,7 @@ class Screen(metaclass=SingletonMeta):
             return
         hwnd = self.handle.hwnd
         monitor_info = self.handle.monitor_info
-        is_back: bool = cfg.background_click
+        is_back: bool = cfg.operation_mode == "background_window"
         left, top, right, bottom = (
             monitor_info["Monitor"] if is_back else monitor_info["Work"]
         )
@@ -514,15 +516,15 @@ class Screen(metaclass=SingletonMeta):
         """检查窗口大小是否合适，若不合适则切换全屏再切换回窗口模式"""
         try:
             screen_width, screen_height = self.handle.monitor_size(
-                not cfg.background_click  # 前台模式使用工作区大小
+                cfg.operation_mode != "background_window"  # 前台模式使用工作区大小
             )
-            if cfg.win_input_type != "window_move":
+            if cfg.operation_mode != "background_window":
                 if screen_width < set_win_size * 16 / 9 or screen_height < set_win_size:
                     log.error(
-                        "屏幕分辨率过低，请重新设定分辨率，或考虑使用后台增强模式"
+                        "屏幕分辨率过低，请重新设定分辨率，或考虑使用后台模式（移动窗口）"
                     )
                     log.debug(f"窗口所在的屏幕分辨率: {screen_width}x{screen_height}")
-                    if not cfg.background_click:
+                    if cfg.operation_mode != "background_window":
                         screen_width, screen_height = self.handle.monitor_size(False)
                         if (
                             screen_width >= set_win_size * 16 / 9

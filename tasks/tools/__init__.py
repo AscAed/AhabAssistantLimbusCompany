@@ -1,12 +1,10 @@
-import sys
 import threading
 from typing import Literal
 
-from PySide6.QtCore import QObject, QThread, QTimer
+from PySide6.QtCore import QObject, QTimer
 from PySide6.QtWidgets import QApplication, QWidget
 
 from module.logger import log
-from tasks.base.script_task_scheme import init_game
 from tasks.tools.infinite_battle import InfiniteBattles
 from tasks.tools.production_module import ProductionModule
 from tasks.tools.screenshot_module import ScreenshotGet

@@ -1,6 +1,3 @@
-import random
-
-
 def generate_bezier_path(
     start: tuple[int, int],
     end: tuple[int, int],
@@ -34,15 +31,15 @@ def generate_bezier_path(
     nx = -dy / distance
     ny = dx / distance
 
-    # Randomise control points with perpendicular and parallel offsets
-    offset1 = random.uniform(-0.25, 0.25) * distance
-    offset2 = random.uniform(-0.25, 0.25) * distance
+    # Deterministic control points for stable, audit-safe input behavior.
+    offset1 = 0.0
+    offset2 = 0.0
 
-    p1_x = x0 + dx * random.uniform(0.2, 0.4) + nx * offset1
-    p1_y = y0 + dy * random.uniform(0.2, 0.4) + ny * offset1
+    p1_x = x0 + dx * 0.3 + nx * offset1
+    p1_y = y0 + dy * 0.3 + ny * offset1
 
-    p2_x = x0 + dx * random.uniform(0.6, 0.8) + nx * offset2
-    p2_y = y0 + dy * random.uniform(0.6, 0.8) + ny * offset2
+    p2_x = x0 + dx * 0.7 + nx * offset2
+    p2_y = y0 + dy * 0.7 + ny * offset2
 
     path = []
     for i in range(steps + 1):

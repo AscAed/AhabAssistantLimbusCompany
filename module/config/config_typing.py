@@ -235,11 +235,8 @@ class ConfigModel(BaseModel):
     memory_protection: bool
     """内存占用保护"""
 
-    background_click: bool
-    """是否使用后台点击"""
-
-    win_input_type: str
-    """键鼠操控方式"""
+    operation_mode: str
+    """运行操作方式：foreground_mouse 或 background_window"""
 
     auto_hard_mirror: bool
     """周四自动切换困难镜牢"""

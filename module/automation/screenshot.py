@@ -1,4 +1,3 @@
-import subprocess
 import time
 from ctypes import windll
 
@@ -39,9 +38,9 @@ class ScreenShot:
                     return None
         else:
             # 将窗口移动到屏幕可见区域，确保获取到完整的内容
-            screen.handle.bring_window_into_view(not cfg.background_click)
+            screen.handle.bring_window_into_view(cfg.operation_mode == "foreground_mouse")
 
-        if cfg.background_click:
+        if cfg.operation_mode == "background_window":
             try:
                 return ScreenShot.background_screenshot(gray)
             except Exception as e:
@@ -232,27 +231,12 @@ class ScreenShot:
             return pil_image
 
         except pywintypes.error as e:
-            log.error(f"后台截图报错: {e}，尝试重启游戏")
-            import win32process
-
-            try:
-                _, pid = win32process.GetWindowThreadProcessId(screen.handle.hwnd)
-                subprocess.run(["taskkill", "/F", "/PID", str(pid)], check=False)
-            except Exception:
-                pass
-            from tasks.base.script_task_scheme import init_game
-
-            init_game()
+            log.error(f"后台截图报错: {e}")
+            raise RuntimeError("后台模式截图失败，已安全停止") from e
 
         except ValueError:
             if screen.handle.isMinimized:
-                screen.handle.set_window_transparent(True)
-                screen.handle.restore()
-
-                from time import sleep
-
-                sleep(0.5)
-                return ScreenShot.background_screenshot(gray)
+                raise RuntimeError("后台模式不支持最小化游戏窗口截图")
             else:
                 raise
 

@@ -14,8 +14,9 @@ class EventHandling:
         self.times = 0
 
     def decision_event_handling(self):
-        # ⚡ Bolt: Cache a single screenshot for all find_element calls to avoid taking 5 sequential screenshots
-        auto.take_screenshot()
+        # ⚡ Bolt: Capture screen once outside the loop instead of capturing up to 5 times sequentially
+        if auto.take_screenshot() is None:
+            return
         for level in ["very_high", "high", "normal", "low", "very_low"]:
             if best_option := auto.find_element(f"event/{level}.png", take_screenshot=False):
                 auto.mouse_action_with_pos(best_option)

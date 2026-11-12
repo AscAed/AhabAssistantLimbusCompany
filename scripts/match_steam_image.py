@@ -8,6 +8,8 @@
 流程: DPI 初始化 → 挂载项目路径 → 启动游戏(120s 超时) → 截图 → 模板匹配 → 打印结果
 """
 
+# ruff: noqa: E402, T201  # script intentionally imports after sys.path setup and prints results.
+
 import os
 import sys
 import time
@@ -33,14 +35,14 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 os.chdir(PROJECT_ROOT)
 
-import cv2
-import numpy as np
-from PIL import Image
+import cv2  # noqa: E402
+import numpy as np  # noqa: E402
+from PIL import Image  # noqa: E402
 
-from module.automation.screenshot import ScreenShot
-from module.config import cfg
-from module.game_and_screen import game_process, screen
-from utils.image_utils import ImageUtils
+from module.automation.screenshot import ScreenShot  # noqa: E402
+from module.config import cfg  # noqa: E402
+from module.game_and_screen import game_process, screen  # noqa: E402
+from utils.image_utils import ImageUtils  # noqa: E402
 
 game_process.start_game()
 deadline = time.time() + 120

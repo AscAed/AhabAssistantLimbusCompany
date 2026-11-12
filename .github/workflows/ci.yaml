@@ -32,7 +32,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.x"
+          python-version: "3.12"
 
       - name: Compute CI version
         id: version
@@ -55,12 +55,18 @@ jobs:
       - name: Setup UV for Python
         uses: astral-sh/setup-uv@v8.1.0
         with:
+          python-version: "3.12"
           enable-cache: true
           cache-dependency-glob: |
             **/uv.lock
 
       - name: Install dependencies
         run: uv sync --frozen
+
+      - name: Syntax and collection checks
+        run: |
+          uv run python -m compileall -q app module tasks utils scripts main.py main_dev.py updater.py
+          uv run pytest --collect-only -q
 
       - name: Run pytest
         run: uv run pytest -ra
