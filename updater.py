@@ -5,7 +5,7 @@ import os
 import shutil
 import subprocess
 import sys
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath, PureWindowsPath
 
 import psutil
 
@@ -130,59 +130,60 @@ class Updater:
         with open(self.changes_file_path, "r", encoding="utf-8") as f:
             changes = json.load(f)
 
+        normalized_changes = {}
+        for category in ("deleted_dir", "deleted", "added_dir", "added", "modified"):
+            normalized_changes[category] = []
+            for relative_path in changes.get(category, []):
+                normalized_path = self._normalize_manifest_path(relative_path)
+                if normalized_path is None:
+                    continue
+                self._resolve_manifest_path(self.cover_folder_path, normalized_path)
+                if category in ("added", "modified"):
+                    self._resolve_manifest_path(self.extract_folder_path, normalized_path)
+                normalized_changes[category].append((relative_path, normalized_path))
+
         print("检测到增量更新清单，执行增量更新...")
 
-        for dir_path in changes.get("deleted_dir", []):
-            normalized_path = self._normalize_manifest_path(dir_path)
-            if not normalized_path:
-                continue
-            full_path = os.path.join(self.cover_folder_path, normalized_path)
+        for dir_path, normalized_path in normalized_changes["deleted_dir"]:
+            full_path = self._resolve_manifest_path(self.cover_folder_path, normalized_path)
             try:
                 shutil.rmtree(full_path)
                 print(f"删除目录: {dir_path}")
             except FileNotFoundError:
                 print(f"删除目录不存在: {dir_path}")
 
-        for file_path in changes.get("deleted", []):
-            normalized_path = self._normalize_manifest_path(file_path)
-            if not normalized_path:
-                continue
-            full_path = os.path.join(self.cover_folder_path, normalized_path)
+        for file_path, normalized_path in normalized_changes["deleted"]:
+            full_path = self._resolve_manifest_path(self.cover_folder_path, normalized_path)
             try:
                 os.remove(full_path)
                 print(f"删除文件: {file_path}")
             except FileNotFoundError:
                 print(f"删除文件不存在: {file_path}")
 
-        for dir_path in changes.get("added_dir", []):
-            normalized_path = self._normalize_manifest_path(dir_path)
-            if not normalized_path:
-                continue
-            full_path = os.path.join(self.cover_folder_path, normalized_path)
+        for dir_path, normalized_path in normalized_changes["added_dir"]:
+            full_path = self._resolve_manifest_path(self.cover_folder_path, normalized_path)
             os.makedirs(full_path, exist_ok=True)
             print(f"创建目录: {dir_path}")
 
-        for file_path in changes.get("added", []):
-            normalized_path = self._normalize_manifest_path(file_path)
-            if not normalized_path:
-                continue
-            src = os.path.join(self.extract_folder_path, normalized_path)
-            dst = os.path.join(self.cover_folder_path, normalized_path)
+        for file_path, normalized_path in normalized_changes["added"]:
+            src = self._resolve_manifest_path(self.extract_folder_path, normalized_path)
+            dst = self._resolve_manifest_path(self.cover_folder_path, normalized_path)
             try:
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
+                src = self._resolve_manifest_path(self.extract_folder_path, normalized_path)
+                dst = self._resolve_manifest_path(self.cover_folder_path, normalized_path)
                 shutil.copy2(src, dst)
                 print(f"新增文件: {file_path}")
             except FileNotFoundError:
                 print(f"源文件不存在: {file_path}")
 
-        for file_path in changes.get("modified", []):
-            normalized_path = self._normalize_manifest_path(file_path)
-            if not normalized_path:
-                continue
-            src = os.path.join(self.extract_folder_path, normalized_path)
-            dst = os.path.join(self.cover_folder_path, normalized_path)
+        for file_path, normalized_path in normalized_changes["modified"]:
+            src = self._resolve_manifest_path(self.extract_folder_path, normalized_path)
+            dst = self._resolve_manifest_path(self.cover_folder_path, normalized_path)
             try:
                 os.makedirs(os.path.dirname(dst), exist_ok=True)
+                src = self._resolve_manifest_path(self.extract_folder_path, normalized_path)
+                dst = self._resolve_manifest_path(self.cover_folder_path, normalized_path)
                 shutil.copy2(src, dst)
                 print(f"更新文件: {file_path}")
             except FileNotFoundError:
@@ -192,7 +193,22 @@ class Updater:
 
     def _normalize_manifest_path(self, relative_path):
         """兼容带归档根目录前缀与普通相对路径的增量清单。"""
-        parts = [part for part in PurePosixPath(relative_path.replace("\\", "/")).parts if part not in ("", ".")]
+        if (
+            not isinstance(relative_path, str)
+            or not relative_path.strip()
+            or "\0" in relative_path
+        ):
+            raise ValueError("更新清单路径必须是非空相对路径字符串")
+        normalized = relative_path.replace("\\", "/")
+        path = PurePosixPath(normalized)
+        windows_path = PureWindowsPath(normalized)
+        if path.is_absolute() or windows_path.drive or windows_path.root:
+            raise ValueError(f"更新清单路径不能是绝对路径或盘符路径: {relative_path}")
+        if not path.parts:
+            raise ValueError(f"更新清单路径不能为空: {relative_path}")
+        parts = list(path.parts)
+        if any(part == ".." or ":" in part or part != part.rstrip(" .") for part in parts):
+            raise ValueError(f"更新清单路径包含不安全的路径分量: {relative_path}")
         if not parts:
             return None
 
@@ -204,6 +220,15 @@ class Updater:
             return None
 
         return os.path.join(*parts)
+
+    @staticmethod
+    def _resolve_manifest_path(root, relative_path):
+        resolved_root = Path(root).resolve()
+        target_path = resolved_root / relative_path
+        resolved_path = target_path.resolve()
+        if not resolved_path.is_relative_to(resolved_root) or resolved_path == resolved_root:
+            raise ValueError(f"更新清单路径超出指定目录: {relative_path}")
+        return str(target_path)
 
     def _get_extracted_updater_path(self):
         return os.path.join(self.extract_folder_path, self.updater_name)

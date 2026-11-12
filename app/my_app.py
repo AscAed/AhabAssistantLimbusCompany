@@ -464,10 +464,10 @@ class MainWindow(FramelessWindow):
         cfg.set_value("window_position_x", self.x())
         cfg.set_value("window_position_y", self.y())
 
-        if (
-            self.farming_interface.interface_left.my_script is not None
-            and self.farming_interface.interface_left.my_script.isRunning()
-        ):
+        left = self.farming_interface.interface_left
+        script = left.my_script
+        tools = list(self.tools_interface.tools.values())
+        if script is not None and script.isRunning() and not getattr(self, "_close_confirmed", False):
             # 确保窗口可见，以便正确显示确认对话框
             if not self.isVisible():
                 self.showNormal()
@@ -479,27 +479,50 @@ class MainWindow(FramelessWindow):
                 self.tr("脚本正在运行中，确定要退出程序吗？"),
                 self.window(),
             )
-            if message_box.exec():
-                self.farming_interface.interface_left.my_script.terminate()
-            else:
+            if not message_box.exec():
                 e.ignore()
                 return
 
-        if self.tools_interface.tools:
+        if tools and not getattr(self, "_close_confirmed", False):
             message_box = MessageBoxConfirm(
                 self.tr("有正在运行的工具"),
                 self.tr("有工具正在运行中，确定要退出程序吗？"),
                 self.window(),
             )
-            if message_box.exec():
-                for tool in self.tools_interface.tools.values():
-                    if isinstance(tool.w, QWidget):
-                        tool.w.close()
-                    elif isinstance(tool.w, QThread):
-                        tool.w.terminate()
-            else:
+            if not message_box.exec():
                 e.ignore()
                 return
+        self._close_confirmed = True
+
+        pending_workers = []
+        if script is not None and script.isRunning():
+            left.stop_script(timeout_ms=0)
+            pending_workers.append(script)
+        for tool in tools:
+            if isinstance(tool.w, QWidget):
+                worker = getattr(tool.w, "worker", None)
+                tool.w.close()
+                if worker is not None and worker.isRunning():
+                    pending_workers.append(worker)
+            elif isinstance(tool.w, QThread) and tool.w.isRunning():
+                stop = getattr(tool.w, "stop", None)
+                if callable(stop):
+                    stop()
+                else:
+                    tool.w.requestInterruption()
+                pending_workers.append(tool.w)
+
+        waiting = False
+        connected = getattr(self, "_close_waiting_workers", set())
+        for worker in pending_workers:
+            if id(worker) not in connected:
+                worker.finished.connect(self.close)
+                connected.add(id(worker))
+            waiting = worker.isRunning() or waiting
+        self._close_waiting_workers = connected
+        if waiting:
+            e.ignore()
+            return
         return super().closeEvent(e)
 
     def changeEvent(self, event):

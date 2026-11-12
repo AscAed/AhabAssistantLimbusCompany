@@ -186,7 +186,7 @@ class ScreenShot:
             hwnd = screen.handle.hwnd
             if screen.handle.isMinimized:
                 raise ValueError("窗口最小化，无法截图")
-            elif screen.handle.isActive and screen.handle.isTransparent:
+            elif screen.handle.isActive and screen.handle.isTransparent and not screen.handle.is_background_input_hidden:
                 screen.handle.set_window_transparent(False)
 
             # 获取窗口的坐标和尺寸

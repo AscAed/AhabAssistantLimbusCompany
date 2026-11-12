@@ -148,3 +148,11 @@ class AbstractInput:
 
     def input_text(self, text: str) -> None:
         raise InterruptedError(f"未实现的输入方法 {self.__class__.__name__}.input_text")
+
+    def report_background_input_result(self, success: bool) -> None:
+        """回报后台透明输入是否实际生效。"""
+        return
+
+    def get_background_input_state(self) -> str:
+        """返回后台透明输入能力状态。"""
+        return "unsupported"

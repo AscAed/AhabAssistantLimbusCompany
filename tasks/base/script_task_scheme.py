@@ -1,7 +1,7 @@
 import platform
 import random
 from datetime import datetime
-from time import sleep, time
+from time import monotonic, sleep, time
 
 from playsound3 import playsound
 from PySide6.QtCore import QT_TRANSLATE_NOOP, QMutex, QThread
@@ -52,7 +52,9 @@ def onetime_EXP_process(combat_count: int = 1):
     else:
         team = cfg.daily_teams
     EXP_luxcavation(combat_count)
-    select_battle_team(team)
+    if select_battle_team(team) is False:
+        log.error("经验本队伍选择失败，已停止本次任务")
+        return False
     if battle.to_battle() is False:
         return False
     battle.fight(combat_count=combat_count)
@@ -68,7 +70,9 @@ def onetime_thread_process(combat_count: int = 1):
     else:
         team = cfg.daily_teams
     thread_luxcavation(combat_count)
-    select_battle_team(team)
+    if select_battle_team(team) is False:
+        log.error("纽本队伍选择失败，已停止本次任务")
+        return False
     if battle.to_battle() is False:
         return False
     battle.fight(combat_count=combat_count)
@@ -99,6 +103,8 @@ def onetime_mir_process(team_setting: TeamSetting, team_num: int):
             return False
     except userStopError:
         raise
+    except unableToFindTeamError:
+        raise
     except Exception as e:
         log.exception(f"镜牢行动出错: {e}")
         return False
@@ -121,7 +127,18 @@ def to_get_reward():
         back_init_menu()
 
 
-def init_game():
+WINDOW_HANDLE_INIT_TIMEOUT_SECONDS = 120
+WINDOW_HANDLE_POLL_INTERVAL_SECONDS = 1
+
+
+def init_game(thread=None, stop_check=None):
+    def check_stop():
+        if (thread is not None and getattr(thread, "is_stop", False)) or (
+            stop_check is not None and stop_check()
+        ):
+            raise userStopError("用户主动终止程序")
+
+    check_stop()
     log.debug("初始化游戏")
     if cfg.simulator:
         if cfg.simulator_type == 0:
@@ -160,6 +177,7 @@ def init_game():
             # 启动时先清理旧连接
             SimulatorControl.clean_connect()
             SimulatorControl()
+    check_stop()
     auto.init_input()
     if cfg.simulator:
         if cfg.simulator_type == 0:
@@ -175,11 +193,18 @@ def init_game():
 
             SimulatorControl.connection_device.start_game()
     else:
+        check_stop()
         game_process.start_game()
+        start_time = monotonic()
         while not screen.init_handle():
-            sleep(10)
+            check_stop()
+            if monotonic() - start_time >= WINDOW_HANDLE_INIT_TIMEOUT_SECONDS:
+                raise withOutGameWinError("等待游戏窗口超时")
+            sleep(WINDOW_HANDLE_POLL_INTERVAL_SECONDS)
+        check_stop()
         if cfg.set_windows:
             screen.set_win()
+    check_stop()
 
 
 def Resonate_with_Ahab():
@@ -220,7 +245,7 @@ def _get_game_rendering_scale() -> int | None:
 def _batch_combat(process_fn, times, max_times):
     """按 max_times 分批执行战斗"""
     if times <= 0:
-        return
+        return True
     if times > max_times:
         once = max_times
         total = times // max_times
@@ -230,16 +255,22 @@ def _batch_combat(process_fn, times, max_times):
         total = 0
         last = times
     for _ in range(total):
-        process_fn(once)
+        if process_fn(once) is False:
+            return False
     if last > 0:
-        process_fn(last)
+        if process_fn(last) is False:
+            return False
+    return True
 
 
 def _single_combat_run(exp_times, thread_times):
     for _ in range(exp_times):
-        onetime_EXP_process()
+        if onetime_EXP_process() is False:
+            return False
     for _ in range(thread_times):
-        onetime_thread_process()
+        if onetime_thread_process() is False:
+            return False
+    return True
 
 
 def Daily_task_wrapper(get_reward=None):
@@ -254,10 +285,14 @@ def Daily_task_wrapper(get_reward=None):
             thread_times -= 1
         if cfg.config.use_continuous_combat and cfg.use_continuous_combat_select > 0:
             max_times = cfg.use_continuous_combat_select
-            _batch_combat(onetime_EXP_process, exp_times, max_times)
-            _batch_combat(onetime_thread_process, thread_times, max_times)
+            if _batch_combat(onetime_EXP_process, exp_times, max_times) is False:
+                return False
+            if _batch_combat(onetime_thread_process, thread_times, max_times) is False:
+                return False
         else:
-            _single_combat_run(exp_times, thread_times)
+            if _single_combat_run(exp_times, thread_times) is False:
+                return False
+        return True
 
     return wrapper
 
@@ -339,9 +374,19 @@ def Mirror_task(thread=None):
 
 
 def script_task(thread=None) -> None | int:
+    previous_stop_check = auto._push_thread_stop_check(
+        lambda: bool(thread and getattr(thread, "is_stop", False))
+    )
+    try:
+        return _script_task_with_stop_context(thread)
+    finally:
+        auto._restore_thread_stop_check(previous_stop_check)
+
+
+def _script_task_with_stop_context(thread=None) -> None | int:
     start_time = time()
     # 获取（启动）游戏对游戏窗口进行设置
-    init_game()
+    init_game(thread=thread)
 
     if cfg.skip_enkephalin:
         log.info(
@@ -364,7 +409,8 @@ def script_task(thread=None) -> None | int:
 
     # 如果是战斗中，先处理战斗
     get_reward = None
-    if auto.click_element("battle/turn_assets.png", take_screenshot=True):
+    auto.take_screenshot(stop_check=lambda: bool(thread and getattr(thread, "is_stop", False)))
+    if auto.click_element("battle/turn_assets.png", take_screenshot=False):
         get_reward = battle.fight()
 
     # 使用 STCE 引擎执行任务

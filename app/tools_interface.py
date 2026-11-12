@@ -1,3 +1,4 @@
+import time
 from time import sleep
 
 from PySide6.QtCore import QT_TRANSLATE_NOOP, Qt, QThread
@@ -12,7 +13,10 @@ from qfluentwidgets import FluentIcon as FIF
 from app.base_combination import BasePushSettingCard, BaseSettingCardGroup
 from app.card.messagebox_custom import BaseInfoBar
 from app.language_manager import LanguageManager
+from module.logger import log
 from tasks import tools
+
+TOOL_STARTUP_TIMEOUT_SECONDS = 10
 
 
 class ToolsInterface(ScrollArea):
@@ -107,12 +111,20 @@ class ToolsInterface(ScrollArea):
             return
         tool = tools.start(tool_name)
         self.tools[tool_name] = tool
+        start_time = time.monotonic()
         while tool.initialized is False:
+            if time.monotonic() - start_time >= TOOL_STARTUP_TIMEOUT_SECONDS:
+                cancel_startup = getattr(tool, "cancel_startup", None)
+                if callable(cancel_startup):
+                    cancel_startup()
+                self.tools.pop(tool_name, None)
+                log.error("工具 %s 初始化超过 %s 秒，已停止等待", tool_name, TOOL_STARTUP_TIMEOUT_SECONDS)
+                return False
             QApplication.processEvents()
             sleep(0.01)
         if tool.initialized is None:
             self.tools.pop(tool_name, None)
-            return
+            return False
         self._update_running_button(card)
         tool.w.destroyed.connect(lambda _: self.tools.pop(tool_name, None))
         tool.w.destroyed.connect(lambda _: self._restore_button_style(card))
@@ -120,6 +132,7 @@ class ToolsInterface(ScrollArea):
             tool.w.on_saved_timestr.connect(self._onScreenshotToolButtonPressed)
         if isinstance(tool.w, QThread):
             tool.w.start()
+        return True
 
     def _update_running_button(self, card: BasePushSettingCard):
         card.button.setText(QT_TRANSLATE_NOOP("BasePushSettingCard", "运行中"))

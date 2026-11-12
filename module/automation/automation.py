@@ -1,17 +1,18 @@
 import gc
 import math
 import subprocess
+import threading
 import time
 from ast import List
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 import cv2
 import numpy as np
 import psutil
 from PIL.Image import Image
 
-from module.my_error.my_error import withOutGameWinError
+from module.my_error.my_error import userStopError, withOutGameWinError
 from utils.image_utils import ImageUtils
 from utils.path_manager import path_manager
 from utils.singletonmeta import SingletonMeta
@@ -98,6 +99,8 @@ class Automation(metaclass=SingletonMeta):
         self.mouse_drag_link = self._mouse_drag_link
         self.mouse_scroll = self._mouse_scroll
         self.batch_mouse_scroll = self._batch_mouse_scroll if self._input_batch_mouse_scroll else None
+        self.report_background_input_result = self.input_handler.report_background_input_result
+        self.get_background_input_state = self.input_handler.get_background_input_state
         self.set_pause = self.input_handler.set_pause
         self.wait_pause = self.input_handler.wait_pause
         self.mouse_to_blank = self.input_handler.mouse_to_blank
@@ -146,6 +149,12 @@ class Automation(metaclass=SingletonMeta):
             "batch_mouse_scroll", self._input_batch_mouse_scroll(*args, **kwargs)
         )
 
+    def report_background_input_result(self, success: bool) -> None:
+        return self.input_handler.report_background_input_result(success)
+
+    def get_background_input_state(self) -> str:
+        return self.input_handler.get_background_input_state()
+
     def check_pause(self) -> bool:
         """
         检查是否处于暂停状态
@@ -154,6 +163,48 @@ class Automation(metaclass=SingletonMeta):
             bool: 是否处于暂停状态
         """
         return self.input_handler.is_pause
+
+    def _get_thread_stop_check(self):
+        stop_context = getattr(self, "_thread_stop_context", None)
+        return getattr(stop_context, "callback", None)
+
+    def _push_thread_stop_check(self, callback):
+        stop_context = getattr(self, "_thread_stop_context", None)
+        if stop_context is None:
+            stop_context = threading.local()
+            self._thread_stop_context = stop_context
+        previous = getattr(stop_context, "callback", None)
+        stop_context.callback = callback
+        return previous
+
+    def _restore_thread_stop_check(self, previous) -> None:
+        stop_context = getattr(self, "_thread_stop_context", None)
+        if stop_context is None:
+            return
+        if previous is None:
+            if hasattr(stop_context, "callback"):
+                del stop_context.callback
+        else:
+            stop_context.callback = previous
+
+    def sleep_with_stop_check(
+        self, seconds: float, stop_check: Callable[[], bool] | None = None
+    ) -> None:
+        """Sleep in short slices when the current worker has a stop request."""
+        if stop_check is None:
+            stop_check = self._get_thread_stop_check()
+        if stop_check is None:
+            time.sleep(seconds)
+            return
+
+        deadline = time.monotonic() + max(0.0, seconds)
+        while True:
+            if stop_check():
+                raise userStopError("用户主动终止程序")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                return
+            time.sleep(min(0.5, remaining))
 
     def get_restore_time(self) -> float:
         """
@@ -212,23 +263,13 @@ class Automation(metaclass=SingletonMeta):
 
     def calculate_click_position(self, coordinates, offset=True):
         """
-        根据给定的坐标计算点击位置。
+        保留识别得到的点击位置，offset 参数仅用于兼容现有调用。
         参数:
         coordinates (tuple): 一个包含(x, y)坐标的元组，表示点击的位置。
         返回:
         tuple: 经过计算后的点击位置坐标。
         """
-        # TODO:后续适配无需窗口设置模式
         x, y = coordinates
-        if self.screenshot_np is None and self.screenshot is not None:
-            self.screenshot_np = np.array(self.screenshot)
-        screenshot = self.screenshot_np
-        if offset:
-            # 使用正态分布生成点击偏移，使其更聚集在中心区域，符合人类点击习惯
-            offset_x = int(np.clip(np.random.normal(0, 4), -10, 10))
-            offset_y = int(np.clip(np.random.normal(0, 4), -10, 10))
-            x = max(0, min(screenshot.shape[1], x + offset_x))
-            y = max(0, min(screenshot.shape[0], y + offset_y))
         return x, y
 
     def mouse_action_with_pos(
@@ -247,7 +288,7 @@ class Automation(metaclass=SingletonMeta):
         在指定坐标上执行点击操作
         Args:
             coordinates: 坐标位置，用于计算点击位置
-            offset: 是否使用偏移量计算点击位置，默认为True
+            offset: 兼容现有调用，点击位置保持识别坐标
             action: 鼠标操作类型，默认为"click"
             move_back: 是否在操作后将鼠标移动回原位置，默认为False
         Returns:
@@ -273,8 +314,7 @@ class Automation(metaclass=SingletonMeta):
         # Ensure we don't arbitrarily wait too long for consecutive fast clicks unless specified
         interval = min(interval, 0.25)
 
-        # 增加随机浮动，规避匀速点击检测
-        actual_interval = max(0.05, np.random.normal(interval, interval * 0.2))
+        actual_interval = max(0.05, interval)
 
         if self.last_click_time == 0:
             self.last_click_time = time.time()
@@ -309,19 +349,27 @@ class Automation(metaclass=SingletonMeta):
 
         return True
 
-    def take_screenshot(self, gray: bool = True) -> Image | None:
+    def take_screenshot(
+        self, gray: bool = True, stop_check: Callable[[], bool] | None = None
+    ) -> Image | None:
         """
         截取当前屏幕并返回图像对象。
         Args:
             gray (bool): 是否将图像转换为灰度图，默认为True。
+            stop_check: 返回 True 时停止截图恢复并传播用户停止异常。
         Returns:
             Image: 截取当前屏幕的图像对象
         """
-        start_time = time.time()
+        if stop_check is None:
+            stop_check = self._get_thread_stop_check()
+        start_time = time.monotonic()
         screenshot_interval_time = cfg.screenshot_interval if cfg.screenshot_interval else 0.85
         is_game_die = False
         failed_attempts = 0
+        restarted = False
         while True:
+            if stop_check is not None and stop_check():
+                raise userStopError("用户主动终止程序")
             try:
                 if time.time() - self.last_screenshot_time < screenshot_interval_time:
                     wait_time = max(
@@ -330,14 +378,20 @@ class Automation(metaclass=SingletonMeta):
                     )
                     time.sleep(wait_time)
 
+                if stop_check is not None and stop_check():
+                    raise userStopError("用户主动终止程序")
                 result = ScreenShot.take_screenshot(gray)
                 if result:
+                    if stop_check is not None and stop_check():
+                        raise userStopError("用户主动终止程序")
                     self.screenshot = result
                     self.screenshot_np = np.array(result)
                     self.last_screenshot_time = time.time()
                     return result
                 else:
                     failed_attempts += 1
+            except userStopError:
+                raise
             except withOutGameWinError as e:
                 log.error(f"截图失败: {e}")
                 is_game_die = True
@@ -346,12 +400,15 @@ class Automation(metaclass=SingletonMeta):
                 failed_attempts += 1
                 if cfg.operation_mode == "background_window" and failed_attempts >= 3:
                     raise RuntimeError("后台模式连续截图失败，已安全停止") from e
-            time.sleep(1)
+            if stop_check is not None and stop_check():
+                raise userStopError("用户主动终止程序")
             if cfg.operation_mode == "background_window" and failed_attempts >= 3:
                 raise RuntimeError("后台模式连续截图失败，已安全停止")
-            if time.time() - start_time > 60 or is_game_die:
+            if time.monotonic() - start_time > 60 or is_game_die:
                 if cfg.operation_mode == "background_window":
                     raise RuntimeError("后台模式截图超时，已安全停止")
+                if restarted:
+                    raise RuntimeError("重启游戏后截图仍失败，已安全停止")
                 log.error("截图超时，尝试重启游戏")
                 import win32process
 
@@ -364,9 +421,12 @@ class Automation(metaclass=SingletonMeta):
                     pass
                 from tasks.base.script_task_scheme import init_game
 
-                init_game()
+                restarted = True
+                init_game(stop_check=stop_check)
                 is_game_die = False
-                start_time = time.time()
+                failed_attempts = 0
+                start_time = time.monotonic()
+            time.sleep(1)
 
     def get_default_roi(self, target: Any) -> list[int] | None:
         """
@@ -434,9 +494,8 @@ class Automation(metaclass=SingletonMeta):
 
         # Intercept legend_assets.png to support closed legend panel state on roadmap
         if target == "mirror/road_in_mir/legend_assets.png":
-            if take_screenshot:
-                while self.take_screenshot() is None:
-                    continue
+            if take_screenshot and self.take_screenshot() is None:
+                raise RuntimeError("查找元素时截图失败，已安全停止")
             res = self._find_element_by_type(target, find_type, threshold, model, my_crop or roi, min_dist, additional_stack)
             if res:
                 return res
@@ -463,9 +522,8 @@ class Automation(metaclass=SingletonMeta):
 
         max_retries = 1 if not take_screenshot else max_retries
         for i in range(max_retries):
-            if take_screenshot:
-                while self.take_screenshot() is None:
-                    continue
+            if take_screenshot and self.take_screenshot() is None:
+                raise RuntimeError("查找元素时截图失败，已安全停止")
 
             # Check location matching cache for hashable single-target types
             is_cacheable = (

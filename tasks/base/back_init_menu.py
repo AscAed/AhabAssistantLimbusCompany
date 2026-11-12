@@ -67,7 +67,7 @@ def back_init_menu(*, allow_restart: bool = True):
                     total_seconds = int(time_remaining.total_seconds())
                     msg = f"当前时间为Limbus周常维护时间，距离正常维护时间结束还有{total_seconds}秒，脚本程序将暂停同样时间"
                     log.info(msg)
-                    sleep(total_seconds)
+                    auto.sleep_with_stop_check(total_seconds)
             if not allow_restart:
                 log.warning("检测到维护提示且本次调用禁用内部重启，返回失败")
                 return False

@@ -2,7 +2,37 @@ from unittest.mock import patch
 
 import numpy as np
 
-from tasks.mirror.search_road import MirrorMap, search_road_from_road_map
+from tasks.mirror.search_road import (
+    MirrorMap,
+    search_road_default_distance,
+    search_road_farthest_distance,
+    search_road_from_road_map,
+)
+
+
+def test_search_road_default_screenshot_failure_stops():
+    with patch("tasks.mirror.search_road.auto") as mock_auto, patch(
+        "tasks.mirror.search_road.cfg"
+    ) as mock_cfg:
+        mock_cfg.set_win_size = 1440
+        mock_auto.take_screenshot.side_effect = [None, AssertionError("unbounded capture")]
+
+        assert search_road_default_distance() is False
+
+    assert mock_auto.take_screenshot.call_count == 1
+
+
+def test_search_road_farthest_screenshot_failure_stops():
+    with patch("tasks.mirror.search_road.auto") as mock_auto, patch(
+        "tasks.mirror.search_road.cfg"
+    ) as mock_cfg:
+        mock_cfg.set_win_size = 1440
+        mock_auto.mouse_scroll.return_value = True
+        mock_auto.take_screenshot.side_effect = [None, AssertionError("unbounded capture")]
+
+        assert search_road_farthest_distance() is False
+
+    assert mock_auto.take_screenshot.call_count == 1
 
 
 @patch("tasks.mirror.search_road.sleep", return_value=None)

@@ -15,6 +15,11 @@ class ToolManager:
         self.tool = tool
         self.initialized = False
         self.w: QObject = None
+        self._startup_cancelled = threading.Event()
+
+    def cancel_startup(self) -> None:
+        self._startup_cancelled.set()
+        self.initialized = None
 
     def run(self):
         try:
@@ -36,6 +41,9 @@ class ToolManager:
 
         def create_and_show():
             try:
+                if self._startup_cancelled.is_set():
+                    self.initialized = None
+                    return
                 if self.tool == "battle":
                     self.w = InfiniteBattles()
                 elif self.tool == "production":

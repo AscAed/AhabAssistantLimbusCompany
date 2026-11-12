@@ -145,8 +145,9 @@ def search_road_default_distance():
     ]
 
     auto.mouse_to_blank()
-    while auto.take_screenshot() is None:
-        continue
+    if auto.take_screenshot() is None:
+        log.error("默认缩放路线截图失败，已停止寻路")
+        return False
     if retry() is False:
         return False
     # 判断中、下两个节点是否有权重3的节点，有的话直接选择进入
@@ -220,8 +221,9 @@ def search_road_farthest_distance():
     auto.mouse_click_blank()
     if not auto.mouse_scroll():
         raise InputAttributeError("后台输入不支持滚轮操作!")
-    while auto.take_screenshot() is None:
-        continue
+    if auto.take_screenshot() is None:
+        log.error("最大距离路线截图失败，已停止寻路")
+        return False
     if retry() is False:
         return False
     three_roads = [

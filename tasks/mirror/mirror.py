@@ -367,7 +367,10 @@ class Mirror:
 
             elif state == GameState.BATTLE_FORMATION:
                 if self.first_battle:
-                    team_formation(self.sinner_team)
+                    if team_formation(self.sinner_team) is False:
+                        raise unableToFindTeamError(
+                            "首次镜牢队伍编队失败，已停止本次任务"
+                        )
                     self.first_battle = False
                     continue
                 if auto.click_element("teams/none_sinner_assets.png", model="clam"):

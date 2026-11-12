@@ -4,6 +4,7 @@ from module.automation import auto
 from module.config import cfg
 from module.decorator.decorator import begin_and_finish_time_log
 from module.logger import log
+from module.my_error.my_error import userStopError
 
 
 def get_the_timing(return_time=False):
@@ -44,15 +45,18 @@ def get_current_enkephalin():
     import numpy as np
 
     from module.ocr import ocr
+    from module.ocr.ocr import OCRExecutionError
     from utils.image_utils import ImageUtils
 
     enkephalin_bbox = ImageUtils.get_bbox(
         ImageUtils.load_image("enkephalin/enkephalin_now_bbox.png")
     )
+    screenshot_available = False
     for _ in range(5):
         try:
-            while auto.take_screenshot() is None:
+            if auto.take_screenshot() is None:
                 continue
+            screenshot_available = True
             sc = ImageUtils.crop(np.array(auto.screenshot), enkephalin_bbox)
             _, binary_image = cv2.threshold(sc, 110, 255, cv2.THRESH_BINARY)
             result = ocr.run(binary_image)
@@ -63,8 +67,12 @@ def get_current_enkephalin():
                 ocr_result = ocr_result.split("/")
                 current_enkephalin = int(ocr_result[0])
                 return current_enkephalin
+        except (userStopError, OCRExecutionError):
+            raise
         except Exception:
             continue
+    if not screenshot_available:
+        return None
     try:
         sc = ImageUtils.crop(np.array(auto.screenshot), enkephalin_bbox)
         _, binary_image = cv2.threshold(sc, 150, 255, cv2.THRESH_BINARY)
@@ -73,6 +81,8 @@ def get_current_enkephalin():
         ocr_result = "".join(ocr_result)
         current_enkephalin = int(ocr_result[0])
         return current_enkephalin
+    except (userStopError, OCRExecutionError):
+        raise
     except Exception:
         pass
     return None

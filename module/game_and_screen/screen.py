@@ -1,3 +1,5 @@
+import ctypes
+from dataclasses import dataclass
 from time import sleep
 from typing import TYPE_CHECKING, overload
 
@@ -15,6 +17,14 @@ if TYPE_CHECKING:
     from .game import Game
 
 
+@dataclass(frozen=True)
+class WindowVisibilitySnapshot:
+    ex_style: int
+    layered_alpha: int | None
+    layered_flags: int | None
+    layered_color_key: int | None = None
+
+
 class Handle:
     """提供统一的获取窗口信息的接口"""
 
@@ -23,6 +33,7 @@ class Handle:
 
     def __init__(self):
         self._enum_windows_list = []
+        self._background_input_hidden = False
 
     def init_handle(
         self,
@@ -97,6 +108,11 @@ class Handle:
     def isTransparent(self) -> bool:
         """判断窗口是否透明"""
         return self._transparent
+
+    @property
+    def is_background_input_hidden(self) -> bool:
+        """判断是否正处于后台输入的临时隐藏状态"""
+        return self._background_input_hidden
 
     @property
     def isMinimized(self) -> bool:
@@ -312,6 +328,140 @@ class Handle:
         if need_x != rect[0] or need_y != rect[1]:
             self.set_window_pos(x, y)
 
+    def _read_layered_state(
+        self, hwnd: int, ex_style: int
+    ) -> tuple[int, int, int] | None:
+        if hwnd == 0:
+            return None
+        if not (ex_style & win32con.WS_EX_LAYERED):
+            return None
+        try:
+            color_key = ctypes.c_uint()
+            alpha = ctypes.c_ubyte()
+            flags = ctypes.c_uint()
+            ok = ctypes.windll.user32.GetLayeredWindowAttributes(
+                hwnd,
+                ctypes.byref(color_key),
+                ctypes.byref(alpha),
+                ctypes.byref(flags),
+            )
+            if not ok:
+                return None
+            return int(color_key.value), int(alpha.value), int(flags.value)
+        except Exception:
+            return None
+
+    def snapshot_window_visibility(self) -> WindowVisibilitySnapshot | None:
+        hwnd = self.hwnd
+        if hwnd == 0:
+            return None
+        ex_style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
+        layered_state = self._read_layered_state(hwnd, ex_style)
+        if ex_style & win32con.WS_EX_LAYERED:
+            if layered_state is None:
+                log.warning("无法读取分层窗口属性，拒绝临时隐藏窗口: hwnd=%s", hwnd)
+                return None
+            color_key, alpha, flags = layered_state
+        else:
+            color_key = alpha = flags = None
+        return WindowVisibilitySnapshot(
+            ex_style=ex_style,
+            layered_alpha=alpha,
+            layered_flags=flags,
+            layered_color_key=color_key,
+        )
+
+    def _apply_window_visibility_snapshot(self, snapshot: WindowVisibilitySnapshot | None) -> bool:
+        hwnd = self.hwnd
+        if hwnd == 0 or snapshot is None:
+            return False
+        if snapshot.ex_style & win32con.WS_EX_LAYERED and (
+            snapshot.layered_alpha is None
+            or snapshot.layered_flags is None
+            or snapshot.layered_color_key is None
+        ):
+            log.warning("分层窗口快照不完整，无法安全恢复: hwnd=%s", hwnd)
+            return False
+        try:
+            win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, snapshot.ex_style)
+            if snapshot.ex_style & win32con.WS_EX_LAYERED:
+                attributes_restored = ctypes.windll.user32.SetLayeredWindowAttributes(
+                    hwnd,
+                    int(snapshot.layered_color_key),
+                    int(snapshot.layered_alpha),
+                    int(snapshot.layered_flags),
+                )
+                if not attributes_restored:
+                    log.warning("恢复分层窗口属性失败: hwnd=%s", hwnd)
+                    return False
+            position_restored = win32gui.SetWindowPos(
+                hwnd,
+                None,
+                0,
+                0,
+                0,
+                0,
+                win32con.SWP_NOMOVE
+                | win32con.SWP_NOSIZE
+                | win32con.SWP_NOZORDER
+                | win32con.SWP_NOACTIVATE
+                | win32con.SWP_FRAMECHANGED,
+            )
+            if position_restored is False:
+                log.warning("刷新窗口样式失败: hwnd=%s", hwnd)
+                return False
+        except Exception as exc:
+            log.warning("恢复窗口可见性失败: %s", exc)
+            return False
+        self._transparent = bool(snapshot.ex_style & win32con.WS_EX_TRANSPARENT)
+        self._background_input_hidden = False
+        return True
+
+    def hide_for_background_input(self) -> WindowVisibilitySnapshot | None:
+        """Legacy visibility helper; do not use for input before native hit-test qualification."""
+        hwnd = self.hwnd
+        if hwnd == 0:
+            return None
+        snapshot = self.snapshot_window_visibility()
+        if snapshot is None:
+            return None
+        try:
+            ex_style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
+            ex_style |= win32con.WS_EX_LAYERED
+            win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, ex_style)
+            if not ctypes.windll.user32.SetLayeredWindowAttributes(
+                hwnd, 0, 0, win32con.LWA_ALPHA
+            ):
+                raise RuntimeError("设置后台输入临时透明度失败")
+            position_updated = win32gui.SetWindowPos(
+                hwnd,
+                None,
+                0,
+                0,
+                0,
+                0,
+                win32con.SWP_NOMOVE
+                | win32con.SWP_NOSIZE
+                | win32con.SWP_NOZORDER
+                | win32con.SWP_NOACTIVATE
+                | win32con.SWP_FRAMECHANGED,
+            )
+            if position_updated is False:
+                raise RuntimeError("刷新后台输入窗口样式失败")
+        except Exception as exc:
+            log.warning("后台输入临时隐藏窗口失败: %s", exc)
+            if self._apply_window_visibility_snapshot(snapshot):
+                return None
+            self._background_input_hidden = True
+            raise RuntimeError("后台输入隐藏失败且原窗口状态未能完整恢复") from exc
+        self._transparent = bool(snapshot.ex_style & win32con.WS_EX_TRANSPARENT)
+        self._background_input_hidden = True
+        return snapshot
+
+    def restore_background_input_visibility(self, snapshot: WindowVisibilitySnapshot | None) -> bool:
+        """恢复后台输入前临时隐藏的窗口状态。"""
+        return self._apply_window_visibility_snapshot(snapshot)
+
     def set_window_transparent(self, transparent: bool = True) -> None:
         """设置窗口是否透明, 同时设置鼠标穿透"""
         hwnd = self.hwnd
@@ -320,20 +470,47 @@ class Handle:
         if cfg.operation_mode != "background_window":
             transparent = False
 
-        ex_style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
-        if not (ex_style & win32con.WS_EX_LAYERED) and transparent:
-            ex_style = ex_style | win32con.WS_EX_LAYERED
-            win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, ex_style)
-
         if transparent:
+            ex_style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
             ex_style |= win32con.WS_EX_LAYERED
             ex_style |= win32con.WS_EX_TRANSPARENT
-            win32gui.SetLayeredWindowAttributes(hwnd, 0, 0, win32con.LWA_ALPHA)
+            win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, ex_style)
+            ctypes.windll.user32.SetLayeredWindowAttributes(hwnd, 0, 0, win32con.LWA_ALPHA)
+            win32gui.SetWindowPos(
+                hwnd,
+                None,
+                0,
+                0,
+                0,
+                0,
+                win32con.SWP_NOMOVE
+                | win32con.SWP_NOSIZE
+                | win32con.SWP_NOZORDER
+                | win32con.SWP_NOACTIVATE
+                | win32con.SWP_FRAMECHANGED,
+            )
+            self._transparent = True
+            self._background_input_hidden = False
         else:
+            ex_style = win32gui.GetWindowLong(hwnd, win32con.GWL_EXSTYLE)
             ex_style &= ~win32con.WS_EX_LAYERED
             ex_style &= ~win32con.WS_EX_TRANSPARENT
-        win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, ex_style)
-        self._transparent = transparent
+            win32gui.SetWindowLong(hwnd, win32con.GWL_EXSTYLE, ex_style)
+            win32gui.SetWindowPos(
+                hwnd,
+                None,
+                0,
+                0,
+                0,
+                0,
+                win32con.SWP_NOMOVE
+                | win32con.SWP_NOSIZE
+                | win32con.SWP_NOZORDER
+                | win32con.SWP_NOACTIVATE
+                | win32con.SWP_FRAMECHANGED,
+            )
+            self._transparent = False
+            self._background_input_hidden = False
 
 
 class Screen(metaclass=SingletonMeta):
@@ -387,7 +564,9 @@ class Screen(metaclass=SingletonMeta):
                 self.adjust_win_position(self.set_win_position)
 
         _set_win()
-        while True:
+        max_attempts = 5
+        last_error = None
+        for attempt in range(max_attempts):
             try:
                 width = self.handle.width(True)
                 height = self.handle.height(True)
@@ -396,11 +575,19 @@ class Screen(metaclass=SingletonMeta):
                     or height != cfg.set_win_size
                 ):
                     _set_win()
-                    sleep(1)
                 else:
-                    break
-            except Exception as e:
-                log.error(f"设置窗口出错: {e}")
+                    return
+            except Exception as exc:
+                last_error = exc
+                log.error(f"设置窗口出错: {exc}")
+
+            if attempt < max_attempts - 1:
+                sleep(1)
+
+        error = RuntimeError(f"设置窗口失败: {max_attempts} 次尝试后尺寸仍未就绪")
+        if last_error is not None:
+            raise error from last_error
+        raise error
 
     def reduce_miscontact(self, pos_style: str) -> None:
         """通过调整窗口置顶减少误触"""

@@ -4,10 +4,27 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
+from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any, Mapping
 
 # 资源清单协议版本仍保持为 1，并统一承载整包同步所需的元数据字段。
 RESOURCE_SYNC_SCHEMA_VERSION = 1
+
+
+def _validate_manifest_relative_path(value: str) -> str:
+    if not isinstance(value, str) or not value.strip() or "\0" in value:
+        raise ValueError("资源清单路径必须是非空相对路径")
+    normalized = value.replace("\\", "/")
+    path = PurePosixPath(normalized)
+    windows_path = PureWindowsPath(normalized)
+    if path.is_absolute() or windows_path.drive or windows_path.root:
+        raise ValueError(f"资源清单路径不能是绝对路径或盘符路径: {value}")
+    if not path.parts or any(
+        part == ".." or ":" in part or part != part.rstrip(" .")
+        for part in path.parts
+    ):
+        raise ValueError(f"资源清单路径包含不安全的路径分量: {value}")
+    return path.as_posix()
 
 
 def _reject_unknown_keys(payload: Mapping[str, Any], allowed_keys: set[str]) -> None:
@@ -34,6 +51,9 @@ class ResourceFileEntry:
     # 保存文件字节数，便于后续同步逻辑展示统计信息并识别明显异常。
     size: int
 
+    def __post_init__(self) -> None:
+        self.path = _validate_manifest_relative_path(self.path)
+
     def to_dict(self) -> dict[str, Any]:
         """将文件条目转换为可直接写入 JSON 的字典。
 
@@ -57,7 +77,7 @@ class ResourceFileEntry:
         _reject_unknown_keys(payload, {"path", "sha256", "size"})
         # 再执行类型归一化，确保后续比较逻辑拿到稳定类型。
         return cls(
-            path=str(payload["path"]),
+            path=payload["path"],
             sha256=str(payload["sha256"]),
             size=int(payload["size"]),
         )
@@ -75,6 +95,9 @@ class ResourcePackageEntry:
     size: int
     # 当前整包同步统一使用 7z 格式，显式记录便于协议校验与后续扩展。
     format: str
+
+    def __post_init__(self) -> None:
+        self.path = _validate_manifest_relative_path(self.path)
 
     def to_dict(self) -> dict[str, Any]:
         """将资源包条目转换为可直接写入 JSON 的字典。
@@ -99,7 +122,7 @@ class ResourcePackageEntry:
         _reject_unknown_keys(payload, {"path", "sha256", "size", "format"})
         # 第二步：逐个字段做类型归一化，重建资源包元数据对象。
         return cls(
-            path=str(payload["path"]),
+            path=payload["path"],
             sha256=str(payload["sha256"]),
             size=int(payload["size"]),
             format=str(payload["format"]),
