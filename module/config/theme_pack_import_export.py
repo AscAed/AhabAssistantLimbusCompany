@@ -103,7 +103,7 @@ def _import_theme_pack_weight_data(
 def import_theme_pack_weight(file_path: str, team_num: int) -> bool:
     """从 YAML 文件导入主题包权重。"""
     try:
-        yaml = YAML()
+        yaml = YAML(typ="safe")
         with open(file_path, "r", encoding="utf-8") as file:
             import_data = yaml.load(file)
 
@@ -158,7 +158,7 @@ def import_theme_pack_weight_from_base64(base64_str: str, team_num: int) -> bool
             log.warning("导入的配置码数据为空")
             return False
 
-        yaml = YAML()
+        yaml = YAML(typ="safe")
         import_data = yaml.load(yaml_content)
         if not import_data:
             log.warning("解析配置码数据后主题包权重为空")

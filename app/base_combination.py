@@ -357,11 +357,11 @@ class MirrorTeamCombination(QFrame):
             )
             return
 
-        data: dict = cfg.yaml.load(setting)
         from module.config import TeamSetting
+        from module.config.team_import_export import parse_team_settings_yaml
 
         try:
-            team_config = TeamSetting(**data)
+            team_config = TeamSetting(**parse_team_settings_yaml(setting))
         except Exception:
             BaseInfoBar.error(
                 title=QT_TRANSLATE_NOOP("BaseInfoBar", "导入数据失败，可能是因为设置版本过旧或过新"),
