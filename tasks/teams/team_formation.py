@@ -115,6 +115,9 @@ def clean_team():
 # 编队
 @begin_and_finish_time_log(task_name="罪人编队")
 def team_formation(sinner_team):
+    if not any(sinner_team):
+        log.error("队伍中未选择罪人，已停止编队")
+        return False
     scale = cfg.set_win_size / 1440
 
     if not clean_team():

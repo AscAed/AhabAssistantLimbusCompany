@@ -115,6 +115,13 @@ def test_team_formation_accepts_partial_sinner_selection():
     assert mock_auto.mouse_click.call_count == 3
 
 
+def test_team_formation_rejects_empty_sinner_selection():
+    with patch("tasks.teams.team_formation.clean_team") as clean_team_mock:
+        assert team_formation([0] * 12) is False
+
+    clean_team_mock.assert_not_called()
+
+
 def test_load_team_code_capture_failure_stops():
     with patch("tasks.teams.team_formation.auto") as mock_auto, patch(
         "tasks.teams.team_formation.sleep"
