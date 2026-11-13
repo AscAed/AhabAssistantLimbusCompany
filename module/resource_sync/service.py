@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
+import tempfile
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -277,9 +279,30 @@ class ResourceSyncService:
         返回:
             实际写入的状态文件路径。
         """
-        # 先确保状态文件目录存在，再执行覆盖写入。
+        serialized_state = state.to_json()
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
-        self.state_path.write_text(state.to_json(), encoding="utf-8")
+        temporary_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=self.state_path.parent,
+                prefix=f".{self.state_path.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as file:
+                temporary_path = Path(file.name)
+                file.write(serialized_state)
+                file.flush()
+                os.fsync(file.fileno())
+            os.replace(temporary_path, self.state_path)
+            temporary_path = None
+        finally:
+            if temporary_path is not None:
+                try:
+                    temporary_path.unlink(missing_ok=True)
+                except OSError as error:
+                    log.warning("清理临时图片资源状态文件失败: %s", error)
         return self.state_path
 
     def check_for_updates(

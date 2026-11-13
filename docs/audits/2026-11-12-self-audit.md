@@ -67,3 +67,5 @@ The build ran with the repository's bundled `assets/binary/7za.exe` exposed as `
 - **Deferred documentation minor:** `assets/doc/en/README_EN.md` repeats the project documentation index bullet. It has no runtime impact and is retained as a polish follow-up.
 
 The itemized cleanup disposition is in [cleanup inventory](cleanup-inventory-2026-11-12.md). Historical audit drafts remain under [history](../history/README.md).
+
+The later read-only [documentation investigation](2026-11-12-documentation-baseline.md) checks the committed `dc7339fb` baseline and records follow-up evidence for team failure propagation, production cancellation and deployment identity. Its findings do not retroactively extend the scope of the tests or build recorded above.

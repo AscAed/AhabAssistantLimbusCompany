@@ -30,6 +30,8 @@ The release workflow runs the reusable Windows build after the test job. `script
 
 The local package build needs PyInstaller and the `7z` executable. A successful source compile or pytest run does not prove the packaged application launches.
 
+The dated [investigation baseline](../audits/2026-11-12-documentation-baseline.md) separates source, historical test/build, and deployment evidence. Future milestone gates and package identity requirements are in the [implementation roadmap](implementation-roadmap.md).
+
 ## Network
 
 External CLI requests must use the local Clash proxy in the same PowerShell invocation:

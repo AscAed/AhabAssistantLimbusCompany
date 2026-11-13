@@ -1242,8 +1242,7 @@ class Mirror:
             auto.find_element("mirror/road_to_mir/dreaming_star/coins_assets.png")
             is None
         ):
-            if auto.take_screenshot() is None:
-                continue
+            wait_for_screenshot()
             loop_count -= 1
             if loop_count % 5 == 0:
                 log.debug(f"选择队伍识别次数剩余{loop_count}次")
@@ -1532,8 +1531,7 @@ class Mirror:
                 return False
             return
         while True:
-            if auto.take_screenshot() is None:
-                continue
+            wait_for_screenshot()
 
             if auto.click_element("mirror/road_in_mir/ego_gift_get_confirm_assets.png"):
                 break

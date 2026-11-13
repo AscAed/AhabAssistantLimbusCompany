@@ -24,3 +24,5 @@ OCR calls route through `module/ocr/ocr.py`; `utils/image_utils.py` owns image l
 - `scripts/build.py`, `main.spec`, and `updater.spec` produce Windows application artifacts.
 
 Keep UI operations in `app/`, configuration schema and migration in `module/config/`, window/input coordination in their respective `module/` packages, and game-specific decisions in `tasks/`.
+
+For proposed contracts, alternatives and priorities, see [target architecture and optimization](target-and-optimization.md). That document describes future design rather than the current implementation.

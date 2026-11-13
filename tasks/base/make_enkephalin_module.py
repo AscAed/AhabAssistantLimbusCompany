@@ -1,10 +1,12 @@
-from time import sleep
-
 from module.automation import auto
 from module.config import cfg
 from module.decorator.decorator import begin_and_finish_time_log
 from module.logger import log
 from module.my_error.my_error import userStopError
+
+
+def _check_stop_requested() -> None:
+    auto.sleep_with_stop_check(0)
 
 
 def get_the_timing(return_time=False):
@@ -97,6 +99,7 @@ def make_enkephalin_module(cancel=True, skip=True, *, task_name: str = "体力�
     """
     if skip and cfg.skip_enkephalin:
         return
+
     import time
 
     start_time = time.time()
@@ -109,6 +112,7 @@ def make_enkephalin_module(cancel=True, skip=True, *, task_name: str = "体力�
     last_open_panel_click_time = 0.0
 
     while True:
+        _check_stop_requested()
         now_time = time.time()
         if auto.get_restore_time() is not None:
             start_time = max(start_time, auto.get_restore_time())
@@ -136,10 +140,12 @@ def make_enkephalin_module(cancel=True, skip=True, *, task_name: str = "体力�
         # 自动截图
         if auto.take_screenshot() is None:
             continue
+        _check_stop_requested()
         auto.mouse_to_blank()
         if auto.find_element(
             "base/update_close_assets.png", model="clam"
         ) and auto.find_element("home/drive_assets.png", model="normal"):
+            _check_stop_requested()
             auto.click_element("base/update_close_assets.png")
             from tasks.base.back_init_menu import back_init_menu
 
@@ -149,6 +155,7 @@ def make_enkephalin_module(cancel=True, skip=True, *, task_name: str = "体力�
         if auto.find_element(
             "base/renew_confirm_assets.png", model="clam"
         ) and auto.find_element("home/drive_assets.png", model="normal"):
+            _check_stop_requested()
             auto.click_element("base/renew_confirm_assets.png")
             from tasks.base.back_init_menu import back_init_menu
 
@@ -168,6 +175,7 @@ def make_enkephalin_module(cancel=True, skip=True, *, task_name: str = "体力�
             )
         )
         if not panel_visible:
+            _check_stop_requested()
             if (
                 now_time - last_open_panel_click_time >= open_panel_click_cooldown
                 and auto.click_element(
@@ -177,65 +185,86 @@ def make_enkephalin_module(cancel=True, skip=True, *, task_name: str = "体力�
                 )
             ):
                 last_open_panel_click_time = now_time
-                sleep(0.5)
+                auto.sleep_with_stop_check(0.5)
             continue
+        _check_stop_requested()
         if auto.click_element(
             "enkephalin/all_in_assets.png",
             threshold=all_in_threshold,
         ):
-            sleep(0.2)
+            auto.sleep_with_stop_check(0.2)
             if auto.take_screenshot() is None:
                 continue
+            _check_stop_requested()
             auto.click_element("enkephalin/enkephalin_confirm_assets.png")
             if cancel:
+                _check_stop_requested()
                 auto.click_element("enkephalin/enkephalin_cancel_assets.png")
             return True
-        sleep(0.2)
+        auto.sleep_with_stop_check(0.2)
         continue
 
 
 @begin_and_finish_time_log(task_name="狂气换体", calculate_time=False)
 def lunacy_to_enkephalin(times=0):
+    _check_stop_requested()
     make_enkephalin_module(cancel=False, skip=False, task_name="狂气换体")
+    _check_stop_requested()
     auto.click_element("enkephalin/use_lunacy_assets.png")
-    sleep(0.5)
+    auto.sleep_with_stop_check(0.5)
     Grandet = False
     while times > 0:
+        _check_stop_requested()
         auto.mouse_to_blank(move_back=False)
         # 自动截图
         if auto.take_screenshot() is None:
             continue
+        _check_stop_requested()
         if times > 0 and auto.find_element("enkephalin/lunacy_spend_26_assets.png"):
             # 葛朗台模式
             if cfg.Dr_Grandet_mode:
-                while get_the_timing() is False:
+                while True:
+                    _check_stop_requested()
+                    if get_the_timing() is not False:
+                        break
                     if Grandet:
                         break
-                    sleep(2)
+                    auto.sleep_with_stop_check(2)
                 Grandet = True
+            _check_stop_requested()
             auto.click_element("enkephalin/enkephalin_confirm_assets.png")
-            sleep(1)
+            auto.sleep_with_stop_check(1)
             continue
         if times >= 2 and auto.find_element("enkephalin/lunacy_spend_52_assets.png"):
             if cfg.Dr_Grandet_mode:
-                while get_the_timing() is False:
+                while True:
+                    _check_stop_requested()
+                    if get_the_timing() is not False:
+                        break
                     if Grandet:
                         break
-                    sleep(2)
+                    auto.sleep_with_stop_check(2)
                     Grandet = True
+            _check_stop_requested()
             auto.click_element("enkephalin/enkephalin_confirm_assets.png")
-            sleep(1)
+            auto.sleep_with_stop_check(1)
             continue
         if times >= 3 and auto.find_element("enkephalin/lunacy_spend_78_assets.png"):
             if cfg.Dr_Grandet_mode:
-                while get_the_timing() is False:
+                while True:
+                    _check_stop_requested()
+                    if get_the_timing() is not False:
+                        break
                     if Grandet:
                         break
-                    sleep(2)
+                    auto.sleep_with_stop_check(2)
                     Grandet = True
+            _check_stop_requested()
             auto.click_element("enkephalin/enkephalin_confirm_assets.png")
-            sleep(1)
+            auto.sleep_with_stop_check(1)
             continue
         break
+    _check_stop_requested()
     auto.click_element("enkephalin/enkephalin_cancel_assets.png")
+    _check_stop_requested()
     make_enkephalin_module(skip=False)

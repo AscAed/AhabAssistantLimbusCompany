@@ -1,4 +1,6 @@
 import hashlib
+import shutil
+from unittest.mock import patch
 
 import pytest
 
@@ -134,6 +136,94 @@ def test_resource_sync_applies_valid_nested_paths(tmp_path, monkeypatch):
     assert not old_file.exists()
     assert applied.downloaded_count == 1
     assert applied.deleted_count == 1
+
+
+def test_resource_sync_retries_after_partial_copy_failure(tmp_path, monkeypatch):
+    payload = b"new image bytes"
+    service, result = _sync_fixture(tmp_path, monkeypatch, payload)
+    entries = [
+        ResourceFileEntry(
+            path=f"nested/{name}.png",
+            sha256=hashlib.sha256(payload).hexdigest(),
+            size=len(payload),
+        )
+        for name in ("first", "second")
+    ]
+    result.remote_manifest.files = entries
+    old_file = service.assets_dir / "nested" / "old.png"
+    old_file.parent.mkdir(parents=True)
+    old_file.write_bytes(b"old image")
+
+    def extract(_package, target):
+        target.mkdir()
+        for entry in entries:
+            image = target / entry.path
+            image.parent.mkdir(parents=True, exist_ok=True)
+            image.write_bytes(payload)
+        return target
+
+    monkeypatch.setattr(service, "_extract_resource_package", extract)
+    original_copy2 = shutil.copy2
+    copy_calls = 0
+
+    def fail_second_copy(source, destination):
+        nonlocal copy_calls
+        copy_calls += 1
+        if copy_calls == 2:
+            raise OSError("disk full")
+        return original_copy2(source, destination)
+
+    plan = ResourceSyncPlan(
+        files_to_add=entries,
+        files_to_delete=["nested/old.png"],
+    )
+    with patch("module.resource_sync.service.shutil.copy2", side_effect=fail_second_copy):
+        with pytest.raises(OSError, match="disk full"):
+            service.apply_sync_plan(check_result=result, sync_plan=plan)
+
+    assert (service.assets_dir / entries[0].path).read_bytes() == payload
+    assert not (service.assets_dir / entries[1].path).exists()
+    assert old_file.read_bytes() == b"old image"
+    assert not service.state_path.exists()
+    assert not service.temp_dir.exists()
+
+    applied = service.apply_sync_plan(check_result=result, sync_plan=plan)
+
+    assert all((service.assets_dir / entry.path).read_bytes() == payload for entry in entries)
+    assert not old_file.exists()
+    assert applied.downloaded_count == 2
+    assert applied.deleted_count == 1
+    assert service.load_state().last_applied_manifest_id == "test"
+
+
+def test_resource_sync_retries_after_partial_delete_failure(tmp_path, monkeypatch):
+    service, result = _sync_fixture(tmp_path, monkeypatch, b"package")
+    first_file = service.assets_dir / "obsolete-first.png"
+    second_file = service.assets_dir / "obsolete-second.png"
+    first_file.write_bytes(b"first obsolete image")
+    second_file.write_bytes(b"second obsolete image")
+    plan = ResourceSyncPlan(files_to_delete=["obsolete-first.png", "obsolete-second.png"])
+    original_unlink = first_file.unlink
+
+    def fail_second_delete(path, *args, **kwargs):
+        if path == second_file:
+            raise PermissionError("file is in use")
+        return original_unlink.__func__(path, *args, **kwargs)
+
+    with patch("module.resource_sync.service.Path.unlink", new=fail_second_delete):
+        with pytest.raises(PermissionError, match="file is in use"):
+            service.apply_sync_plan(check_result=result, sync_plan=plan)
+
+    assert not first_file.exists()
+    assert second_file.read_bytes() == b"second obsolete image"
+    assert not service.state_path.exists()
+
+    applied = service.apply_sync_plan(check_result=result, sync_plan=plan)
+
+    assert not first_file.exists()
+    assert not second_file.exists()
+    assert applied.deleted_count == 1
+    assert service.load_state().last_applied_manifest_id == "test"
 
 
 def test_resource_sync_rejects_asset_link_outside_root(tmp_path, monkeypatch):

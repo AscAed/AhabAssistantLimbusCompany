@@ -35,3 +35,4 @@
 - Real-game input, simulator compatibility, native Win32 behavior, and packaged execution require separate runtime evidence.
 - Historical claims about EGO coordinates and shop fusion are not treated as proven failures without a reproducible fixture or incident.
 - See [the dated self-audit](audits/2026-11-12-self-audit.md) for current verified findings and open limitations.
+- The later [documentation investigation](audits/2026-11-12-documentation-baseline.md) names the examined `dc7339fb` checkout and deployment evidence gaps. The [target design](architecture/target-and-optimization.md) and [roadmap](development/implementation-roadmap.md) are proposals, not implemented capabilities.

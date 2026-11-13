@@ -142,6 +142,14 @@ class Updater:
                     self._resolve_manifest_path(self.extract_folder_path, normalized_path)
                 normalized_changes[category].append((relative_path, normalized_path))
 
+        for category in ("added", "modified"):
+            for file_path, normalized_path in normalized_changes[category]:
+                source_path = self._resolve_manifest_path(
+                    self.extract_folder_path, normalized_path
+                )
+                if not os.path.isfile(source_path):
+                    raise RuntimeError(f"更新包缺少清单要求的源文件: {file_path}")
+
         print("检测到增量更新清单，执行增量更新...")
 
         for dir_path, normalized_path in normalized_changes["deleted_dir"]:
@@ -174,8 +182,10 @@ class Updater:
                 dst = self._resolve_manifest_path(self.cover_folder_path, normalized_path)
                 shutil.copy2(src, dst)
                 print(f"新增文件: {file_path}")
-            except FileNotFoundError:
-                print(f"源文件不存在: {file_path}")
+            except FileNotFoundError as error:
+                raise RuntimeError(
+                    f"更新包缺少清单要求的源文件: {file_path}"
+                ) from error
 
         for file_path, normalized_path in normalized_changes["modified"]:
             src = self._resolve_manifest_path(self.extract_folder_path, normalized_path)
@@ -186,8 +196,10 @@ class Updater:
                 dst = self._resolve_manifest_path(self.cover_folder_path, normalized_path)
                 shutil.copy2(src, dst)
                 print(f"更新文件: {file_path}")
-            except FileNotFoundError:
-                print(f"源文件不存在: {file_path}")
+            except FileNotFoundError as error:
+                raise RuntimeError(
+                    f"更新包缺少清单要求的源文件: {file_path}"
+                ) from error
 
         print("增量更新完成")
 
@@ -331,7 +343,11 @@ class Updater:
         if not apply_mode and self._handoff_to_new_updater():
             return
         self.terminate_processes()
-        self.cover_folder()
+        try:
+            self.cover_folder()
+        except Exception as error:
+            print(f"应用更新失败，保留更新包以便恢复: {error}")
+            return False
         self.cleanup()
         input("已完成更新，按回车键退出并打开软件\nThe update is complete, press enter to exit and open the software")
         if subprocess.run(["cmd", "/c", "start", '""', os.path.abspath("./AALC.exe")], check=False).returncode != 0:

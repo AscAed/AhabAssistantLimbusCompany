@@ -1113,8 +1113,7 @@ class Shop:
         sinner_be_heal = False
         while True:
             # 自动截图
-            if auto.take_screenshot() is None:
-                continue
+            wait_for_screenshot()
 
             loop_count -= 1
             if loop_count < 5:
