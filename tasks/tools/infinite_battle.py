@@ -14,6 +14,7 @@ from module.config import cfg
 from module.game_and_screen import screen
 from module.hotkey_listener import ExactGlobalHotKeys
 from module.logger import log
+from module.my_error.my_error import userStopError
 from tasks.battle.battle import Battle
 from tasks.tools.ui_style import apply_tool_window_theme, get_status_label_style
 from utils.path_manager import path_manager
@@ -38,37 +39,57 @@ class BattleWorker(QThread):
         self.defense_on_turn1 = defense_on_turn1
         self.choice_event_handling = choice_event_handling
         self.initialized = False
+        self.is_stop = False
         self.battle = Battle(is_tool=True)  # 复用镜牢战斗逻辑
         self.operation_mode = cfg.operation_mode
 
     def stop(self):
         """停止工作线程"""
         self.battle.running = False
+        self.is_stop = True
 
     def run(self):
         """工作线程的主循环"""
+        previous_stop_check = auto._push_thread_stop_check(
+            lambda: self.is_stop or not self.battle.running
+        )
+        try:
+            self._run_battle_worker()
+        finally:
+            auto._restore_thread_stop_check(previous_stop_check)
+
+    def _run_battle_worker(self):
         # 首先进行游戏初始化
         if not self.initialized:
             try:
                 from tasks.base.script_task_scheme import init_game
 
-                init_game()
+                init_game(thread=self)
+                if self.is_stop:
+                    return
                 self._set_win()
                 path_manager.initialize_paths(reset_eliminations=False)
                 auto.clear_img_cache()
                 log.debug(f"初始化图片路径: {path_manager.pic_path}")
                 self.initialized = True
                 self.initialization_complete.emit()
+            except userStopError:
+                return
             except Exception as e:
                 self.error_occurred.emit(f"游戏初始化错误: {str(e)}")
                 self.msleep(2000)
                 return
-        self.battle.fight(
-            infinite_battle=True,
-            defense_on_turn1=self.defense_on_turn1,
-            defense_all_time=self.defense,
-            choice_event_handling=self.choice_event_handling,
-        )
+        if self.is_stop:
+            return
+        try:
+            self.battle.fight(
+                infinite_battle=True,
+                defense_on_turn1=self.defense_on_turn1,
+                defense_all_time=self.defense,
+                choice_event_handling=self.choice_event_handling,
+            )
+        except userStopError:
+            return
 
     def _set_win(self):
         try:
@@ -187,22 +208,23 @@ class InfiniteBattles(QWidget):
     def on_battle_finished(self):
         self.log_text.append("战斗线程已停止")
         self.start_stop_button.setText("开始战斗")
+        self.start_stop_button.setEnabled(True)
+        self.defense_box.setDisabled(False)
+        self.defense_on_turn1_box.setDisabled(False)
+        self.not_choose_event_box.setDisabled(False)
         self.status_label.setText("状态：已停止")
+        screen.reset_win(activate=False)
+        auto.clear_img_cache()
 
     def stop_battle(self):
         """停止战斗工作线程"""
-        if self.worker.isRunning():
+        if self.worker is not None and self.worker.isRunning():
             self.log_text.append("中止：等待战斗线程停止...")
             self.worker.stop()
-            self.worker.wait(1000)  # 等待1秒
-            if self.worker.isRunning():
-                self.worker.terminate()
-                self.worker.wait(1000)
-            self.defense_box.setDisabled(False)
-            self.defense_on_turn1_box.setDisabled(False)
-            self.not_choose_event_box.setDisabled(False)
-            screen.reset_win()
-            auto.clear_img_cache()
+            self.start_stop_button.setEnabled(False)
+            self.status_label.setText(self.tr("状态：正在停止..."))
+            return self.worker.wait(1000)
+        return True
 
     def toggle_battle(self):
         """切换战斗状态"""
@@ -233,22 +255,16 @@ class InfiniteBattles(QWidget):
 
     def closeEvent(self, event):
         """窗口关闭时停止所有定时器和工作线程"""
-        # 停止工作线程
-        if hasattr(self, "worker") and self.worker:
+        if self.worker is not None and self.worker.isRunning():
             self.worker.stop()
-            self.worker.wait(3000)  # 等待最多3秒
+            if not getattr(self, "_close_pending", False):
+                self._close_pending = True
+                self.worker.finished.connect(self.close)
             if self.worker.isRunning():
-                self.worker.terminate()
-
-        # 资源清理
-        try:
-            if self.worker is not None and self.worker.isRunning():
-                screen.reset_win()
-                auto.clear_img_cache()
-                self.listener.stop()
-        except Exception:
-            # 忽略清理异常，避免影响关闭
-            pass
+                event.ignore()
+                return
+        if self.listener is not None:
+            self.listener.stop()
         event.accept()
 
     def _on_stop_shortcut(self):

@@ -26,7 +26,7 @@
 
 [简体中文](/README.md) | **English**
 
-Encountering problems? Please check the [FAQ](assets/doc/en/FAQ.md) before asking questions.
+Encountering problems? Please check the [FAQ](FAQ_EN.md) before asking questions.
 
 ---
 
@@ -203,7 +203,7 @@ The AALC project could not have been possible without the help of the following 
 | March7thAssistant                     | [March7thAssistant](https://github.com/moesnow/March7thAssistant)                 | Learned quite a bit from the big guy here                                                                                                   |
 | BAAS                                  | [blue_archive_auto_script](https://github.com/pur1fying/blue_archive_auto_script) | I learned the simulator-related code from the big guy here                                                                                  |
 
-The file [ChineseFont.ttf](./assets/app/fonts/ChineseFont.ttf) is sourced from [Sarasa-Gothic](https://github.com/be5invis/Sarasa-Gothic), This portion of the code adheres to the **SIL Open Font License** license.
+The file [ChineseFont.ttf](../../app/fonts/ChineseFont.ttf) is sourced from [Sarasa-Gothic](https://github.com/be5invis/Sarasa-Gothic), This portion of the code adheres to the **SIL Open Font License** license.
 
 ### Uniform acknowledgements
 
@@ -260,7 +260,7 @@ git pull
 # Clone the repository
 git clone https://github.com/KIYI671/AhabAssistantLimbusCompany
 cd AhabAssistantLimbusCompany
-# Please use a Python binary with version higher than 3.13 (with GIL)
+# Please use Python 3.12 or newer (CPython with GIL)
 pip install -r requirements.txt
 python main.py
 
@@ -280,6 +280,8 @@ git pull
 
 - Development Participation(Document Under Construction)
 - Translation Support: Refer to [Translation Guide](translateGuide.md)
+- Maintainers and AI agents: start from the [project documentation index](../../../docs/INDEX.md).
+- Maintainers and AI agents: start from the [project documentation index](../../../docs/INDEX.md).
 
 ---
 

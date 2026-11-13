@@ -367,7 +367,10 @@ class Mirror:
 
             elif state == GameState.BATTLE_FORMATION:
                 if self.first_battle:
-                    team_formation(self.sinner_team)
+                    if team_formation(self.sinner_team) is False:
+                        raise unableToFindTeamError(
+                            "首次镜牢队伍编队失败，已停止本次任务"
+                        )
                     self.first_battle = False
                     continue
                 if auto.click_element("teams/none_sinner_assets.png", model="clam"):
@@ -1239,8 +1242,7 @@ class Mirror:
             auto.find_element("mirror/road_to_mir/dreaming_star/coins_assets.png")
             is None
         ):
-            if auto.take_screenshot() is None:
-                continue
+            wait_for_screenshot()
             loop_count -= 1
             if loop_count % 5 == 0:
                 log.debug(f"选择队伍识别次数剩余{loop_count}次")
@@ -1529,8 +1531,7 @@ class Mirror:
                 return False
             return
         while True:
-            if auto.take_screenshot() is None:
-                continue
+            wait_for_screenshot()
 
             if auto.click_element("mirror/road_in_mir/ego_gift_get_confirm_assets.png"):
                 break

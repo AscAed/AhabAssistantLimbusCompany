@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
+import tempfile
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -17,6 +19,7 @@ from module.resource_sync.manifest import (
     ResourceFileEntry,
     ResourceManifest,
     ResourcePackageEntry,
+    _validate_manifest_relative_path,
 )
 from module.resource_sync.source import ResourceSource, get_default_sources
 from module.resource_sync.state import LOCAL_STATE_PATH, ResourceSyncState
@@ -31,6 +34,16 @@ DEFAULT_LOCAL_STATE_PATH = Path(LOCAL_STATE_PATH)
 DEFAULT_TEMP_DIR = Path("update_temp")
 # 网络请求超时时间，单位为秒。
 DEFAULT_REQUEST_TIMEOUT = 10
+
+
+def _resolve_contained_path(root: Path, relative_path: str) -> Path:
+    normalized = _validate_manifest_relative_path(relative_path)
+    resolved_root = root.resolve()
+    target_path = resolved_root / normalized
+    resolved_path = target_path.resolve()
+    if not resolved_path.is_relative_to(resolved_root) or resolved_path == resolved_root:
+        raise ValueError(f"资源路径超出指定目录: {relative_path}")
+    return target_path
 
 
 class ResourceCheckStatus(Enum):
@@ -266,9 +279,30 @@ class ResourceSyncService:
         返回:
             实际写入的状态文件路径。
         """
-        # 先确保状态文件目录存在，再执行覆盖写入。
+        serialized_state = state.to_json()
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
-        self.state_path.write_text(state.to_json(), encoding="utf-8")
+        temporary_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=self.state_path.parent,
+                prefix=f".{self.state_path.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as file:
+                temporary_path = Path(file.name)
+                file.write(serialized_state)
+                file.flush()
+                os.fsync(file.fileno())
+            os.replace(temporary_path, self.state_path)
+            temporary_path = None
+        finally:
+            if temporary_path is not None:
+                try:
+                    temporary_path.unlink(missing_ok=True)
+                except OSError as error:
+                    log.warning("清理临时图片资源状态文件失败: %s", error)
         return self.state_path
 
     def check_for_updates(
@@ -401,7 +435,7 @@ class ResourceSyncService:
         hasher = hashlib.sha256()
         file_count = 0
         for relative_path in self._iter_local_files():
-            local_path = self.assets_dir / relative_path
+            local_path = _resolve_contained_path(self.assets_dir, relative_path)
             stat_result = local_path.stat()
             hasher.update(
                 f"{relative_path}\t{stat_result.st_size}\t{stat_result.st_mtime_ns}\n".encode(
@@ -484,7 +518,7 @@ class ResourceSyncService:
 
         # 第二步：逐项比较远端清单与本地文件，识别新增和内容变更。
         for relative_path, entry in remote_entries.items():
-            local_path = self.assets_dir / relative_path
+            local_path = _resolve_contained_path(self.assets_dir, relative_path)
             if not local_path.exists():
                 plan.files_to_add.append(entry)
                 continue
@@ -656,6 +690,13 @@ class ResourceSyncService:
             if has_download_entries
             else None
         )
+        # 先验证整份计划，避免后面的非法条目导致前面的文件已经被修改。
+        for entry in download_entries:
+            _resolve_contained_path(self.assets_dir, entry.path)
+        for relative_path in deletion_candidates:
+            _resolve_contained_path(self.assets_dir, relative_path)
+        if package_entry is not None:
+            _validate_manifest_relative_path(package_entry.path)
 
         # 第二步：仅在存在新增或变更文件时，才准备资源包下载与解压环境。
         if has_download_entries:
@@ -706,14 +747,16 @@ class ResourceSyncService:
                     progress_callback(current_step, total_steps)
                 if extract_dir is None:
                     raise ValueError("存在待下载文件时未准备资源包解压目录")
-                extracted_path = extract_dir / entry.path
+                extracted_path = _resolve_contained_path(extract_dir, entry.path)
                 if not extracted_path.is_file():
                     raise ValueError(f"资源包中缺少清单要求的文件: {entry.path}")
                 if sha256_file(extracted_path) != entry.sha256:
                     raise ValueError(f"资源包内文件校验失败: {entry.path}")
 
-                target_path = self.assets_dir / entry.path
+                target_path = _resolve_contained_path(self.assets_dir, entry.path)
                 target_path.parent.mkdir(parents=True, exist_ok=True)
+                extracted_path = _resolve_contained_path(extract_dir, entry.path)
+                target_path = _resolve_contained_path(self.assets_dir, entry.path)
                 shutil.copy2(extracted_path, target_path)
                 downloaded_count += 1
 
@@ -725,7 +768,7 @@ class ResourceSyncService:
                 current_step += 1
                 if progress_callback:
                     progress_callback(current_step, total_steps)
-                target_path = self.assets_dir / relative_path
+                target_path = _resolve_contained_path(self.assets_dir, relative_path)
                 if target_path.exists():
                     target_path.unlink()
                     deleted_count += 1

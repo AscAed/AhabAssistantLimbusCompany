@@ -441,6 +441,8 @@ class FarmingInterfaceLeft(QWidget):
         self.setObjectName("FarmingInterfaceLeft")
 
         self.my_script = None
+        self._manual_stop_requested = False
+        self._script_finish_wait_connected = False
 
         self.__init_widget()
         self.__init_card()
@@ -533,7 +535,9 @@ class FarmingInterfaceLeft(QWidget):
             self.after_completion_selector._hide_editor()
         except Exception:
             pass
-        sys.exit(0)
+        window = self.window()
+        window._close_confirmed = True
+        window.close()
 
     def check_setting(self):
         # 检测是否有未保存的镜牢队伍设置
@@ -620,47 +624,41 @@ class FarmingInterfaceLeft(QWidget):
             self._disable_setting(self.parent())
             self.create_and_start_script()
         else:
-            if cfg.set_reduce_miscontact and cfg.simulator is False:
-                # 手动停止时仍需恢复游戏窗口，但这里不再要求抢前台。
-                screen.reset_win(activate=False)
-            else:
+            self._manual_stop_requested = True
+            if self.stop_script():
+                self._on_script_finished()
+
+    def _finish_manual_stop_cleanup(self):
+        if not getattr(self, "_manual_stop_requested", False):
+            return
+        self._manual_stop_requested = False
+        try:
+            if cfg.simulator:
                 if cfg.simulator_type == 0:
-                    from module.automation.input_handlers.simulator.mumu_control import (
-                        MumuControl,
-                    )
+                    from module.automation.input_handlers.simulator.mumu_control import MumuControl
 
-                    while True:
-                        try:
-                            MumuControl.clean_connect()
-                            break
-                        except Exception:
-                            continue
+                    MumuControl.clean_connect()
                 else:
-                    from module.automation.input_handlers.simulator.simulator_control import (
-                        SimulatorControl,
-                    )
+                    from module.automation.input_handlers.simulator.simulator_control import SimulatorControl
 
-                    while True:
-                        try:
-                            SimulatorControl.clean_connect()
-                            break
-                        except Exception:
-                            continue
-            self.link_start_button.set_text("Link Start!")
-            self._enable_setting(self.parent())
-            self.reset_pause_resume_button()
-            mediator.refresh_teams_order.emit()
-            # 检查线程是否仍在运行，如果仍在运行则执行清理，否则跳过（因为脚本已自行清理）
-            thread_was_running = self.my_script is not None and self.my_script.isRunning()
-            self.stop_script()
-            if thread_was_running:
-                auto.clear_img_cache()
-            mediator.mirror_bar_kill_signal.emit()
+                    SimulatorControl.clean_connect()
+            elif cfg.set_reduce_miscontact:
+                screen.reset_win(activate=False)
+        except Exception as exc:
+            log.warning("脚本停止后的清理失败: %s", exc)
+        auto.clear_img_cache()
 
     def _on_script_finished(self):
-        # 自然结束只做 UI 收尾；不要复用“手动停止”入口，否则会重复触发窗口清理。
-        log.debug("脚本自然结束，执行 UI 收尾，不再重复重置游戏窗口")
+        if self.my_script is not None and self.my_script.isRunning():
+            if not getattr(self, "_script_finish_wait_connected", False):
+                self._script_finish_wait_connected = True
+                self.my_script.finished.connect(self._on_script_finished)
+            return
+        self._script_finish_wait_connected = False
+        self._finish_manual_stop_cleanup()
+        log.debug("脚本线程已结束，执行 UI 收尾")
         self.link_start_button.set_text("Link Start!")
+        self.link_start_button.button.setEnabled(True)
         self._enable_setting(self.parent())
         self.reset_pause_resume_button()
         mediator.refresh_teams_order.emit()
@@ -715,12 +713,16 @@ class FarmingInterfaceLeft(QWidget):
                 self._enable_setting(child)
 
     def create_and_start_script(self):
+        if self.my_script is not None and self.my_script.isRunning():
+            log.warning("上一次脚本线程仍在运行，拒绝重复启动")
+            return
         try:
             msg = "开始进行所有任务"
             log.info(msg)
             ui_log_dispatcher.clear()
             # 启动脚本线程
             self.my_script = my_script_task()
+            self.my_script.finished.connect(self._on_script_finished)
             # 设置脚本线程为守护(当程序被关闭，一起停止)
             self.my_script.daemon = True
             self.my_script.start()
@@ -730,13 +732,22 @@ class FarmingInterfaceLeft(QWidget):
             self._enable_setting(self.parent())
             self.reset_pause_resume_button()
 
-    def stop_script(self):
+    def stop_script(self, timeout_ms=2000) -> bool:
         if self.my_script and self.my_script.isRunning():
             log.debug("正在请求脚本线程安全停止...")
+            self._manual_stop_requested = True
             self.my_script.is_stop = True
-            # 等待最多 2000 毫秒让其协同停止
-            if not self.my_script.wait(2000):
-                log.warning("脚本线程未能在 2000 毫秒内停止，继续等待其协同退出。")
+            self.link_start_button.set_text(self.tr("正在停止..."))
+            self.link_start_button.button.setEnabled(False)
+            try:
+                if auto.check_pause():
+                    auto.set_pause()
+            except Exception as exc:
+                log.warning("停止时恢复暂停状态失败，继续等待脚本退出: %s", exc)
+            if not self.my_script.wait(timeout_ms):
+                log.warning("脚本线程尚未停止，保持停止状态等待其协同退出。")
+                return False
+        return True
 
     def my_stop_shortcut(self):
         current_text = self.link_start_button.get_text()

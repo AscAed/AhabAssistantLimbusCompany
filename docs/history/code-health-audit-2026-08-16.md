@@ -1,4 +1,6 @@
-# Code Health Audit
+# Historical Code Health Audit
+
+> Audit date: 2026-08-16. This report describes revision `37440bf` and its environment. Its counts, line references, and completion claims are historical. Use the [2026-11-12 current audit](../audits/2026-11-12-self-audit.md) for current state.
 
 ## 1. Audit Metadata
 
@@ -23,7 +25,7 @@ This document is a triage baseline, not proof that every listed hypothesis is a 
 ### 2.2 Python and dependency environment
 
 - `pyproject.toml` requires Python 3.12 or newer, while the existing `.venv` reports Python 3.13.6. Python 3.13 may expose compatibility differences not present in the intended Python 3.12 development and packaging environment.
-- `uv run` cannot initialize its default cache at `C:\Users\AscAed\AppData\Local\uv\cache` because access is denied. The audit therefore used executables from `.venv` where possible.
+- `uv run` could not initialize its default user-local cache because access was denied. The audit therefore used executables from `.venv` where possible.
 - Before repair validation, create or select a Python 3.12 environment and use a writable `UV_CACHE_DIR` outside the tracked source tree.
 
 ### 2.3 Static and test baseline
@@ -541,7 +543,7 @@ This section records the verification performed after the first version of this 
 - 对批次 1/2 触碰文件执行 `.venv/Scripts/ruff.exe check`，结果为 `All checks passed!`。
 - 对批次 1/2 触碰文件执行 `.venv/Scripts/python.exe -m compileall -q`，退出码为 0。
 - `.venv/Scripts/python.exe -m pytest --collect-only -q` 成功收集 29 个测试，无收集错误；`.pytest_cache` 的权限警告仍属环境问题。
-- 在临时 `--basetemp=./.tmp_pytest_run -p no:cacheprovider` 下运行完整 pytest，结果为 `29 passed`；临时目录随后已删除。默认 `tmp_path` 会访问用户临时目录 `C:\Users\AscAed\AppData\Local\Temp\pytest-of-AscAed`，当前环境存在权限拒绝，属于环境问题而非源码失败。
+- 在临时 `--basetemp=./.tmp_pytest_run -p no:cacheprovider` 下运行完整 pytest，结果为 `29 passed`；临时目录随后已删除。默认 `tmp_path` 使用的用户临时目录当时存在权限拒绝，属于该次环境限制而非源码结论。
 - 批次 3 后在临时 `--basetemp=./.tmp_pytest_run -p no:cacheprovider` 下运行完整 pytest，结果为 `33 passed`；临时目录随后已删除。
 - 批次 4/6/7/8 后运行完整 pytest，结果为 `38 passed`；临时目录随后已删除。
 - 批次 9 后在临时 `--basetemp=./.tmp_pytest_run -p no:cacheprovider` 下运行完整 pytest，结果为 `40 passed`；`ruff check . --statistics` 为 0，`ruff check .` 通过。临时目录在收尾前清理。

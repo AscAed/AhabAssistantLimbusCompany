@@ -15,6 +15,7 @@ from module.automation.input_handlers.input import (
 )
 from module.automation.input_handlers.simulator.mumu_control import MumuControl
 from module.automation.input_handlers.simulator.simulator_control import SimulatorControl
+from module.game_and_screen.screen import WindowVisibilitySnapshot
 
 
 def _simulator_instance():
@@ -179,11 +180,14 @@ def test_input_without_driver_uses_pyautogui(mock_cfg, mock_screen, mock_pyautog
 def _lease_handler(mock_screen):
     mock_screen.handle.hwnd = 1000
     mock_screen.handle.isMinimized = False
+    mock_screen.handle.rect.return_value = (10, 20, 1930, 1100)
     handler = object.__new__(WindowMoveInput)
     handler.driver = None
     handler.use_post_message = False
     handler.is_pause = False
     handler.restore_time = None
+    handler.background_input_state = "unknown"
+    handler._get_last_input_elapsed_ms = lambda: 600
     return handler
 
 
@@ -430,10 +434,214 @@ def test_window_move_lease_restores_original_foreground_after_input(mock_screen)
         "original_position": (10, 20),
         "original_cursor": (500, 400),
         "was_paused": False,
+        "lease_mode": "transparent",
+        "visibility_snapshot": WindowVisibilitySnapshot(ex_style=0, layered_alpha=None, layered_flags=None),
+        "lease_start_elapsed_ms": 100,
     })()
-    with patch.object(handler, "_restore_window_position", return_value=True) as restore_position, \
-        patch.object(handler, "_restore_foreground", return_value=True) as restore_foreground:
+    with patch("module.automation.input_handlers.input.win32gui.GetForegroundWindow", return_value=1000), \
+        patch.object(handler, "_restore_window_position", return_value=True) as restore_position, \
+        patch.object(handler, "_restore_foreground", return_value=True) as restore_foreground, \
+        patch.object(mock_screen.handle, "restore_background_input_visibility", return_value=True) as restore_visibility:
         assert handler._end_mouse_lease(lease) is True
 
     restore_position.assert_called_once_with((10, 20))
     restore_foreground.assert_called_once_with(2000)
+    restore_visibility.assert_called_once()
+
+
+@patch("module.automation.input_handlers.input.screen")
+def test_window_move_lease_restores_position_and_visibility_when_foreground_query_fails(
+    mock_screen,
+):
+    handler = _lease_handler(mock_screen)
+    snapshot = WindowVisibilitySnapshot(
+        ex_style=0,
+        layered_alpha=None,
+        layered_flags=None,
+    )
+    lease = type(
+        "Lease",
+        (),
+        {
+            "game_hwnd": 1000,
+            "original_foreground": 2000,
+            "original_position": (10, 20),
+            "original_cursor": (500, 400),
+            "was_paused": False,
+            "lease_mode": "transparent",
+            "visibility_snapshot": snapshot,
+            "lease_start_elapsed_ms": 100,
+        },
+    )()
+
+    with patch(
+        "module.automation.input_handlers.input.win32gui.GetForegroundWindow",
+        side_effect=RuntimeError("foreground unavailable"),
+    ), patch.object(
+        handler, "_restore_window_position", return_value=True
+    ) as restore_position, patch.object(
+        handler, "_restore_foreground"
+    ) as restore_foreground, patch.object(
+        mock_screen.handle, "restore_background_input_visibility", return_value=True
+    ) as restore_visibility:
+        assert handler._end_mouse_lease(lease) is False
+
+    restore_position.assert_called_once_with((10, 20))
+    restore_foreground.assert_not_called()
+    restore_visibility.assert_called_once_with(snapshot)
+
+
+def test_window_move_background_input_state_transitions():
+    handler = object.__new__(WindowMoveInput)
+    handler.background_input_state = "unknown"
+
+    assert handler.get_background_input_state() == "unknown"
+    handler.report_background_input_result(True)
+    assert handler.get_background_input_state() == "supported"
+    handler.report_background_input_result(False)
+    assert handler.get_background_input_state() == "fallback_visible"
+    handler.report_background_input_result(True)
+    assert handler.get_background_input_state() == "fallback_visible"
+
+
+@patch("module.automation.input_handlers.input.screen")
+@patch("module.automation.input_handlers.input.cfg")
+def test_window_move_begin_lease_defaults_to_visible_without_hiding(mock_cfg, mock_screen):
+    mock_cfg.config.mouse_down_duration = 0
+    mock_screen.handle.hwnd = 1000
+    mock_screen.handle.isMinimized = False
+    mock_screen.handle.rect.return_value = (10, 20, 1930, 1100)
+    handler = _lease_handler(mock_screen)
+
+    with patch("module.automation.input_handlers.input.win32gui.GetForegroundWindow", return_value=2000), \
+        patch.object(handler, "_wait_for_user_idle", return_value=True), \
+        patch.object(handler, "_get_last_input_elapsed_ms", return_value=600), \
+        patch.object(handler, "_set_window_pos", return_value=(10, 20)), \
+        patch.object(handler, "_activate_for_lease", return_value=True), \
+        patch.object(handler, "get_mouse_position", return_value=(500, 400)), \
+        patch.object(mock_screen.handle, "hide_for_background_input") as hide:
+        lease = handler._begin_mouse_lease(300, 400)
+
+    assert lease is not None
+    assert lease.lease_mode == "visible"
+    assert lease.visibility_snapshot is None
+    hide.assert_not_called()
+
+
+@patch("module.automation.input_handlers.input.screen")
+def test_window_move_begin_lease_does_not_probe_transparent_mode(mock_screen):
+    mock_screen.handle.hwnd = 1000
+    mock_screen.handle.isMinimized = False
+    handler = _lease_handler(mock_screen)
+
+    with patch.object(handler, "_begin_mouse_lease_with_mode", return_value=None) as begin_mode:
+        assert handler._begin_mouse_lease(300, 400) is None
+
+    begin_mode.assert_called_once_with(300, 400, "visible")
+    assert handler.get_background_input_state() == "unknown"
+
+
+@patch("module.automation.input_handlers.input.screen")
+def test_window_move_begin_lease_rechecks_idle_after_wait(mock_screen):
+    mock_screen.handle.hwnd = 1000
+    mock_screen.handle.isMinimized = False
+    handler = _lease_handler(mock_screen)
+
+    with patch.object(handler, "_wait_for_user_idle", return_value=True), \
+        patch.object(handler, "_get_last_input_elapsed_ms", return_value=10), \
+        patch("module.automation.input_handlers.input.win32gui.GetForegroundWindow", return_value=2000), \
+        patch.object(handler, "_set_window_pos") as set_pos, \
+        patch.object(handler, "_activate_for_lease") as activate:
+        lease = handler._begin_mouse_lease_with_mode(300, 400, "visible")
+
+    assert lease is None
+    set_pos.assert_not_called()
+    activate.assert_not_called()
+
+
+@patch("module.automation.input_handlers.input.screen")
+@patch("module.automation.input_handlers.input.cfg")
+def test_window_move_begin_lease_restores_state_when_position_set_raises_after_move(
+    mock_cfg, mock_screen
+):
+    mock_cfg.config.mouse_down_duration = 0
+    mock_screen.handle.hwnd = 1000
+    mock_screen.handle.isMinimized = False
+    original_rect = (10, 20, 1930, 1100)
+    mock_screen.handle.rect.return_value = original_rect
+    handler = _lease_handler(mock_screen)
+    snapshot = WindowVisibilitySnapshot(
+        ex_style=0x10,
+        layered_alpha=255,
+        layered_flags=1,
+    )
+
+    def move_then_raise(*_args, **_kwargs):
+        mock_screen.handle.rect.return_value = (300, 400, 2220, 1480)
+        raise RuntimeError("partial move failed")
+
+    with patch(
+        "module.automation.input_handlers.input.win32gui.GetForegroundWindow",
+        return_value=2000,
+    ), patch.object(handler, "_wait_for_user_idle", return_value=True), patch.object(
+        handler, "_get_last_input_elapsed_ms", return_value=600
+    ), patch.object(
+        mock_screen.handle, "hide_for_background_input", return_value=snapshot
+    ), patch.object(
+        handler, "_set_window_pos", side_effect=move_then_raise
+    ), patch.object(
+        handler, "_restore_window_position", return_value=True
+    ) as restore_position, patch.object(
+        handler, "_restore_foreground", return_value=True
+    ) as restore_foreground, patch.object(
+        mock_screen.handle, "restore_background_input_visibility", return_value=True
+    ) as restore_visibility:
+        with pytest.raises(RuntimeError, match="partial move failed"):
+            handler._begin_mouse_lease_with_mode(300, 400, "transparent")
+
+    restore_position.assert_called_once_with((10, 20))
+    restore_foreground.assert_called_once_with(2000)
+    restore_visibility.assert_called_once_with(snapshot)
+
+
+@patch("module.automation.input_handlers.input.screen")
+@patch("module.automation.input_handlers.input.cfg")
+def test_window_move_begin_lease_restores_visibility_when_activation_raises(
+    mock_cfg, mock_screen
+):
+    mock_cfg.config.mouse_down_duration = 0
+    mock_screen.handle.hwnd = 1000
+    mock_screen.handle.isMinimized = False
+    mock_screen.handle.rect.return_value = (10, 20, 1930, 1100)
+    handler = _lease_handler(mock_screen)
+    snapshot = WindowVisibilitySnapshot(
+        ex_style=0x10,
+        layered_alpha=255,
+        layered_flags=1,
+    )
+
+    with patch(
+        "module.automation.input_handlers.input.win32gui.GetForegroundWindow",
+        return_value=2000,
+    ), patch.object(handler, "_wait_for_user_idle", return_value=True), patch.object(
+        handler, "_get_last_input_elapsed_ms", return_value=600
+    ), patch.object(
+        handler, "_set_window_pos", return_value=(10, 20)
+    ) as move_window, patch.object(
+        handler, "_activate_for_lease", side_effect=RuntimeError("activation failed")
+    ), patch.object(
+        handler, "_restore_window_position", return_value=True
+    ) as restore_position, patch.object(
+        handler, "_restore_foreground", return_value=True
+    ) as restore_foreground, patch.object(
+        mock_screen.handle, "hide_for_background_input", return_value=snapshot
+    ), patch.object(
+        mock_screen.handle, "restore_background_input_visibility", return_value=True
+    ) as restore_visibility:
+        with pytest.raises(RuntimeError, match="activation failed"):
+            handler._begin_mouse_lease_with_mode(300, 400, "transparent")
+
+    move_window.assert_called_once_with(300, 400)
+    restore_position.assert_called_once_with((10, 20))
+    restore_foreground.assert_called_once_with(2000)
+    restore_visibility.assert_called_once_with(snapshot)

@@ -1,4 +1,6 @@
-# 后台模式鼠标输入修复 - 变更总结
+# 历史记录：后台模式鼠标输入修复变更总结
+
+> Historical summary. Test counts, line numbers, runtime claims, and timing estimates below describe the earlier implementation and are not current verification evidence. See the [current self-audit](../audits/2026-11-12-self-audit.md).
 
 ## 🎯 修复目标
 
@@ -192,7 +194,7 @@ uv run pytest tests/test_batch_scroll_fix.py -v
 
 ---
 
-### 4. `docs/BACKGROUND_INPUT_FIX.md` ✨ 新增
+### 4. `docs/history/background-input-fix-legacy.md` ✨ 新增
 
 **文件作用**：详细技术文档
 
@@ -316,5 +318,5 @@ A：拖拽是"持续性"输入（按住 + 移动 + 释放），Unity 的 UI 系�
 - ✅ `module/automation/automation.py`
 - ✅ `tasks/teams/team_formation.py`
 - ✅ `tests/test_batch_scroll_fix.py` (新增)
-- ✅ `docs/BACKGROUND_INPUT_FIX.md` (新增)
-- ✅ `docs/CHANGES_SUMMARY.md` (本文件，新增)
+- ✅ `docs/history/background-input-fix-legacy.md` (新增)
+- ✅ `docs/history/background-input-changes-legacy.md` (本文件，新增)

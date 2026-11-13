@@ -1,9 +1,149 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from PIL import Image
 
 from module.automation.automation import Automation, GameState, PageStateDispatcher
+from module.my_error.my_error import userStopError, withOutGameWinError
 from tasks.mirror.mirror import Mirror
+
+
+def _capture_automation():
+    auto = object.__new__(Automation)
+    auto.model = "clam"
+    auto.screenshot = None
+    auto.screenshot_np = None
+    auto.last_screenshot_time = 0
+    auto.img_cache = {}
+    auto.location_cache = {}
+    return auto
+
+
+@pytest.mark.parametrize(
+    ("method", "args"),
+    [
+        ("find_text_element", ("target",)),
+        ("find_language_text", ("target", "target")),
+        ("get_text_from_screenshot", ()),
+    ],
+)
+def test_text_consumers_propagate_ocr_failure(method, args):
+    auto = _capture_automation()
+    failure = RuntimeError("OCR engine failed")
+    with patch("module.automation.automation.ocr.run", side_effect=failure):
+        with pytest.raises(RuntimeError) as raised:
+            getattr(auto, method)(*args)
+
+    assert raised.value is failure
+
+
+@pytest.mark.parametrize("target", ["test_assets.png", "mirror/road_in_mir/legend_assets.png"])
+def test_find_element_capture_failure_is_bounded(target):
+    auto = _capture_automation()
+    with patch.object(
+        auto, "take_screenshot", side_effect=[None, AssertionError("unbounded capture")]
+    ) as capture:
+        with pytest.raises(RuntimeError, match="截图"):
+            auto.find_element(target, take_screenshot=True)
+
+    assert capture.call_count == 1
+
+
+def test_take_screenshot_stop_request_interrupts_retry():
+    auto = _capture_automation()
+    stopped = {"value": False}
+
+    def capture_failed(_gray):
+        stopped["value"] = True
+        return None
+
+    with patch("module.automation.automation.cfg") as mock_cfg, patch(
+        "module.automation.automation.ScreenShot.take_screenshot", side_effect=capture_failed
+    ) as capture, patch("module.automation.automation.time.sleep"):
+        mock_cfg.operation_mode = "foreground_mouse"
+        mock_cfg.screenshot_interval = 0.1
+        with pytest.raises(userStopError):
+            auto.take_screenshot(stop_check=lambda: stopped["value"])
+
+    assert capture.call_count == 1
+
+
+def test_take_screenshot_stop_during_throttle_skips_capture():
+    auto = _capture_automation()
+    auto.last_screenshot_time = 99.5
+    stopped = {"value": False}
+
+    def request_stop(_seconds):
+        stopped["value"] = True
+
+    with patch("module.automation.automation.cfg") as mock_cfg, patch(
+        "module.automation.automation.ScreenShot.take_screenshot", return_value=None
+    ) as capture, patch(
+        "module.automation.automation.time.time", return_value=100
+    ), patch(
+        "module.automation.automation.time.sleep", side_effect=request_stop
+    ):
+        mock_cfg.operation_mode = "foreground_mouse"
+        mock_cfg.screenshot_interval = 1
+        with pytest.raises(userStopError):
+            auto.take_screenshot(stop_check=lambda: stopped["value"])
+
+    capture.assert_not_called()
+
+
+def test_take_screenshot_stop_during_capture_discards_frame():
+    auto = _capture_automation()
+    stopped = {"value": False}
+    frame = Image.new("L", (4, 4), color=0)
+
+    def capture(_gray):
+        stopped["value"] = True
+        return frame
+
+    with patch("module.automation.automation.cfg") as mock_cfg, patch(
+        "module.automation.automation.ScreenShot.take_screenshot", side_effect=capture
+    ), patch("module.automation.automation.time.sleep"):
+        mock_cfg.operation_mode = "foreground_mouse"
+        mock_cfg.screenshot_interval = 0.1
+        with pytest.raises(userStopError):
+            auto.take_screenshot(stop_check=lambda: stopped["value"])
+
+    assert auto.screenshot is None
+
+
+def test_stop_checked_sleep_interrupts_before_waiting():
+    auto = _capture_automation()
+    with patch("module.automation.automation.time.sleep") as sleep:
+        with pytest.raises(userStopError):
+            auto.sleep_with_stop_check(3600, stop_check=lambda: True)
+
+    sleep.assert_not_called()
+
+
+def test_take_screenshot_foreground_restart_is_bounded():
+    class CaptureBudgetExceeded(BaseException):
+        pass
+
+    auto = _capture_automation()
+    with patch("module.automation.automation.cfg") as mock_cfg, patch(
+        "module.automation.automation.ScreenShot.take_screenshot",
+        side_effect=[
+            withOutGameWinError("missing"),
+            withOutGameWinError("missing"),
+            CaptureBudgetExceeded("unbounded restart"),
+        ],
+    ) as capture, patch("module.automation.automation.time.sleep"), patch(
+        "module.automation.automation.subprocess.run"
+    ), patch(
+        "win32process.GetWindowThreadProcessId", return_value=(1, 1234)
+    ), patch("tasks.base.script_task_scheme.init_game") as init_game:
+        mock_cfg.operation_mode = "foreground_mouse"
+        mock_cfg.screenshot_interval = 0.1
+        with pytest.raises(RuntimeError, match="截图"):
+            auto.take_screenshot()
+
+    assert capture.call_count == 2
+    init_game.assert_called_once()
 
 
 @pytest.fixture
@@ -15,10 +155,29 @@ def mock_automation():
         
         # Initialise automation instance with a mock title
         auto = Automation("test_title")
-        auto.screenshot = MagicMock()
-        auto.location_cache = {}
-        auto.img_cache = {}
-        yield auto
+        missing = object()
+        attribute_names = (
+            "screenshot",
+            "screenshot_np",
+            "location_cache",
+            "img_cache",
+            "take_screenshot",
+            "find_element",
+        )
+        original_attributes = {
+            name: auto.__dict__.get(name, missing) for name in attribute_names
+        }
+        try:
+            auto.screenshot = MagicMock()
+            auto.location_cache = {}
+            auto.img_cache = {}
+            yield auto
+        finally:
+            for name, original in original_attributes.items():
+                if original is missing:
+                    auto.__dict__.pop(name, None)
+                else:
+                    auto.__dict__[name] = original
 
 def test_wait_until_appear(mock_automation):
     # Mock find_element to fail first two times, then succeed

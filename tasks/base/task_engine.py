@@ -21,6 +21,7 @@ class Task:
         self.status = TaskStatus.PENDING
         self.allowed_start_states = allowed_start_states or [GameState.MAIN_MENU]
         self.error = None
+        self.recovery_error = None
 
     def run(self, engine) -> bool:
         raise NotImplementedError
@@ -46,8 +47,7 @@ class DailyLuxcavationTask(Task):
         from tasks.base.script_task_scheme import Daily_task_wrapper
         # Let daily task wrapper execute
         wrapper = Daily_task_wrapper(get_reward=engine.get_reward_context)
-        wrapper()
-        return True
+        return wrapper() is not False
 
 
 class GetRewardTask(Task):
@@ -91,25 +91,24 @@ class TaskEngine:
         self.tasks: list[Task] = []
         self.dispatcher = PageStateDispatcher(auto)
         self.get_reward_context = None
-        self._original_take_screenshot = None
+        self._previous_thread_stop_check = None
+        self._thread_stop_check_installed = False
 
     def add_task(self, task: Task):
         self.tasks.append(task)
 
     def _setup_screenshot_hook(self):
-        """Monkey-patch auto.take_screenshot to cooperatively raise userStopError when thread is stopped."""
-        self._original_take_screenshot = auto.take_screenshot
-        
-        def hook_take_screenshot(*args, **kwargs):
-            if self.thread and getattr(self.thread, "is_stop", False):
-                raise userStopError("用户主动终止程序")
-            return self._original_take_screenshot(*args, **kwargs)
-
-        auto.take_screenshot = hook_take_screenshot
+        """Install a stop callback scoped to the current worker thread."""
+        self._previous_thread_stop_check = auto._push_thread_stop_check(
+            lambda: bool(self.thread and getattr(self.thread, "is_stop", False))
+        )
+        self._thread_stop_check_installed = True
 
     def _restore_screenshot_hook(self):
-        if self._original_take_screenshot:
-            auto.take_screenshot = self._original_take_screenshot
+        if self._thread_stop_check_installed:
+            auto._restore_thread_stop_check(self._previous_thread_stop_check)
+            self._previous_thread_stop_check = None
+            self._thread_stop_check_installed = False
 
     def run(self):
         self._setup_screenshot_hook()
@@ -137,6 +136,7 @@ class TaskEngine:
                     if success is False:
                         task.status = TaskStatus.FAILED
                         log.error(f"==> 任务引擎：任务 [{task.name}] 执行失败")
+                        raise RuntimeError(f"任务 [{task.name}] 执行失败")
                     else:
                         task.status = TaskStatus.SUCCESS
                         log.info(f"==> 任务引擎：任务 [{task.name}] 执行完成")
@@ -153,8 +153,12 @@ class TaskEngine:
                     try:
                         from tasks.base.back_init_menu import back_init_menu
                         back_init_menu(allow_restart=False)
-                    except Exception:
-                        pass
+                    except Exception as recovery_exc:
+                        task.recovery_error = recovery_exc
+                        log.exception(
+                            "==> 任务引擎：任务 [%s] 故障恢复失败",
+                            task.name,
+                        )
                     raise e
         finally:
             self._restore_screenshot_hook()

@@ -40,6 +40,7 @@ class ProductionWork(QThread):
     def __init__(self, kill_game=False, parent=None):
         super().__init__(parent)
         self.production_running = True
+        self.is_stop = False
         self.kill_game = kill_game
         self._init_retry_count = 0
         self._last_back_init_restart_time = 0.0
@@ -47,15 +48,27 @@ class ProductionWork(QThread):
     def stop(self):
         """停止工作线程"""
         self.production_running = False
+        self.is_stop = True
 
     def run(self):
+        previous_stop_check = auto._push_thread_stop_check(
+            lambda: self.is_stop or not self.production_running
+        )
+        try:
+            self._run_production()
+        finally:
+            auto._restore_thread_stop_check(previous_stop_check)
+
+    def _run_production(self):
         """工作线程的主循环"""
         while self.production_running:
             # 首先进行游戏初始化
             try:
                 from tasks.base.script_task_scheme import init_game
 
-                init_game()
+                init_game(thread=self)
+                if self.is_stop:
+                    return
                 self._init_retry_count = 0
                 self._set_win()
                 self.initialization_complete.emit()
@@ -111,6 +124,15 @@ class ProductionWork(QThread):
                 self._sleep_with_stop_check(float(sleep_time))
             except userStopError:
                 return
+            except Exception as exc:
+                from module.ocr.ocr import OCRExecutionError
+
+                if not isinstance(exc, OCRExecutionError):
+                    raise
+                log.error("体力 OCR 执行失败: %s", exc)
+                self.error_occurred.emit(f"体力 OCR 执行失败: {exc}")
+                self.production_running = False
+                return
 
     def _back_init_menu_with_tool_policy(self) -> bool:
         restart_timeout = 180.0 if cfg.simulator else 120.0
@@ -145,7 +167,7 @@ class ProductionWork(QThread):
                 kill_game()
                 from tasks.base.script_task_scheme import init_game
 
-                init_game()
+                init_game(thread=self)
                 self._set_win()
             except userStopError:
                 raise
@@ -285,21 +307,22 @@ class ProductionModule(QWidget):
     def on_production_finished(self):
         self.log_text.append("工作线程已停止")
         self.start_stop_button.setText(self.start_msg)
+        self.start_stop_button.setEnabled(True)
+        self.kill_game_box.setDisabled(False)
         self.status_label.setText("状态：已停止")
+        if cfg.set_reduce_miscontact and not cfg.simulator:
+            screen.reset_win(activate=False)
+        auto.clear_img_cache()
 
     def stop_production(self):
         """停止工作工作线程"""
-        if self.worker.isRunning():
+        if self.worker is not None and self.worker.isRunning():
             self.log_text.append("中止：等待工作线程停止...")
             self.worker.stop()
-            self.worker.wait(1000)  # 等待1秒
-            if self.worker.isRunning():
-                self.worker.terminate()
-                self.worker.wait(1000)
-            self.kill_game_box.setDisabled(False)
-            if cfg.set_reduce_miscontact and not cfg.simulator:
-                screen.reset_win()
-            auto.clear_img_cache()
+            self.start_stop_button.setEnabled(False)
+            self.status_label.setText(self.tr("状态：正在停止..."))
+            return self.worker.wait(1000)
+        return True
 
     def toggle_production(self):
         """切换生产状态"""
@@ -345,19 +368,12 @@ class ProductionModule(QWidget):
 
     def closeEvent(self, event):
         """窗口关闭时停止所有定时器和工作线程"""
-        # 停止工作线程
-        if hasattr(self, "worker") and self.worker:
-            self.worker.stop()
-            self.worker.wait(3000)  # 等待最多3秒
-            if self.worker.isRunning():
-                self.worker.terminate()
-
-        # 资源清理
         if self.worker is not None and self.worker.isRunning():
-            try:
-                if cfg.set_reduce_miscontact and not cfg.simulator:
-                    screen.reset_win()
-                auto.clear_img_cache()
-            except Exception as e:
-                log.error(f"关闭自动换饼窗口时清理失败: {e}")
+            self.worker.stop()
+            if not getattr(self, "_close_pending", False):
+                self._close_pending = True
+                self.worker.finished.connect(self.close)
+            if self.worker.isRunning():
+                event.ignore()
+                return
         event.accept()

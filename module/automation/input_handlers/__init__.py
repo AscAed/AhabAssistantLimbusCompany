@@ -1,7 +1,9 @@
+import threading
 from time import sleep, time
 from typing import Callable
 
 from module.logger import log
+from module.my_error.my_error import userStopError
 
 
 class AbstractInput:
@@ -13,6 +15,23 @@ class AbstractInput:
     def __init__(self) -> None:
         self.is_pause: bool = False
         self.restore_time: float | None = None
+        self._stop_context = threading.local()
+
+    def _push_stop_check(self, callback):
+        if not hasattr(self, "_stop_context"):
+            self._stop_context = threading.local()
+        previous = getattr(self._stop_context, "callback", None)
+        self._stop_context.callback = callback
+        return previous
+
+    def _restore_stop_check(self, previous) -> None:
+        if not hasattr(self, "_stop_context"):
+            return
+        if previous is None:
+            if hasattr(self._stop_context, "callback"):
+                del self._stop_context.callback
+        else:
+            self._stop_context.callback = previous
 
     def set_pause(self) -> None:
         """
@@ -31,11 +50,19 @@ class AbstractInput:
         """
         pause_identity = False
         while self.is_pause:
+            stop_check = getattr(
+                getattr(self, "_stop_context", None), "callback", None
+            )
+            if stop_check is not None and stop_check():
+                raise userStopError("用户主动终止程序")
             if pause_identity is not False:
                 log.info("AALC 已暂停")
                 pause_identity = True
             sleep(1)
             self.restore_time = time()
+        stop_check = getattr(getattr(self, "_stop_context", None), "callback", None)
+        if stop_check is not None and stop_check():
+            raise userStopError("用户主动终止程序")
 
     def mouse_click(self, x, y, times=1, move_back=False) -> bool:
         """在指定坐标上执行点击操作
@@ -148,3 +175,11 @@ class AbstractInput:
 
     def input_text(self, text: str) -> None:
         raise InterruptedError(f"未实现的输入方法 {self.__class__.__name__}.input_text")
+
+    def report_background_input_result(self, success: bool) -> None:
+        """回报后台透明输入是否实际生效。"""
+        return
+
+    def get_background_input_state(self) -> str:
+        """返回后台透明输入能力状态。"""
+        return "unsupported"

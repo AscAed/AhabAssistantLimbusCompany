@@ -106,10 +106,10 @@ def test_driver_delegation(mock_cfg, mock_screen):
     assert driver.downs[0][0] == 100
     assert driver.downs[0][1] == 100
 
-# 4. Test _randomize_coords applies a bounded offset
+# 4. The legacy coordinate helper preserves detected coordinates.
 @patch("module.automation.input_handlers.input.screen")
 @patch("module.automation.input_handlers.input.cfg")
-def test_randomize_coords_bounded_offset(mock_cfg, mock_screen):
+def test_coordinate_compatibility_helper_preserves_coordinates(mock_cfg, mock_screen):
     mock_cfg.config.use_post_message = True
     mock_screen.handle.hwnd = 12345
     mock_screen.handle.isMinimized = False
@@ -118,13 +118,12 @@ def test_randomize_coords_bounded_offset(mock_cfg, mock_screen):
     radius = 4
     for _ in range(100):
         rx, ry = handler._randomize_coords(100, 200, radius=radius)
-        assert 100 - radius <= rx <= 100 + radius, f"rx={rx} out of bounds"
-        assert 200 - radius <= ry <= 200 + radius, f"ry={ry} out of bounds"
+        assert (rx, ry) == (100, 200)
 
 
 @patch("module.automation.input_handlers.input.screen")
 @patch("module.automation.input_handlers.input.cfg")
-def test_randomize_coords_is_deterministic(mock_cfg, mock_screen):
+def test_coordinate_compatibility_helper_ignores_radius(mock_cfg, mock_screen):
     mock_cfg.config.use_post_message = True
     mock_screen.handle.hwnd = 12345
     mock_screen.handle.isMinimized = False
@@ -133,10 +132,10 @@ def test_randomize_coords_is_deterministic(mock_cfg, mock_screen):
     assert handler._randomize_coords(100, 200) == (100, 200)
     assert handler._randomize_coords(100, 200, radius=10) == (100, 200)
 
-# 5. Test BackgroundInput.mouse_click uses randomized coords and move_back defaults to False
+# 5. Background clicks preserve coordinates and default to no cursor restoration.
 @patch("module.automation.input_handlers.input.screen")
 @patch("module.automation.input_handlers.input.cfg")
-def test_background_input_randomized_click(mock_cfg, mock_screen):
+def test_background_input_preserves_click_coordinates(mock_cfg, mock_screen):
     mock_cfg.config.use_post_message = True
     mock_cfg.config.mouse_down_duration = 0
     mock_screen.handle.rect.return_value = (0, 0, 1920, 1080)
@@ -150,8 +149,6 @@ def test_background_input_randomized_click(mock_cfg, mock_screen):
     bg_input.last_y = 10
 
     target_x, target_y = 50, 60
-    radius = 4
-
     with patch.object(bg_input, "get_mouse_position", return_value=(0, 0)), patch.object(
         bg_input, "set_active"
     ):
@@ -160,16 +157,14 @@ def test_background_input_randomized_click(mock_cfg, mock_screen):
 
     assert len(driver.downs) == 1
     assert len(driver.ups) == 1
-    # Coordinates must be within the randomization radius
     actual_x = driver.downs[0][0]
     actual_y = driver.downs[0][1]
-    assert target_x - radius <= actual_x <= target_x + radius, f"click x={actual_x} not within radius"
-    assert target_y - radius <= actual_y <= target_y + radius, f"click y={actual_y} not within radius"
+    assert (actual_x, actual_y) == (target_x, target_y)
 
-# 6. Test BackgroundInput.mouse_click legacy test updated for randomized coords
+# 6. Background clicks use the existing path and driver boundary.
 @patch("module.automation.input_handlers.input.screen")
 @patch("module.automation.input_handlers.input.cfg")
-def test_background_input_bezier_and_driver(mock_cfg, mock_screen):
+def test_background_input_path_and_driver(mock_cfg, mock_screen):
     mock_cfg.config.use_post_message = True
     mock_cfg.config.mouse_down_duration = 0
     mock_screen.handle.rect.return_value = (0, 0, 1920, 1080)
@@ -183,8 +178,6 @@ def test_background_input_bezier_and_driver(mock_cfg, mock_screen):
     bg_input.last_y = 10
 
     target_x, target_y = 50, 60
-    radius = 4
-
     with patch.object(bg_input, "get_mouse_position", return_value=(0, 0)), patch.object(
         bg_input, "set_active"
     ):
@@ -192,11 +185,9 @@ def test_background_input_bezier_and_driver(mock_cfg, mock_screen):
 
     assert len(driver.moves) > 0
     assert len(driver.downs) == 1
-    # Coordinates are randomized — check within expected range
     actual_x = driver.downs[0][0]
     actual_y = driver.downs[0][1]
-    assert target_x - radius <= actual_x <= target_x + radius
-    assert target_y - radius <= actual_y <= target_y + radius
+    assert (actual_x, actual_y) == (target_x, target_y)
 
 
 @patch("module.automation.input_handlers.input.generate_bezier_path", side_effect=lambda start, end: [start, end])
@@ -352,14 +343,28 @@ def test_window_move_input_rejects_driver(mock_cfg, mock_screen):
     mock_screen.handle.hwnd = 12345
     mock_screen.handle.isMinimized = False
 
-    handler = WindowMoveInput(driver=object())
+    handler = object.__new__(WindowMoveInput)
+    handler.driver = object()
     handler.is_pause = False
     handler.restore_time = None
-    with patch.object(handler, "_set_window_pos", side_effect=RuntimeError("后台模式不支持物理输入驱动")), \
+    handler.background_input_state = "unknown"
+    snapshot = type("Snapshot", (), {})()
+    with patch.object(handler, "_set_window_pos", return_value=(0, 0)) as move_window, \
         patch.object(handler, "_wait_for_user_idle", return_value=True), \
-        patch.object(handler, "get_mouse_position", return_value=(960, 540)):
+        patch.object(handler, "_get_last_input_elapsed_ms", return_value=600), \
+        patch.object(handler, "get_mouse_position", return_value=(960, 540)), \
+        patch.object(mock_screen.handle, "hide_for_background_input", return_value=snapshot) as hide, \
+        patch.object(handler, "_activate_for_lease", return_value=True) as activate, \
+        patch.object(handler, "_send_mouse_input", return_value=True), \
+        patch.object(handler, "_restore_window_position", return_value=True), \
+        patch.object(handler, "_restore_foreground", return_value=True), \
+        patch("module.automation.input_handlers.input.win32gui.GetForegroundWindow", return_value=2000):
         with pytest.raises(RuntimeError, match="物理输入驱动"):
             handler.mouse_click(300, 400)
+
+    move_window.assert_not_called()
+    hide.assert_not_called()
+    activate.assert_not_called()
 
 
 # 8. Test BackgroundInput.mouse_scroll uses descendant hwnd when found window is a child of game hwnd

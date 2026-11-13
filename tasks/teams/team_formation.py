@@ -1,51 +1,143 @@
 from time import sleep
 
+from PIL import ImageChops
+
 from module.automation import auto
 from module.config import cfg
 from module.decorator.decorator import begin_and_finish_time_log
 from module.logger import log
+from module.my_error.my_error import userStopError
+
+MAX_SCREENSHOT_ATTEMPTS = 3
+MAX_CLEAN_TEAM_ATTEMPTS = 30
+
+
+def _capture_screenshot_with_retries():
+    last_error = None
+    for attempt in range(1, MAX_SCREENSHOT_ATTEMPTS + 1):
+        try:
+            screenshot = auto.take_screenshot()
+        except userStopError:
+            raise
+        except Exception as exc:
+            last_error = exc
+            log.warning(
+                "队伍界面截图失败（%s/%s）: %s",
+                attempt,
+                MAX_SCREENSHOT_ATTEMPTS,
+                exc,
+            )
+            continue
+        if screenshot is not None:
+            return screenshot
+
+    if last_error is not None:
+        log.error("队伍界面截图连续失败，已停止")
+    return None
+
+
+def _scroll_pane_changed(before, after, region) -> bool:
+    if before.size != after.size:
+        return False
+
+    width, height = before.size
+    left, top, right, bottom = (int(value) for value in region)
+    left = max(0, min(width, left))
+    top = max(0, min(height, top))
+    right = max(0, min(width, right))
+    bottom = max(0, min(height, bottom))
+    if right <= left or bottom <= top:
+        return False
+
+    before_pane = before.convert("L").crop((left, top, right, bottom))
+    after_pane = after.convert("L").crop((left, top, right, bottom))
+    difference = ImageChops.difference(before_pane, after_pane).point(
+        lambda pixel: 255 if pixel > 16 else 0
+    )
+    changed_pixels = sum(difference.histogram()[1:])
+    minimum_changed_pixels = max(32, ((right - left) * (bottom - top)) // 500)
+    return changed_pixels >= minimum_changed_pixels
+
+
+def _scroll_pane_region(first_position, scale, screenshot):
+    width, height = screenshot.size
+    x, y = first_position
+    return (
+        max(0, int(x - 60 * scale)),
+        max(0, int(y - 100 * scale)),
+        min(width, int(x + 800 * scale)),
+        min(height, int(y + 700 * scale)),
+    )
+
+
+def _first_team_row_visible(position, scale) -> bool:
+    first_row = auto.find_language_text(
+        "编队#1",
+        ["TEAMS #1", "TEAMS#1", "TFAMS#1"],
+        my_crop=(0, 0, position[0] + 130 * scale, position[1] + 600 * scale),
+    )
+    if hasattr(first_row, "position"):
+        first_row = first_row.position
+    if not first_row:
+        return False
+
+    expected_y = position[1] + 220 * scale
+    row_y = first_row[1]
+    return expected_y - 50 * scale <= row_y <= expected_y + 50 * scale
 
 
 # 清队
 def clean_team():
     scale = cfg.set_win_size / 1440
-    while True:
+    for _ in range(MAX_CLEAN_TEAM_ATTEMPTS):
         # 自动截图
-        if auto.take_screenshot() is None:
-            continue
+        if _capture_screenshot_with_retries() is None:
+            log.error("清理队伍时无法获取截图，已停止")
+            return False
         if auto.click_element("teams/clear_selection_confirm_assets.png"):
-            break
+            return True
         if (
             identify_position := auto.find_element("teams/identify_assets.png")
         ) and auto.mouse_action_with_pos(
             [identify_position[0], identify_position[1] + 600 * scale]
         ):
             sleep(0.5)
-            auto.take_screenshot()
+            if _capture_screenshot_with_retries() is None:
+                log.error("清理队伍后无法验证截图，已停止")
+                return False
             if auto.find_element("teams/clear_selection_confirm_assets.png") is None:
-                break
+                return True
+
+    log.error("清理队伍达到最大尝试次数，已停止")
+    return False
 
 
-@begin_and_finish_time_log(task_name="罪人编队")
 # 编队
+@begin_and_finish_time_log(task_name="罪人编队")
 def team_formation(sinner_team):
+    if not any(sinner_team):
+        log.error("队伍中未选择罪人，已停止编队")
+        return False
     scale = cfg.set_win_size / 1440
 
-    clean_team()
-    while auto.take_screenshot() is None:
-        continue
+    if not clean_team():
+        log.error("清理现有队伍失败，已停止编队")
+        return False
+    if _capture_screenshot_with_retries() is None:
+        log.error("编队前无法获取截图，已停止")
+        return False
     if reset_team := auto.find_element("teams/identify_assets.png"):
         first_sinner = [reset_team[0] - 1800 * scale, reset_team[1] + 130 * scale]
     else:
         log.error("无法找到罪人编队的起始位置")
-        return
+        return False
     sleep(0.5)
 
     for i in range(1, 13):
         if i in sinner_team:
             sinner = sinner_team.index(i)
         else:
-            return
+            continue
         if sinner <= 5:
             auto.mouse_click(first_sinner[0] + 270 * sinner * scale, first_sinner[1])
         else:
@@ -54,6 +146,7 @@ def team_formation(sinner_team):
                 first_sinner[1] + 500 * scale,
             )
         sleep(cfg.mouse_action_interval)
+    return True
 
 
 @begin_and_finish_time_log(task_name="寻找队伍")
@@ -61,9 +154,9 @@ def team_formation(sinner_team):
 def select_battle_team(num):
     scale = cfg.set_win_size / 1440
     my_position = [0, 150 * scale]
-    find = False
-    while auto.take_screenshot() is None:
-        continue
+    if _capture_screenshot_with_retries() is None:
+        log.error("寻找队伍时无法获取截图，已停止")
+        return False
     if auto.find_element(
         "home/first_prompt_assets.png", model="clam"
     ) and auto.find_element("home/back_assets.png", model="normal"):
@@ -81,7 +174,9 @@ def select_battle_team(num):
         auto.mouse_click(my_position[0], my_position[1])
         sleep(0.5)
 
-        # screen imported at module level
+        def report_background_input_result(success: bool) -> None:
+            if hasattr(auto, "report_background_input_result"):
+                auto.report_background_input_result(success)
 
         def scroll_once(direction, x, y, count=1):
             try:
@@ -99,68 +194,106 @@ def select_battle_team(num):
                 log.warning("滚轮投递失败，将尝试窗口拖拽兜底: %s", exc)
                 return False
 
-        def drag_scroll(positions):
+        def scroll_with_verification(
+            first_pos,
+            *,
+            direction,
+            count,
+            drag_start_y,
+            drag_distance,
+            drag_time,
+            allow_top_row=False,
+            top_retry=0,
+        ):
+            before = _capture_screenshot_with_retries()
+            if before is None:
+                log.error("滚动队伍列表前无法获取截图，已停止")
+                return False
+
+            scroll_success = scroll_once(
+                direction,
+                int(first_pos[0]),
+                int(first_pos[1] + 150 * scale),
+                count=count,
+            )
+            after_scroll = _capture_screenshot_with_retries()
+            if after_scroll is None:
+                log.error("滚动队伍列表后无法获取截图，已停止")
+                return False
+
+            pane_region = _scroll_pane_region(first_pos, scale, before)
+            if scroll_success and _scroll_pane_changed(before, after_scroll, pane_region):
+                if not allow_top_row or _first_team_row_visible(position, scale):
+                    report_background_input_result(True)
+                    return True
+            if allow_top_row and _first_team_row_visible(position, scale):
+                return True
+
+            report_background_input_result(False)
             try:
-                for x, y, dy, drag_time, wait_time in positions:
-                    auto.mouse_drag(x, y, dy=dy, drag_time=drag_time)
-                    sleep(wait_time)
+                auto.mouse_drag(
+                    first_pos[0],
+                    drag_start_y,
+                    dy=drag_distance,
+                    drag_time=drag_time,
+                )
+                sleep(0.2)
             except Exception as exc:
                 log.error("队伍列表窗口拖拽兜底失败: %s", exc)
                 return False
-            return True
+
+            after_drag = _capture_screenshot_with_retries()
+            if after_drag is None:
+                log.error("拖拽队伍列表后无法获取截图，已停止")
+                return False
+            if _scroll_pane_changed(before, after_drag, pane_region):
+                if not allow_top_row or _first_team_row_visible(position, scale):
+                    return True
+                if top_retry >= 2:
+                    return False
+                log.debug("队伍列表仍未回到首行，将继续有界滚动确认")
+                return scroll_with_verification(
+                    first_pos,
+                    direction=1,
+                    count=30,
+                    drag_start_y=drag_start_y,
+                    drag_distance=drag_distance,
+                    drag_time=drag_time,
+                    allow_top_row=True,
+                    top_retry=top_retry + 1,
+                )
+            if allow_top_row and _first_team_row_visible(position, scale):
+                return True
+
+            log.warning("队伍列表滚动后未观察到列表变化，已停止队伍选择")
+            return False
 
         def scroll_to_top(first_pos):
-            # Use batch scroll for efficiency: 30 scrolls in one lease
-            scroll_success = scroll_once(
-                1,
-                int(first_pos[0]),
-                int(first_pos[1] + 150 * scale),
-                count=30
+            return scroll_with_verification(
+                first_pos,
+                direction=1,
+                count=30,
+                drag_start_y=first_pos[1],
+                drag_distance=1000 * scale,
+                drag_time=0.8,
+                allow_top_row=True,
             )
-
-            if not scroll_success:
-                # Optimized single-drag fallback: 1000px in one lease (~1.5s total)
-                log.debug("使用单次大拖拽滚动到顶部")
-                try:
-                    auto.mouse_drag(
-                        first_pos[0],
-                        first_pos[1],
-                        dy=1000 * scale,  # Large upward drag
-                        drag_time=0.8  # Fast but smooth for Unity
-                    )
-                    sleep(0.2)
-                    log.debug("队伍列表已完成单次拖拽滚动到顶部")
-                except Exception as exc:
-                    log.error("队伍列表顶部拖拽失败: %s", exc)
-                    raise RuntimeError("队伍列表滚动到顶部失败，已安全停止")
 
         def scroll_down(first_pos, pages):
-            # Use batch scroll for efficiency
-            scroll_success = scroll_once(
-                -1,
-                int(first_pos[0]),
-                int(first_pos[1] + 150 * scale),
-                count=pages * 12
+            if pages <= 0:
+                return True
+            return scroll_with_verification(
+                first_pos,
+                direction=-1,
+                count=pages * 12,
+                drag_start_y=first_pos[1] + 375 * scale,
+                drag_distance=-375 * scale * pages,
+                drag_time=0.6 * pages,
             )
 
-            if not scroll_success:
-                # Optimized single-drag fallback per page
-                log.debug("使用单次拖拽向下滚动 %s 页", pages)
-                try:
-                    auto.mouse_drag(
-                        first_pos[0],
-                        first_pos[1] + 375 * scale,
-                        dy=-375 * scale * pages,  # Single large drag for all pages
-                        drag_time=0.6 * pages  # Scale duration with distance
-                    )
-                    sleep(0.2)
-                    log.debug("队伍列表已完成单次拖拽向下滚动")
-                except Exception as exc:
-                    log.error("队伍列表向下拖拽失败: %s", exc)
-                    raise RuntimeError("队伍列表向下滚动失败，已安全停止")
-
         first_position = [position[0], position[1] + 70 * scale]
-        scroll_to_top(first_position)
+        if not scroll_to_top(first_position):
+            return False
         sleep(0.75)
 
         if cfg.select_team_by_order:
@@ -171,7 +304,8 @@ def select_battle_team(num):
             else:
                 team_range = (num - 1) // 5
                 team_order = (num - 1) % 5
-                scroll_down(first_position, team_range)
+                if not scroll_down(first_position, team_range):
+                    return False
                 sleep(0.75)
                 if num <= 15:
                     auto.mouse_click(
@@ -189,33 +323,47 @@ def select_battle_team(num):
             team_name_zh = "编队#" + str(num)
             team_name_en = [f"TEAMS #{num}", f"TEAMS#{num}", f"TFAMS#{num}"]
             position_bbox = (0, 0, position[0] + 130 * scale, position[1] + 600 * scale)
-            for i in range(10):
-                while auto.take_screenshot() is None:
-                    continue
+            for _ in range(10):
+                before_drag = _capture_screenshot_with_retries()
+                if before_drag is None:
+                    log.error("搜索队伍名称时无法获取截图，已停止")
+                    return False
                 if team_position := auto.find_language_text(
                     team_name_zh, team_name_en, my_crop=position_bbox
                 ):
                     auto.mouse_action_with_pos(team_position, offset=False)
-                    find = True
-                    break
-                auto.mouse_drag(
-                    first_position[0],
-                    first_position[1] + 375 * scale,
-                    dy=-385 * scale,
-                    drag_time=1.5,
+                    log.info(f"成功找到队伍 # {num}")
+                    sleep(1)
+                    return True
+
+                report_background_input_result(False)
+                try:
+                    auto.mouse_drag(
+                        first_position[0],
+                        first_position[1] + 375 * scale,
+                        dy=-385 * scale,
+                        drag_time=1.5,
+                    )
+                except Exception as exc:
+                    log.error("搜索队伍名称时拖拽失败: %s", exc)
+                    return False
+                sleep(1)
+                after_drag = _capture_screenshot_with_retries()
+                if after_drag is None:
+                    log.error("搜索队伍名称后无法获取截图，已停止")
+                    return False
+                pane_region = _scroll_pane_region(
+                    first_position, scale, before_drag
                 )
-                sleep(1)
-                while auto.take_screenshot() is None:
-                    continue
-            if find:
-                msg = f"成功找到队伍 # {num}"
-                log.info(msg)
-                sleep(1)
-                return True
-            else:
-                msg = f"找不到队伍 # {num}"
-                log.info(msg)
-                return False
+                if not _scroll_pane_changed(before_drag, after_drag, pane_region):
+                    log.warning("队伍名称搜索未观察到列表变化，已停止")
+                    return False
+
+            log.info(f"找不到队伍 # {num}")
+            return False
+    else:
+        log.error("无法找到队伍选择界面的定位锚点，已停止")
+        return False
 
 
 def deal_with_spills():
@@ -327,8 +475,9 @@ def load_team_code_in_game(team_code: str) -> bool:
     max_retries = 3
     for _ in range(1, max_retries + 1):
         # 截图
-        while auto.take_screenshot() is None:
-            continue
+        if _capture_screenshot_with_retries() is None:
+            log.error("加载编队码时无法获取截图，已停止")
+            return False
 
         # 点击队伍代码按钮
         auto.click_element("teams/team_code_assets.png")

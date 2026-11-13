@@ -1,4 +1,6 @@
-# 后台模式鼠标输入问题修复方案
+# 历史记录：后台模式鼠标输入问题修复方案
+
+> Historical note: this file records an earlier diagnosis and implementation. Its Unity explanations and timing estimates were not independently measured. Use the current source and [2026-11-12 audit](../audits/2026-11-12-self-audit.md) for present behavior.
 
 ## 问题概述
 
@@ -252,47 +254,16 @@ uv run pytest tests/test_batch_scroll_fix.py -v
 
 因此，**拖拽兜底优化是必需的**，即使滚轮大部分时候能工作。
 
-## 未来改进方向
+## 安全边界
 
-### 1. 直接向子窗口投递消息（高风险）
-
-尝试找到 Unity 的渲染窗口（`QtRenderWindow` 或 `UnityWndClass`）并直接发送 `PostMessage`：
-
-```python
-child_hwnd = win32gui.FindWindowEx(game_hwnd, None, "UnityWndClass", None)
-if child_hwnd:
-    win32api.PostMessage(child_hwnd, win32con.WM_MOUSEWHEEL, wparam, lparam)
-```
-
-**风险**：可能触发游戏反作弊检测
-
-### 2. 使用驱动级输入（极高风险）
-
-使用内核驱动模拟输入，绕过 Windows 输入队列：
-
-- 需要签名驱动和管理员权限
-- 可能被游戏反作弊系统检测为外挂
-- **不推荐**用于合法自动化工具
-
-### 3. 混合模式（平衡方案）
-
-滚轮失败时立即切换到拖拽，不重试：
-
-```python
-scroll_success = scroll_once(...)
-if not scroll_success:
-    # 不记录警告，直接使用拖拽
-    optimized_drag_fallback()
-```
-
-减少日志噪音，提升用户体验。
+This historical proposal included direct message injection and driver-level input ideas. Those are outside the current project boundary and must not be implemented. Current work uses bounded, observable input operations and stops safely when list movement cannot be verified.
 
 ## 总结
 
 本次修复解决了两个核心问题：
 
 1. **修复滚轮信号投递**：正确绑定 `batch_mouse_scroll` 方法，利用焦点租约系统高效投递批量滚轮事件
-2. **优化拖拽兜底效率**：从多次小拖拽改为单次大拖拽，减少租约开销，耗时降低 **60-70%**
+2. **优化拖拽兜底效率**：从多次小拖拽改为单次大拖拽。历史耗时降幅为估算值，未在当前版本测量。
 
 这些改进在不改变游戏窗口可见性和焦点状态的前提下，显著提升了后台自动化的效率和稳定性。
 
@@ -302,7 +273,7 @@ if not scroll_success:
 - ✅ `module/automation/automation.py`：添加 `batch_mouse_scroll` 绑定
 - ✅ `tasks/teams/team_formation.py`：优化 `scroll_once` 和拖拽兜底逻辑
 - ✅ `tests/test_batch_scroll_fix.py`：添加单元测试验证
-- ✅ `docs/BACKGROUND_INPUT_FIX.md`：本技术文档
+- ✅ `docs/history/background-input-fix-legacy.md`：本历史技术文档
 
 **相关文件**（无需修改）：
 - `module/automation/input_handlers/input.py`：已实现 `WindowMoveInput.batch_mouse_scroll`

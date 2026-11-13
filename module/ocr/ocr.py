@@ -10,6 +10,10 @@ from rapidocr.utils.output import RapidOCROutput
 from utils.singletonmeta import SingletonMeta
 
 
+class OCRExecutionError(RuntimeError):
+    """Raised when image conversion or the OCR engine fails."""
+
+
 class OCR(metaclass=SingletonMeta):
     def __init__(self, logger: logging.Logger):
         self.logger = logger
@@ -65,7 +69,7 @@ class OCR(metaclass=SingletonMeta):
             return results
         except Exception as e:
             self.logger.error(e)
-            return RapidOCROutput()
+            raise OCRExecutionError("OCR execution failed") from e
 
     def log_results(self, ocr_results: RapidOCROutput) -> None:
         """记录OCR识别记录"""

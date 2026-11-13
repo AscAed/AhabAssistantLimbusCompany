@@ -1,87 +1,27 @@
-import numpy as np
-
-
-def random_normal_distribution(a, b, n=5):
-    output = np.mean(np.random.uniform(a, b, size=n))
-    return output
-
-
-def random_theta():
-    theta = np.random.uniform(0, 2 * np.pi)
-    return np.array([np.sin(theta), np.cos(theta)])
-
-
-def random_rho(dis):
-    return random_normal_distribution(-dis, dis)
+import math
 
 
 def insert_swipe(p0, p3, speed=15, min_distance=10):
-    """
-    从起点到终点插入路径点。
-    首先生成三次贝塞尔曲线
+    """插入确定性的直线路径点，保留起终点及中间点最小间距。"""
+    start = [int(p0[0]), int(p0[1])]
+    end = [int(p3[0]), int(p3[1])]
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    distance = math.hypot(dx, dy)
+    segments = max(math.ceil(distance / speed), 1)
+    min_distance_squared = min_distance**2
+    points = [start]
 
-    参数：
-        p0：起点。
-        p3：终点。
-        速度：平均移动速度，每 10 毫秒的像素数。
-        min_distance：
+    for index in range(1, segments):
+        point = [
+            int(start[0] + dx * index / segments),
+            int(start[1] + dy * index / segments),
+        ]
+        previous = points[-1]
+        previous_distance = (point[0] - previous[0]) ** 2 + (point[1] - previous[1]) ** 2
+        end_distance = (end[0] - point[0]) ** 2 + (end[1] - point[1]) ** 2
+        if previous_distance >= min_distance_squared and end_distance >= min_distance_squared:
+            points.append(point)
 
-    返回：
-        list[list[int]]：点列表。
-
-    例子：
-        > insert_swipe（（400， 400）， （600， 600）， 20）
-        [[400, 400], [406, 406], [416, 415], [429, 428], [444, 442], [462, 459], [481, 478], [504, 500], [527, 522],
-        [545, 540], [560, 557], [573, 570], [584, 582], [592, 590], [597, 596], [600, 600]]
-    """
-    p0 = np.array(p0)
-    p3 = np.array(p3)
-
-    # Random control points in Bézier curve
-    distance = np.linalg.norm(p3 - p0)
-    p1 = 2 / 3 * p0 + 1 / 3 * p3 + random_theta() * random_rho(distance * 0.1)
-    p2 = 1 / 3 * p0 + 2 / 3 * p3 + random_theta() * random_rho(distance * 0.1)
-
-    # Random `t` on Bézier curve, sparse in the middle, dense at start and end
-    segments = max(int(distance / speed) + 1, 5)
-    lower = random_normal_distribution(-85, -60)
-    upper = random_normal_distribution(80, 90)
-    theta = np.arange(lower + 0.0, upper + 0.0001, (upper - lower) / segments)
-    ts = np.sin(theta / 180 * np.pi)
-    ts = np.sign(ts) * abs(ts) ** 0.9
-    ts = (ts - min(ts)) / (max(ts) - min(ts))
-
-    # Generate cubic Bézier curve
-    points = []
-    prev = (-100, -100)
-    min_dist_sq = min_distance ** 2
-    for t in ts:
-        point = (
-            p0 * (1 - t) ** 3
-            + 3 * p1 * t * (1 - t) ** 2
-            + 3 * p2 * t**2 * (1 - t)
-            + p3 * t**3
-        )
-        point = point.astype(int).tolist()
-        # 使用简单的欧氏平方距离代替 numpy 操作，避免 python 层在密集循环中调用 numpy 的开销
-        if (point[0] - prev[0]) ** 2 + (point[1] - prev[1]) ** 2 < min_dist_sq:
-            continue
-
-        points.append(point)
-        prev = point
-
-    # Delete nearing points
-    if len(points) > 1:
-        p_start = points[0]
-        filtered_points = [p_start]
-        for p in points[1:]:
-            if (p[0] - p_start[0])**2 + (p[1] - p_start[1])**2 > min_dist_sq:
-                filtered_points.append(p)
-        points = filtered_points
-
-        if len(points) <= 1:
-            points = [p0.tolist(), p3.tolist()]
-    else:
-        points = [p0.tolist(), p3.tolist()]
-
+    # Short paths still need both endpoints even when they are closer than min_distance.
+    points.append(end)
     return points

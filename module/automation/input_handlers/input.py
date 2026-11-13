@@ -14,6 +14,7 @@ from module.config import cfg
 from utils.singletonmeta import SingletonMeta
 
 from ...game_and_screen import screen
+from ...game_and_screen.screen import WindowVisibilitySnapshot
 from ...logger import log
 from . import AbstractInput
 from .bezier import generate_bezier_path
@@ -59,6 +60,9 @@ class _MouseLease:
     original_position: tuple[int, int]
     original_cursor: tuple[int, int]
     was_paused: bool
+    lease_mode: str
+    visibility_snapshot: WindowVisibilitySnapshot | None
+    lease_start_elapsed_ms: int | None
 
 key_list = {
     "a": 0x41,
@@ -996,9 +1000,23 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
     FOCUS_ACQUIRE_TIMEOUT_SECONDS = 0.5
     INPUT_SETTLE_MS = 50  # Unity input event processing time
 
+    def __init__(self, driver: InputDriver | None = None) -> None:
+        super().__init__(driver)
+        self.background_input_state = "unknown"
+
     def mouse_to_blank(self, coordinate=(1, 1), move_back=False) -> None:
         # FIXME: 移动窗口来防止遮蔽不是一个好选择
         return
+
+    def report_background_input_result(self, success: bool) -> None:
+        if success:
+            if self.background_input_state != "fallback_visible":
+                self.background_input_state = "supported"
+        else:
+            self.background_input_state = "fallback_visible"
+
+    def get_background_input_state(self) -> str:
+        return self.background_input_state
 
     def _send_mouse_input(self, flags: int, mouse_data: int = 0) -> bool:
         operation = {
@@ -1156,30 +1174,102 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
         log.warning("后台输入恢复原前台窗口未通过验证: hwnd=%s", hwnd)
         return False
 
+    def _rollback_mouse_lease_acquisition(
+        self,
+        game_hwnd: int,
+        original_foreground: int,
+        original_position: tuple[int, int],
+        visibility_snapshot: WindowVisibilitySnapshot | None,
+    ) -> bool:
+        restored = True
+        try:
+            current_foreground = win32gui.GetForegroundWindow()
+            if current_foreground in {game_hwnd, original_foreground}:
+                restored = self._restore_foreground(original_foreground) and restored
+        except Exception as exc:
+            log.warning("恢复后台输入租约前台窗口失败: %s", exc)
+            restored = False
+
+        restored = self._restore_window_position(original_position) and restored
+        if visibility_snapshot is not None:
+            restored = (
+                screen.handle.restore_background_input_visibility(visibility_snapshot)
+                and restored
+            )
+        return restored
+
     def _begin_mouse_lease(self, x: int, y: int) -> _MouseLease | None:
+        # Alpha-zero hit testing is unqualified; keep the production lease visible.
+        return self._begin_mouse_lease_with_mode(x, y, "visible")
+
+    def _begin_mouse_lease_with_mode(self, x: int, y: int, lease_mode: str) -> _MouseLease | None:
+        if self.driver is not None:
+            raise RuntimeError("后台模式不支持物理输入驱动")
         game_hwnd = screen.handle.hwnd
         if not game_hwnd:
             log.warning("后台输入无法建立焦点租约：游戏窗口句柄为空")
             return None
-        original_foreground = win32gui.GetForegroundWindow()
+        requested_foreground = win32gui.GetForegroundWindow()
         original_cursor = tuple(self.get_mouse_position())
         was_paused = bool(self.is_pause)
         if not self._wait_for_user_idle():
             return None
-
-        original_position = self._set_window_pos(int(x), int(y))
-        if not self._activate_for_lease(game_hwnd):
-            try:
-                self._restore_window_position(original_position)
-            finally:
-                self._restore_foreground(original_foreground)
+        lease_foreground = win32gui.GetForegroundWindow()
+        lease_elapsed_ms = self._get_last_input_elapsed_ms()
+        if lease_elapsed_ms is None or lease_elapsed_ms < self.USER_IDLE_REQUIRED_MS:
+            log.debug(
+                "后台输入租约取消: 等待空闲后用户恢复操作 requested_foreground=%s lease_foreground=%s elapsed_ms=%s",
+                requested_foreground,
+                lease_foreground,
+                lease_elapsed_ms,
+            )
             return None
+        original_foreground = lease_foreground or requested_foreground
+
+        window_rect = screen.handle.rect()
+        original_position = (int(window_rect[0]), int(window_rect[1]))
+        visibility_snapshot = None
+        if lease_mode == "transparent":
+            visibility_snapshot = screen.handle.hide_for_background_input()
+            if visibility_snapshot is None:
+                log.warning("后台输入临时隐藏失败，回退到可见租约: game_hwnd=%s", game_hwnd)
+                return None
+
+        try:
+            self._set_window_pos(int(x), int(y))
+            activated = self._activate_for_lease(game_hwnd)
+            lease_start_elapsed_ms = (
+                self._get_last_input_elapsed_ms() if activated else None
+            )
+        except BaseException as exc:
+            if not self._rollback_mouse_lease_acquisition(
+                game_hwnd,
+                original_foreground,
+                original_position,
+                visibility_snapshot,
+            ):
+                log.error("后台输入租约获取异常后恢复失败: %s", exc)
+                raise RuntimeError("后台输入租约获取异常且状态恢复失败") from exc
+            raise
+
+        if not activated:
+            if not self._rollback_mouse_lease_acquisition(
+                game_hwnd,
+                original_foreground,
+                original_position,
+                visibility_snapshot,
+            ):
+                raise RuntimeError("后台输入焦点租约获取失败且恢复未通过验证")
+            return None
+
         log.debug(
-            "lease_acquired: game_hwnd=%s original_foreground=%s cursor=%s paused=%s",
+            "lease_acquired: game_hwnd=%s original_foreground=%s cursor=%s paused=%s lease_mode=%s elapsed_ms=%s",
             game_hwnd,
             original_foreground,
             original_cursor,
             was_paused,
+            lease_mode,
+            lease_start_elapsed_ms,
         )
         return _MouseLease(
             game_hwnd,
@@ -1187,6 +1277,9 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
             original_position,
             original_cursor,
             was_paused,
+            lease_mode,
+            visibility_snapshot,
+            lease_start_elapsed_ms,
         )
 
     def _restore_window_position(self, position: tuple[int, int]) -> bool:
@@ -1217,14 +1310,34 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
 
     def _end_mouse_lease(self, lease: _MouseLease) -> bool:
         restored = True
-        restored = self._restore_window_position(lease.original_position)
-        restored = self._restore_foreground(lease.original_foreground) and restored
+        try:
+            current_foreground = win32gui.GetForegroundWindow()
+        except Exception as exc:
+            current_foreground = None
+            restored = False
+            log.warning("后台输入租约释放时无法读取当前前台窗口: %s", exc)
+
+        if current_foreground is not None:
+            if current_foreground in {lease.game_hwnd, lease.original_foreground}:
+                restored = self._restore_foreground(lease.original_foreground) and restored
+            else:
+                log.debug(
+                    "lease_released_skip_restore_foreground: game_hwnd=%s original_foreground=%s current_foreground=%s lease_mode=%s",
+                    lease.game_hwnd,
+                    lease.original_foreground,
+                    current_foreground,
+                    lease.lease_mode,
+                )
+        restored = self._restore_window_position(lease.original_position) and restored
+        if lease.visibility_snapshot is not None:
+            restored = screen.handle.restore_background_input_visibility(lease.visibility_snapshot) and restored
         log.debug(
-            "lease_released: game_hwnd=%s original_foreground=%s cursor=%s paused=%s restored=%s",
+            "lease_released: game_hwnd=%s original_foreground=%s cursor=%s paused=%s lease_mode=%s restored=%s",
             lease.game_hwnd,
             lease.original_foreground,
             lease.original_cursor,
             lease.was_paused,
+            lease.lease_mode,
             restored,
         )
         return restored
@@ -1268,9 +1381,11 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
                 )
                 return False
             log.debug(
-                "后台滚轮已通过焦点租约投递: game=%s direction=%s",
+                "后台滚轮已通过焦点租约投递: game=%s direction=%s lease_mode=%s state=%s",
                 lease.game_hwnd,
                 direction,
+                lease.lease_mode,
+                self.background_input_state,
             )
             # Give Unity time to process wheel events
             sleep(self.INPUT_SETTLE_MS / 1000.0)
@@ -1306,10 +1421,12 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
                     sleep(0.01)
             
             log.debug(
-                "后台批量滚轮已通过焦点租约投递: game=%s direction=%s count=%s",
+                "后台批量滚轮已通过焦点租约投递: game=%s direction=%s count=%s lease_mode=%s state=%s",
                 lease.game_hwnd,
                 direction,
                 count,
+                lease.lease_mode,
+                self.background_input_state,
             )
             # Give Unity time to process all wheel events
             sleep(self.INPUT_SETTLE_MS / 1000.0)

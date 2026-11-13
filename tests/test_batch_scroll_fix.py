@@ -1,6 +1,9 @@
 """测试后台模式滚轮输入和拖拽兜底优化"""
+
+from unittest.mock import Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+
 from module.automation.automation import Automation
 from module.automation.input_handlers.input import WindowMoveInput
 

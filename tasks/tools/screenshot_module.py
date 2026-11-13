@@ -6,6 +6,7 @@ from module.automation import auto
 from module.config import cfg
 from module.game_and_screen import screen
 from module.logger import log
+from module.my_error.my_error import userStopError
 
 
 class ScreenshotGet(QThread):
@@ -20,15 +21,19 @@ class ScreenshotGet(QThread):
         try:
             from tasks.base.script_task_scheme import init_game
 
-            init_game()
+            init_game(stop_check=self.isInterruptionRequested)
             should_reset_window = (
                 cfg.set_windows and cfg.set_reduce_miscontact and not cfg.simulator
             )
+        except userStopError:
+            return
         except Exception as e:
             log.error(f"初始化游戏失败: {str(e)}")
             return
         try:
-            img = auto.take_screenshot(gray=False)
+            img = auto.take_screenshot(
+                gray=False, stop_check=self.isInterruptionRequested
+            )
             if img:
                 timestr = time.strftime("%Y%m%d_%H%M%S", time.localtime())
                 img.save(f"screenshot_{timestr}.png")
@@ -36,6 +41,8 @@ class ScreenshotGet(QThread):
                 self.on_saved_timestr.emit(timestr)
             else:
                 log.error("截图失败，请确认游戏是否处于启动状态")
+        except userStopError:
+            return
         except Exception as e:
             log.error(f"截图错误: {str(e)}")
             return

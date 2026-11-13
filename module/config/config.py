@@ -1,6 +1,8 @@
 import atexit
 import copy
+import os
 import sys
+import tempfile
 import threading
 from pathlib import Path
 from time import localtime, strftime, time
@@ -54,6 +56,9 @@ class Config(metaclass=SingletonMeta):
         self.yaml = YAML()
         # 并发与延迟写控制
         self._lock = threading.RLock()
+        self._write_lock = threading.RLock()
+        self._writer_idle = threading.Condition(self._lock)
+        self._writer_active = False
         self._save_timer = None
         self._save_interval = 1.0  # 秒：在此时间窗口内的多次修改合并为一次写盘
         self._pending_save = False
@@ -93,7 +98,7 @@ class Config(metaclass=SingletonMeta):
 
         # 镜牢历史数据格式转换
         if saved_version < 1768403022:
-            team_num = len(self.get_value("teams_be_select", []))
+            team_num = len(loaded_config.get("teams_be_select", []))
 
             def _calculate_time_history(
                 time_list: list[float], count: int
@@ -147,19 +152,19 @@ class Config(metaclass=SingletonMeta):
 
         # 旧配置类型转换
         if saved_version < 1771413380:
-            if self.get_value("set_win_position", True) is True:
+            if loaded_config.get("set_win_position", True) is True:
                 loaded_config["set_win_position"] = "free"
         if saved_version < 1772205660:
             # 迁移旧版结束后动作配置，按字段独立迁移，避免覆盖用户已设置的新字段
             # 映射表统一由 module.after_completion_types 维护；config 层只负责迁移与落盘。
-            legacy_value = int(self.get_value("after_completion", 0) or 0)
+            legacy_value = int(loaded_config.get("after_completion", 0) or 0)
             legacy_actions, legacy_power = LEGACY_AFTER_COMPLETION_TO_CONFIG.get(
                 legacy_value, ((), POWER_ACTION_NONE)
             )
             migrated = False
 
             # 仅在 actions 字段缺失或类型错误时补写
-            current_actions = self.get_value("after_completion_actions")
+            current_actions = loaded_config.get("after_completion_actions")
             if not isinstance(current_actions, list):
                 # 配置文件保持字符串协议，不直接持久化内部 Enum。
                 loaded_config["after_completion_actions"] = serialize_after_actions(
@@ -168,7 +173,7 @@ class Config(metaclass=SingletonMeta):
                 migrated = True
 
             # 仅在 power_action 字段缺失或类型错误时补写（与 actions 独立判断）
-            current_power = self.get_value("after_completion_power_action")
+            current_power = loaded_config.get("after_completion_power_action")
             if not isinstance(current_power, str):
                 loaded_config["after_completion_power_action"] = serialize_power_action(
                     legacy_power
@@ -284,29 +289,26 @@ class Config(metaclass=SingletonMeta):
                             loaded_config = ConfigModel(**self._defaults).model_dump()
                     else:
                         loaded_config = ConfigModel(**self._defaults).model_dump()
-                if not isinstance(loaded_config.get("config_version", 0), int):
-                    raise TypeError("配置文件版本号不是 int 类型")
-                if "operation_mode" not in loaded_config:
-                    loaded_config["operation_mode"] = migrate_operation_mode(loaded_config)
-                if loaded_config.get("config_version", 0) < self.config.config_version:
-                    saved_version = loaded_config.get("config_version", 0)
-                    loaded_config["config_version"] = self.config.config_version
-                    self._old_version_cfg_upgrade(saved_version, loaded_config)
-                # 使用更新后的配置初始化 Config 对象
-                self.config = ConfigModel(**{**self._defaults, **loaded_config})
-                queue_in_loaded_config = loaded_config.get("teams_active_queue")
-                if queue_in_loaded_config is None:
-                    normalized_queue = self._normalize_team_queue(
-                        self.migrate_legacy_team_queue()
-                    )
-                else:
-                    normalized_queue = self._normalize_team_queue(
-                        queue_in_loaded_config
-                    )
-                self._sync_legacy_team_state(normalized_queue)
-                # 成功加载后保存当前文件为备份
-                self.backup_config()
-                self._save_config()
+            if not isinstance(loaded_config.get("config_version", 0), int):
+                raise TypeError("配置文件版本号不是 int 类型")
+            if "operation_mode" not in loaded_config:
+                loaded_config["operation_mode"] = migrate_operation_mode(loaded_config)
+            if loaded_config.get("config_version", 0) < self.config.config_version:
+                saved_version = loaded_config.get("config_version", 0)
+                loaded_config["config_version"] = self.config.config_version
+                self._old_version_cfg_upgrade(saved_version, loaded_config)
+            self.config = ConfigModel(**{**self._defaults, **loaded_config})
+            queue_in_loaded_config = loaded_config.get("teams_active_queue")
+            if queue_in_loaded_config is None:
+                normalized_queue = self._normalize_team_queue(
+                    self.migrate_legacy_team_queue()
+                )
+            else:
+                normalized_queue = self._normalize_team_queue(queue_in_loaded_config)
+            self._sync_legacy_team_state(normalized_queue)
+            # Replace the file only after its reader has been closed.
+            self.backup_config()
+            self._save_config()
         except FileNotFoundError:
             if self.backup_path.exists():
                 backup_files = [
@@ -395,16 +397,35 @@ class Config(metaclass=SingletonMeta):
             raise
 
     def _save_config(self) -> None:
-        """保存到配置文件（立即写盘）"""
-        # 拷贝快照后在锁外写盘，避免长时间持锁
-        with self._lock:
-            snapshot = self.config.model_dump()
-        example_yaml = self._load_default_config()
-        # 从快照更新到yaml对象，保持注释不变
-        example_yaml.update(snapshot)
+        """Write a serialized snapshot and atomically replace the config file."""
+        with self._write_lock:
+            with self._lock:
+                snapshot = self.config.model_dump()
+            example_yaml = self._load_default_config()
+            example_yaml.update(snapshot)
 
-        with open(self.config_path, "w", encoding="utf-8") as file:
-            self.yaml.dump(example_yaml, file)
+            temporary_path = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    mode="w",
+                    encoding="utf-8",
+                    dir=self.config_path.parent,
+                    prefix=f".{self.config_path.name}.",
+                    suffix=".tmp",
+                    delete=False,
+                ) as file:
+                    temporary_path = Path(file.name)
+                    self.yaml.dump(example_yaml, file)
+                    file.flush()
+                    os.fsync(file.fileno())
+                os.replace(temporary_path, self.config_path)
+                temporary_path = None
+            finally:
+                if temporary_path is not None:
+                    try:
+                        temporary_path.unlink(missing_ok=True)
+                    except OSError as error:
+                        log.warning("清理临时配置文件失败: %s", error)
 
     def get_value(
         self, key: str, default: Any = None, *, config_obj: Optional[BaseModel] = None
@@ -591,30 +612,52 @@ class Config(metaclass=SingletonMeta):
             self._writer_event.set()
 
     def flush(self) -> None:
-        """立即将挂起的更改写入磁盘。"""
-        with self._lock:
-            if self._save_timer is not None:
+        """Persist queued changes and wait for any background write to finish."""
+        while True:
+            with self._lock:
+                if self._save_timer is not None:
+                    try:
+                        self._save_timer.cancel()
+                    except Exception:
+                        pass
+                    self._save_timer = None
+                should_save = self._pending_save or self._writer_event.is_set()
+                self._pending_save = False
+                self._writer_event.clear()
+            if should_save:
                 try:
-                    self._save_timer.cancel()
+                    self._save_config()
                 except Exception:
-                    pass
-                self._save_timer = None
-            pending = self._pending_save
-            self._pending_save = False
-        if pending:
-            self._save_config()
+                    with self._lock:
+                        self._pending_save = True
+                    raise
+            with self._writer_idle:
+                self._writer_idle.wait_for(lambda: not self._writer_active)
+                if not self._pending_save and not self._writer_event.is_set():
+                    return
 
     def _writer_loop(self) -> None:
         """后台写盘线程：收到事件后把当前config写入文件"""
         while True:
             self._writer_event.wait()
-            try:
-                self._save_config()
-            except Exception as e:
-                log.error(f"配置保存失败，错误信息：{e}")
+            self._write_queued_save()
 
-            # 等待下一次
+    def _write_queued_save(self) -> None:
+        with self._lock:
+            if not self._writer_event.is_set():
+                return
             self._writer_event.clear()
+            self._writer_active = True
+        try:
+            self._save_config()
+        except Exception as e:
+            with self._lock:
+                self._pending_save = True
+            log.error(f"配置保存失败，错误信息：{e}")
+        finally:
+            with self._writer_idle:
+                self._writer_active = False
+                self._writer_idle.notify_all()
 
     def just_load_config(self, path: Optional[Path | str] = None) -> None:
         """仅加载配置文件，不保存"""

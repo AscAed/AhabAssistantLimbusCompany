@@ -62,7 +62,7 @@ A: Check if your computer has enabled night mode. For more details, refer to [th
 
 Q: I encountered the XXX theme pack, which led to the death of all members. Can I set it not to enter?
 
-A: Yes, you can set it not to enter. Please try [Setting Theme Pack Weight](/README_EN.md#theme-package-weight-setting) on your own.
+A: Yes, you can set it not to enter. Please try [Setting Theme Pack Weight](/assets/doc/en/README_EN.md#theme-package-weight-setting) on your own.
 
 ---
 
