@@ -380,7 +380,8 @@ def check_temp_dir_and_run():
         file_name = sys.argv[1] if len(sys.argv) == 2 else None
 
     updater = Updater(file_name)
-    updater.run(apply_mode=apply_mode)
+    if updater.run(apply_mode=apply_mode) is False:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

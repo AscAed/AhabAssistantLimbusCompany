@@ -132,6 +132,9 @@ WINDOW_HANDLE_POLL_INTERVAL_SECONDS = 1
 
 
 def init_game(thread=None, stop_check=None):
+    if thread is None and stop_check is None:
+        stop_check = auto._get_thread_stop_check()
+
     def check_stop():
         if (thread is not None and getattr(thread, "is_stop", False)) or (
             stop_check is not None and stop_check()
@@ -196,8 +199,10 @@ def init_game(thread=None, stop_check=None):
         check_stop()
         game_process.start_game()
         start_time = monotonic()
-        while not screen.init_handle():
+        while True:
             check_stop()
+            if screen.init_handle(start_game=False):
+                break
             if monotonic() - start_time >= WINDOW_HANDLE_INIT_TIMEOUT_SECONDS:
                 raise withOutGameWinError("等待游戏窗口超时")
             sleep(WINDOW_HANDLE_POLL_INTERVAL_SECONDS)

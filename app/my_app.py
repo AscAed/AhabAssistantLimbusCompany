@@ -499,6 +499,11 @@ class MainWindow(FramelessWindow):
             left.stop_script(timeout_ms=0)
             pending_workers.append(script)
         for tool in tools:
+            if tool.initialized is False:
+                cancel_startup = getattr(tool, "cancel_startup", None)
+                if callable(cancel_startup):
+                    cancel_startup()
+                continue
             if isinstance(tool.w, QWidget):
                 worker = getattr(tool.w, "worker", None)
                 tool.w.close()

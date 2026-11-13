@@ -34,7 +34,7 @@ The dated [investigation baseline](../audits/2026-11-12-documentation-baseline.m
 
 ## Network
 
-External CLI requests must use the local Clash proxy in the same PowerShell invocation:
+When available, use the local Clash proxy for external CLI requests in the same PowerShell invocation. Otherwise use your environment's configured proxy or connect directly:
 
 ```powershell
 $env:http_proxy = "http://127.0.0.1:7897"

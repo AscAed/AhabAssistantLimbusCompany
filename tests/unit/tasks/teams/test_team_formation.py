@@ -99,6 +99,22 @@ def test_team_formation_stops_when_clean_team_fails():
     mock_auto.mouse_click.assert_not_called()
 
 
+def test_team_formation_accepts_partial_sinner_selection():
+    with patch("tasks.teams.team_formation.clean_team", return_value=True), patch(
+        "tasks.teams.team_formation._capture_screenshot_with_retries",
+        return_value=_frame_with_team_list(),
+    ), patch("tasks.teams.team_formation.auto") as mock_auto, patch(
+        "tasks.teams.team_formation.cfg"
+    ) as mock_cfg, patch("tasks.teams.team_formation.sleep"):
+        mock_cfg.set_win_size = 1440
+        mock_cfg.mouse_action_interval = 0
+        mock_auto.find_element.return_value = (2300, 200)
+
+        assert team_formation([1, 4, 7]) is True
+
+    assert mock_auto.mouse_click.call_count == 3
+
+
 def test_load_team_code_capture_failure_stops():
     with patch("tasks.teams.team_formation.auto") as mock_auto, patch(
         "tasks.teams.team_formation.sleep"
@@ -121,6 +137,7 @@ def test_team_selection_scroll_verification_uses_visible_fallback():
         mock_cfg.set_win_size = 1440
         mock_cfg.select_team_by_order = True
         state = _team_selection_auto(mock_auto)
+        mock_auto.find_language_text.side_effect = [None, (150, 635)]
         mock_auto.take_screenshot.side_effect = [
             same_frame,
             same_frame,

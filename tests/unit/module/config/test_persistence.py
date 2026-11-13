@@ -56,6 +56,43 @@ def test_save_config_preserves_existing_file_when_replace_fails(tmp_path):
     assert list(tmp_path.glob(".settings.yaml.*.tmp")) == []
 
 
+def test_load_config_closes_reader_before_saving(tmp_path):
+    config = _config(tmp_path)
+    config.config_path.write_text("config_version: 1\n", encoding="utf-8")
+    config.backup_path = tmp_path / "backup"
+    config._defaults = {}
+    config.config = SimpleNamespace(config_version=1)
+    reader = []
+    config.yaml = SimpleNamespace(
+        load=Mock(
+            side_effect=lambda stream: (
+                reader.append(stream)
+                or {
+                    "config_version": 1,
+                    "operation_mode": "foreground_mouse",
+                    "teams_active_queue": [],
+                }
+            )
+        )
+    )
+    config._normalize_team_queue = Mock(return_value=[])
+    config._sync_legacy_team_state = Mock()
+    config.backup_config = Mock(side_effect=lambda: reader_is_closed(reader))
+    config._save_config = Mock()
+
+    with patch(
+        "module.config.config.ConfigModel",
+        return_value=SimpleNamespace(config_version=1),
+    ):
+        config._load_config()
+
+    config._save_config.assert_called_once_with()
+
+
+def reader_is_closed(reader):
+    assert reader and reader[0].closed
+
+
 def test_flush_writes_a_save_already_queued_by_the_timer(tmp_path):
     config = _config(tmp_path)
     config._writer_event.set()

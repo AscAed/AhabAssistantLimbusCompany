@@ -6,6 +6,7 @@ import pytest
 from PIL import Image
 
 from module.automation.automation import Automation
+from module.automation.input_handlers import AbstractInput
 from module.my_error.my_error import userStopError
 from tasks.base.task_engine import Task, TaskEngine, TaskStatus
 
@@ -75,6 +76,21 @@ def test_task_engine_stop_context_does_not_cancel_another_thread():
     assert automation._get_thread_stop_check() is None
 
 
+def test_pause_wait_observes_worker_stop_request():
+    automation = object.__new__(Automation)
+    automation.input_handler = AbstractInput()
+    automation.input_handler.is_pause = True
+    previous = automation._push_thread_stop_check(lambda: True)
+    try:
+        with pytest.raises(userStopError):
+            automation.input_handler.wait_pause()
+    finally:
+        automation._restore_thread_stop_check(previous)
+
+    assert automation._get_thread_stop_check() is None
+    assert not hasattr(automation.input_handler._stop_context, "callback")
+
+
 def test_task_engine_records_recovery_failure_without_masking_task_error():
     class FailedTask(Task):
         def run(self, _engine):
@@ -95,3 +111,30 @@ def test_task_engine_records_recovery_failure_without_masking_task_error():
 
     assert task.error.args == ("task failure",)
     assert task.recovery_error is recovery_error
+
+
+def test_task_engine_stops_after_task_returns_failure():
+    ran = []
+
+    class FailedTask(Task):
+        def run(self, _engine):
+            ran.append(self.name)
+            return False
+
+    class LaterTask(Task):
+        def run(self, _engine):
+            ran.append(self.name)
+            return True
+
+    engine = TaskEngine()
+    first = FailedTask("failure", ["MAIN_MENU"])
+    engine.add_task(first)
+    engine.add_task(LaterTask("later", ["MAIN_MENU"]))
+    engine.dispatcher.detect_state = lambda: "MAIN_MENU"
+
+    with patch("tasks.base.back_init_menu.back_init_menu"):
+        with pytest.raises(RuntimeError, match="failure"):
+            engine.run()
+
+    assert ran == ["failure"]
+    assert first.status == TaskStatus.FAILED

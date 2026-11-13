@@ -519,10 +519,12 @@ class Screen(metaclass=SingletonMeta):
         self.game = game
         self.handle = Handle()
 
-    def init_handle(self) -> bool:
+    def init_handle(self, *, start_game: bool = True) -> bool:
         try:
             self.handle.init_handle(self.title)
             if self.handle.hwnd == 0:
+                if not start_game:
+                    return False
                 log.info(f"未能获取到游戏窗口: {self.title},尝试启动游戏")
                 self.game.start_game()
                 sleep(30)
@@ -530,13 +532,15 @@ class Screen(metaclass=SingletonMeta):
 
             if self.handle.hwnd == 0:
                 log.error(f"未能获取到游戏窗口: {self.title}")
-                self.game.start_game()
+                if start_game:
+                    self.game.start_game()
                 return False
             else:
                 return True
         except Exception as e:
             log.error(f"未能获取到游戏窗口: {e}")
-            self.game.start_game()
+            if start_game:
+                self.game.start_game()
             return False
 
     def set_win(self) -> None:
@@ -566,7 +570,7 @@ class Screen(metaclass=SingletonMeta):
         _set_win()
         max_attempts = 5
         last_error = None
-        for attempt in range(max_attempts):
+        for attempt in range(max_attempts - 1):
             try:
                 width = self.handle.width(True)
                 height = self.handle.height(True)
@@ -583,6 +587,15 @@ class Screen(metaclass=SingletonMeta):
 
             if attempt < max_attempts - 1:
                 sleep(1)
+
+        try:
+            width = self.handle.width(True)
+            height = self.handle.height(True)
+            if width == int(cfg.set_win_size * 16 / 9) and height == cfg.set_win_size:
+                return
+        except Exception as exc:
+            last_error = exc
+            log.error(f"设置窗口出错: {exc}")
 
         error = RuntimeError(f"设置窗口失败: {max_attempts} 次尝试后尺寸仍未就绪")
         if last_error is not None:

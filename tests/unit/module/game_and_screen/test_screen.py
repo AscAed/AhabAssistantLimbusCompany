@@ -15,6 +15,18 @@ def _handle():
     return handle
 
 
+def test_init_handle_can_poll_without_restarting_game():
+    screen = object.__new__(Screen)
+    screen.title = "LimbusCompany"
+    screen.handle = Mock(hwnd=0)
+    screen.handle.init_handle.return_value = None
+    screen.game = Mock()
+
+    assert screen.init_handle(start_game=False) is False
+
+    screen.game.start_game.assert_not_called()
+
+
 @patch("module.game_and_screen.screen.win32gui.IsWindow", return_value=True)
 @patch("module.game_and_screen.screen.win32gui.SetWindowPos")
 @patch("module.game_and_screen.screen.ctypes.windll.user32.SetLayeredWindowAttributes")

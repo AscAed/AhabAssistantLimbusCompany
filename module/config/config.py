@@ -289,29 +289,26 @@ class Config(metaclass=SingletonMeta):
                             loaded_config = ConfigModel(**self._defaults).model_dump()
                     else:
                         loaded_config = ConfigModel(**self._defaults).model_dump()
-                if not isinstance(loaded_config.get("config_version", 0), int):
-                    raise TypeError("配置文件版本号不是 int 类型")
-                if "operation_mode" not in loaded_config:
-                    loaded_config["operation_mode"] = migrate_operation_mode(loaded_config)
-                if loaded_config.get("config_version", 0) < self.config.config_version:
-                    saved_version = loaded_config.get("config_version", 0)
-                    loaded_config["config_version"] = self.config.config_version
-                    self._old_version_cfg_upgrade(saved_version, loaded_config)
-                # 使用更新后的配置初始化 Config 对象
-                self.config = ConfigModel(**{**self._defaults, **loaded_config})
-                queue_in_loaded_config = loaded_config.get("teams_active_queue")
-                if queue_in_loaded_config is None:
-                    normalized_queue = self._normalize_team_queue(
-                        self.migrate_legacy_team_queue()
-                    )
-                else:
-                    normalized_queue = self._normalize_team_queue(
-                        queue_in_loaded_config
-                    )
-                self._sync_legacy_team_state(normalized_queue)
-                # 成功加载后保存当前文件为备份
-                self.backup_config()
-                self._save_config()
+            if not isinstance(loaded_config.get("config_version", 0), int):
+                raise TypeError("配置文件版本号不是 int 类型")
+            if "operation_mode" not in loaded_config:
+                loaded_config["operation_mode"] = migrate_operation_mode(loaded_config)
+            if loaded_config.get("config_version", 0) < self.config.config_version:
+                saved_version = loaded_config.get("config_version", 0)
+                loaded_config["config_version"] = self.config.config_version
+                self._old_version_cfg_upgrade(saved_version, loaded_config)
+            self.config = ConfigModel(**{**self._defaults, **loaded_config})
+            queue_in_loaded_config = loaded_config.get("teams_active_queue")
+            if queue_in_loaded_config is None:
+                normalized_queue = self._normalize_team_queue(
+                    self.migrate_legacy_team_queue()
+                )
+            else:
+                normalized_queue = self._normalize_team_queue(queue_in_loaded_config)
+            self._sync_legacy_team_state(normalized_queue)
+            # Replace the file only after its reader has been closed.
+            self.backup_config()
+            self._save_config()
         except FileNotFoundError:
             if self.backup_path.exists():
                 backup_files = [

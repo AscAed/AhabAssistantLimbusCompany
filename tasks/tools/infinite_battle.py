@@ -50,6 +50,15 @@ class BattleWorker(QThread):
 
     def run(self):
         """工作线程的主循环"""
+        previous_stop_check = auto._push_thread_stop_check(
+            lambda: self.is_stop or not self.battle.running
+        )
+        try:
+            self._run_battle_worker()
+        finally:
+            auto._restore_thread_stop_check(previous_stop_check)
+
+    def _run_battle_worker(self):
         # 首先进行游戏初始化
         if not self.initialized:
             try:
@@ -72,12 +81,15 @@ class BattleWorker(QThread):
                 return
         if self.is_stop:
             return
-        self.battle.fight(
-            infinite_battle=True,
-            defense_on_turn1=self.defense_on_turn1,
-            defense_all_time=self.defense,
-            choice_event_handling=self.choice_event_handling,
-        )
+        try:
+            self.battle.fight(
+                infinite_battle=True,
+                defense_on_turn1=self.defense_on_turn1,
+                defense_all_time=self.defense,
+                choice_event_handling=self.choice_event_handling,
+            )
+        except userStopError:
+            return
 
     def _set_win(self):
         try:

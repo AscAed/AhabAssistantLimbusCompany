@@ -136,6 +136,7 @@ class TaskEngine:
                     if success is False:
                         task.status = TaskStatus.FAILED
                         log.error(f"==> 任务引擎：任务 [{task.name}] 执行失败")
+                        raise RuntimeError(f"任务 [{task.name}] 执行失败")
                     else:
                         task.status = TaskStatus.SUCCESS
                         log.info(f"==> 任务引擎：任务 [{task.name}] 执行完成")

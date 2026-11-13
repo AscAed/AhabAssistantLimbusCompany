@@ -27,7 +27,7 @@
 
 ## External Network Commands
 
-The project environment uses the local Clash proxy at `127.0.0.1:7897`. Set proxy variables in the same PowerShell invocation as any external network command:
+When the local Clash proxy is available at `127.0.0.1:7897`, set its proxy variables in the same PowerShell invocation as an external network command. Otherwise use your environment's configured proxy or connect directly:
 
 ```powershell
 $env:http_proxy = "http://127.0.0.1:7897"

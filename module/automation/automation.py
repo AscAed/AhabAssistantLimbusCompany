@@ -175,17 +175,25 @@ class Automation(metaclass=SingletonMeta):
             self._thread_stop_context = stop_context
         previous = getattr(stop_context, "callback", None)
         stop_context.callback = callback
-        return previous
+        input_handler = getattr(self, "input_handler", None)
+        input_previous = (
+            input_handler._push_stop_check(callback)
+            if input_handler is not None
+            else None
+        )
+        return previous, input_previous
 
     def _restore_thread_stop_check(self, previous) -> None:
         stop_context = getattr(self, "_thread_stop_context", None)
-        if stop_context is None:
-            return
-        if previous is None:
+        previous_callback, input_previous = previous
+        if stop_context is not None and previous_callback is None:
             if hasattr(stop_context, "callback"):
                 del stop_context.callback
-        else:
-            stop_context.callback = previous
+        elif stop_context is not None:
+            stop_context.callback = previous_callback
+        input_handler = getattr(self, "input_handler", None)
+        if input_handler is not None:
+            input_handler._restore_stop_check(input_previous)
 
     def sleep_with_stop_check(
         self, seconds: float, stop_check: Callable[[], bool] | None = None

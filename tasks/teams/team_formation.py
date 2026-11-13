@@ -134,7 +134,7 @@ def team_formation(sinner_team):
         if i in sinner_team:
             sinner = sinner_team.index(i)
         else:
-            return False
+            continue
         if sinner <= 5:
             auto.mouse_click(first_sinner[0] + 270 * sinner * scale, first_sinner[1])
         else:
@@ -200,6 +200,7 @@ def select_battle_team(num):
             drag_distance,
             drag_time,
             allow_top_row=False,
+            top_retry=0,
         ):
             before = _capture_screenshot_with_retries()
             if before is None:
@@ -219,8 +220,9 @@ def select_battle_team(num):
 
             pane_region = _scroll_pane_region(first_pos, scale, before)
             if scroll_success and _scroll_pane_changed(before, after_scroll, pane_region):
-                report_background_input_result(True)
-                return True
+                if not allow_top_row or _first_team_row_visible(position, scale):
+                    report_background_input_result(True)
+                    return True
             if allow_top_row and _first_team_row_visible(position, scale):
                 return True
 
@@ -242,7 +244,21 @@ def select_battle_team(num):
                 log.error("拖拽队伍列表后无法获取截图，已停止")
                 return False
             if _scroll_pane_changed(before, after_drag, pane_region):
-                return True
+                if not allow_top_row or _first_team_row_visible(position, scale):
+                    return True
+                if top_retry >= 2:
+                    return False
+                log.debug("队伍列表仍未回到首行，将继续有界滚动确认")
+                return scroll_with_verification(
+                    first_pos,
+                    direction=1,
+                    count=30,
+                    drag_start_y=drag_start_y,
+                    drag_distance=drag_distance,
+                    drag_time=drag_time,
+                    allow_top_row=True,
+                    top_retry=top_retry + 1,
+                )
             if allow_top_row and _first_team_row_visible(position, scale):
                 return True
 
