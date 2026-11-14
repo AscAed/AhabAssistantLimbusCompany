@@ -1064,14 +1064,17 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
         )
         deadline = monotonic() + self.USER_IDLE_TIMEOUT_SECONDS
         while monotonic() < deadline:
+            self._raise_if_stop_requested()
             if self.is_pause:
                 self.wait_pause()
             elapsed = self._get_last_input_elapsed_ms()
             if elapsed is not None and elapsed >= self.USER_IDLE_REQUIRED_MS:
                 # Give Unity time to process input events before restoring foreground
                 sleep(self.INPUT_SETTLE_MS / 1000.0)
+                self._raise_if_stop_requested()
                 return True
             sleep(0.05)
+        self._raise_if_stop_requested()
         log.warning("后台输入等待用户空闲超时: timeout=%ss", self.USER_IDLE_TIMEOUT_SECONDS)
         return False
 
@@ -1226,6 +1229,7 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
             return None
         original_foreground = lease_foreground or requested_foreground
 
+        self._raise_if_stop_requested()
         window_rect = screen.handle.rect()
         original_position = (int(window_rect[0]), int(window_rect[1]))
         visibility_snapshot = None
@@ -1236,6 +1240,7 @@ class WindowMoveInput(WinAbstractInput, metaclass=SingletonMeta):
                 return None
 
         try:
+            self._raise_if_stop_requested()
             self._set_window_pos(int(x), int(y))
             activated = self._activate_for_lease(game_hwnd)
             lease_start_elapsed_ms = (

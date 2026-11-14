@@ -3,6 +3,7 @@ from time import monotonic
 from module.automation import auto
 from module.decorator.decorator import begin_and_finish_time_log
 from module.logger import log
+from module.my_error.my_error import cannotOperateGameError
 from tasks.base.retry import retry
 from tasks.mirror.in_shop import wait_for_screenshot
 
@@ -38,6 +39,7 @@ reward_card_model = {
 }
 
 _CLAIM_RETRY_DELAY = 5.0
+_MAX_REWARD_CARD_ITERATIONS = 31
 
 
 @begin_and_finish_time_log(task_name="镜牢获取奖励卡", calculate_time=False)
@@ -48,7 +50,7 @@ def get_reward_card(model=0):
     state = "select_reward"
     auto.model = "clam"
     reward_card = reward_card_model[model]
-    while True:
+    for _ in range(_MAX_REWARD_CARD_ITERATIONS):
         wait_for_screenshot()
         auto.mouse_to_blank()
         if auto.find_element("mirror/road_in_mir/legend_assets.png"):
@@ -109,4 +111,7 @@ def get_reward_card(model=0):
             auto.model = "aggressive"
         if loop_count < 0:
             log.error("无法获取奖励卡")
-            return False
+            raise cannotOperateGameError("镜牢奖励领取出错,请手动操作重试")
+
+    log.error("奖励卡领取流程达到最大迭代次数")
+    raise cannotOperateGameError("镜牢奖励领取出错,请手动操作重试")

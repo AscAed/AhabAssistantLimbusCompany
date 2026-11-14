@@ -9,6 +9,8 @@ from tasks.mirror.in_shop import wait_for_screenshot
 from utils.image_utils import ImageUtils
 from utils.path_manager import path_manager
 
+_MAX_THEME_PACK_ITERATIONS = 32
+
 
 @begin_and_finish_time_log(task_name="选择镜牢主题包")
 # 选择镜牢主题包
@@ -37,6 +39,7 @@ def select_theme_pack(
         )
     refresh_times = 3
     difficulty = None
+    iteration_count = 0
     # 如果检测到卡包选择界面指示图，不执行因图例检测（兜底误匹配）而触发的提前返回
     if not (auto.find_element("mirror/theme_pack/feature_theme_pack_assets.png", take_screenshot=True) or
             auto.find_element("mirror/theme_pack/normal_assets.png") or
@@ -44,6 +47,10 @@ def select_theme_pack(
         if auto.find_element("mirror/road_in_mir/legend_assets.png"):
             return
     while True:
+        if iteration_count >= _MAX_THEME_PACK_ITERATIONS:
+            log.error("主题包选择操作次数超限，尝试回到初始界面")
+            break
+        iteration_count += 1
         wait_for_screenshot()
 
         if (
@@ -69,14 +76,18 @@ def select_theme_pack(
                 ocr_result = auto.find_text_element(
                     None, my_crop=difficulty_bbox, only_text=True
                 )
-                if not isinstance(ocr_result, str):
-                    if auto.find_element("mirror/road_in_mir/legend_assets.png"):
-                        return
-                    continue
-                if "normal" in ocr_result:
+                if isinstance(ocr_result, str):
+                    ocr_texts = [ocr_result]
+                elif isinstance(ocr_result, (list, tuple)):
+                    ocr_texts = ocr_result
+                else:
+                    ocr_texts = []
+                if any(isinstance(text, str) and "normal" in text for text in ocr_texts):
                     difficulty = "normal"
-                elif "hard" in ocr_result:
+                elif any(isinstance(text, str) and "hard" in text for text in ocr_texts):
                     difficulty = "hard"
+                if difficulty is None and auto.find_element("mirror/road_in_mir/legend_assets.png"):
+                    return
             loop_count -= 1
             sleep(1)
             continue

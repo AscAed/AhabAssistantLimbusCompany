@@ -14,8 +14,9 @@ This index is the entry point for maintainers and coding agents. Current facts b
 | Staged implementation and acceptance gates | [Implementation roadmap](development/implementation-roadmap.md) |
 | Dated baseline repairs and validation evidence | [2026-11-12 self-audit](audits/2026-11-12-self-audit.md) |
 | Documentation investigation, deployment evidence, and open questions | [2026-11-12 investigation baseline](audits/2026-11-12-documentation-baseline.md) |
-| Current source assessment, gaps, and deployment evidence | [2026-11-13 stage and gap assessment](audits/2026-11-13-stage-gap-assessment.md) |
-| Latest implementation state, validation, and continuation steps | [2026-11-14 implementation handoff](audits/2026-11-14-implementation-handoff.md) |
+| Current stage assessment, decisions, and deployment evidence | [2026-11-14 stage assessment](audits/2026-11-14-stage-assessment.md) |
+| Historical stage and gap assessment | [2026-11-13 stage and gap assessment](audits/2026-11-13-stage-gap-assessment.md) |
+| Implementation validation and historical continuation steps | [2026-11-14 implementation handoff](audits/2026-11-14-implementation-handoff.md) |
 | Historical implementation batches and their exact validation | [2026-11-13 implementation checkpoint](audits/2026-11-13-implementation-checkpoint.md) |
 | Mirror offline-test and visual-fixture coverage | [2026-11-13 Mirror fixture inventory](audits/2026-11-13-mirror-fixture-inventory.md) |
 | Cleanup candidates and decisions | [2026-11-12 cleanup inventory](audits/cleanup-inventory-2026-11-12.md) |

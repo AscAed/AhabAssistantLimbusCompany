@@ -214,7 +214,12 @@ class Shop:
         keyword_refresh_count = 0
         normal_refresh_count = 0
         complete_count = 0
-        while True:
+        loop_limit = (
+            31
+            + max(0, self.max_keyword_refresh)
+            + max(0, self.max_normal_refresh)
+        )
+        for _ in range(loop_limit):
             # 自动截图
             wait_for_screenshot()
             if self.shopping_strategy is False or (
@@ -441,6 +446,9 @@ class Shop:
                     continue
 
             break
+        else:
+            log.error("商店购买操作次数超限")
+            raise self.RestartGame()
 
     def fuse_useless_gifts_aggressive(self):
         """合成无用饰品_激进版 (合成：四级优先)"""
@@ -654,7 +662,7 @@ class Shop:
 
         log.debug("开始执行普通合成模块")
         block = True
-        while True:
+        for _ in range(31):
             auto.mouse_to_blank()
             wait_for_screenshot()
 
@@ -792,6 +800,9 @@ class Shop:
 
             auto.mouse_click_blank(times=3)
             break
+        else:
+            log.error("普通饰品合成操作次数超限")
+            raise self.RestartGame()
 
         if retry() is False:
             raise self.RestartGame()
@@ -809,9 +820,10 @@ class Shop:
             if g[0] == self.system:
                 system_gifts.append(gift)
 
-        self.enter_fuse()
+        if self.enter_fuse() is False:
+            return False
 
-        while True:
+        for _ in range(31):
             if list_block := auto.find_element(
                 "mirror/shop/gifts_list_block.png", take_screenshot=True
             ):
@@ -898,6 +910,9 @@ class Shop:
             if fusion:
                 msg = f"成功合成{self.system}体系的公式饰品{fusion_gift if fusion_gift else ''}"
                 log.debug(msg)
+        else:
+            log.error("体系饰品合成操作次数超限")
+            raise self.RestartGame()
 
     def sell_gifts(self):
         scale = cfg.set_win_size / 1440
@@ -911,7 +926,7 @@ class Shop:
         sell_chance = 20
         second = None
         log.debug("开始执行饰品出售模块")
-        while True:
+        for _ in range(64):
             # 自动截图
             wait_for_screenshot()
 
@@ -989,13 +1004,16 @@ class Shop:
             auto.mouse_click_blank(times=3)
             sleep(1)
             break
+        else:
+            log.error("饰品出售操作次数超限")
+            raise self.RestartGame()
 
     def enter_fuse(self):
         loop_count = 15
         auto.model = "clam"
         auto.mouse_to_blank()
         log.debug("开始执行饰品合成前置模块")
-        while True:
+        for _ in range(loop_count + 1):
             wait_for_screenshot()
 
             if (
@@ -1040,6 +1058,9 @@ class Shop:
 
                 time.sleep(1)
                 continue
+        else:
+            log.error("无法合成ego饰品")
+            return False
 
         return True
 
@@ -1092,7 +1113,8 @@ class Shop:
             return
         # 合成体系饰品
         if not self.only_aggressive_fuse and not self.do_not_system_fuse:
-            self.fuse_system_gifts()
+            if self.fuse_system_gifts() is False:
+                return False
             auto.mouse_click_blank(times=3)
 
     def heal_sinner(self):
@@ -1186,7 +1208,7 @@ class Shop:
 
         my_scale = cfg.set_win_size / 1440
         loop_try_count = 10
-        while True:
+        for _ in range(loop_try_count + 1):
             # 自动截图
             wait_for_screenshot()
             if button := auto.find_element("mirror/shop/sort_button_assets.png"):
@@ -1206,6 +1228,11 @@ class Shop:
             if loop_try_count < -50:
                 log.error("不应该发生这样的问题，请提交issue")
                 return False
+        else:
+            log.error("进入饰品强化列表的操作次数超限")
+            if retry() is False:
+                raise self.RestartGame()
+            return False
 
         loop_count = 30
         auto.model = "clam"
@@ -1584,7 +1611,7 @@ class Shop:
 
             loop_count = 30
             auto.model = "clam"
-            while True:
+            for _ in range(31):
                 # 自动截图
                 wait_for_screenshot()
 
@@ -1613,6 +1640,11 @@ class Shop:
 
                     back_init_menu()
                     break
+            else:
+                log.error("退出商店操作次数超限，尝试回到初始界面")
+                from tasks.base.back_init_menu import back_init_menu
+
+                back_init_menu()
         except self.RestartGame:
             log.error("执行商店操作期间出现错误，尝试重启游戏")
             return
