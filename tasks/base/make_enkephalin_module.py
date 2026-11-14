@@ -55,10 +55,10 @@ def get_current_enkephalin():
     )
     screenshot_available = False
     for _ in range(5):
+        if auto.take_screenshot() is None:
+            continue
+        screenshot_available = True
         try:
-            if auto.take_screenshot() is None:
-                continue
-            screenshot_available = True
             sc = ImageUtils.crop(np.array(auto.screenshot), enkephalin_bbox)
             _, binary_image = cv2.threshold(sc, 110, 255, cv2.THRESH_BINARY)
             result = ocr.run(binary_image)

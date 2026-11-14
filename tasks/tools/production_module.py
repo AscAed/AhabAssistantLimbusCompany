@@ -28,6 +28,9 @@ from tasks.base.make_enkephalin_module import (
 from tasks.base.retry import kill_game
 from tasks.tools.ui_style import apply_tool_window_theme, get_status_label_style
 
+_LUNACY_ASSET_WAIT_TIMEOUT = 90.0
+_LUNACY_ASSET_WAIT_POLL_INTERVAL = 0.5
+
 
 class ProductionWork(QThread):
     """生产逻辑工作线程，避免阻塞UI"""
@@ -44,6 +47,7 @@ class ProductionWork(QThread):
         self.kill_game = kill_game
         self._init_retry_count = 0
         self._last_back_init_restart_time = 0.0
+        self.failure_message: str | None = None
 
     def stop(self):
         """停止工作线程"""
@@ -87,7 +91,7 @@ class ProductionWork(QThread):
                         self.error_occurred.emit(msg)
                         self.msleep(wait_seconds * 1000)
                         continue
-                self.error_occurred.emit(f"游戏初始化错误: {str(e)}")
+                self._report_terminal_failure(f"游戏初始化错误: {e}")
                 self.msleep(2000)
                 return
             try:
@@ -96,10 +100,8 @@ class ProductionWork(QThread):
                     self.msleep(1000)
                     continue
                 make_enkephalin_module(cancel=False, skip=False)
-                while not auto.find_element(
-                    "enkephalin/lunacy_assets.png", take_screenshot=True
-                ):
-                    auto.click_element("enkephalin/use_lunacy_assets.png")
+                if not self._wait_for_lunacy_assets():
+                    return
                 current_enkephalin = get_current_enkephalin()
                 if current_enkephalin is None:
                     log.warning("无法识别当前体力，跳过本次循环")
@@ -127,12 +129,32 @@ class ProductionWork(QThread):
             except Exception as exc:
                 from module.ocr.ocr import OCRExecutionError
 
-                if not isinstance(exc, OCRExecutionError):
-                    raise
-                log.error("体力 OCR 执行失败: %s", exc)
-                self.error_occurred.emit(f"体力 OCR 执行失败: {exc}")
-                self.production_running = False
+                if isinstance(exc, OCRExecutionError):
+                    message = f"体力 OCR 执行失败: {exc}"
+                    log.error(message)
+                else:
+                    message = f"自动换饼执行失败: {exc}"
+                    log.error(message)
+                self._report_terminal_failure(message)
                 return
+
+    def _report_terminal_failure(self, message: str) -> None:
+        self.failure_message = message
+        self.production_running = False
+        self.error_occurred.emit(message)
+
+    def _wait_for_lunacy_assets(self) -> bool:
+        deadline = monotonic() + _LUNACY_ASSET_WAIT_TIMEOUT
+        while self.production_running:
+            if auto.find_element("enkephalin/lunacy_assets.png", take_screenshot=True):
+                return True
+            if monotonic() >= deadline:
+                raise TimeoutError(
+                    f"lunacy 资源页面确认超时（{int(_LUNACY_ASSET_WAIT_TIMEOUT)}秒）"
+                )
+            auto.sleep_with_stop_check(_LUNACY_ASSET_WAIT_POLL_INTERVAL)
+            auto.click_element("enkephalin/use_lunacy_assets.png")
+        return False
 
     def _back_init_menu_with_tool_policy(self) -> bool:
         restart_timeout = 180.0 if cfg.simulator else 120.0
@@ -309,7 +331,11 @@ class ProductionModule(QWidget):
         self.start_stop_button.setText(self.start_msg)
         self.start_stop_button.setEnabled(True)
         self.kill_game_box.setDisabled(False)
-        self.status_label.setText("状态：已停止")
+        failure_message = self.worker.failure_message if self.worker else None
+        if failure_message:
+            self.status_label.setText(f"状态：错误 - {failure_message[:50]}...")
+        else:
+            self.status_label.setText("状态：已停止")
         if cfg.set_reduce_miscontact and not cfg.simulator:
             screen.reset_win(activate=False)
         auto.clear_img_cache()

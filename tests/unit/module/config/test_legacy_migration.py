@@ -3,8 +3,10 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from ruamel.yaml import YAML
 
 from module.config.config import Config
+from module.config.config_typing import ConfigModel
 
 LEGACY_AFTER_COMPLETION_VERSION = 1772205659
 
@@ -75,13 +77,26 @@ def test_legacy_migration_only_fills_missing_new_field():
     assert loaded_config["after_completion_power_action"] == "none"
 
 
-def test_legacy_window_position_uses_loaded_value():
-    config = _config_with_current_defaults()
-    loaded_config = {"set_win_position": True}
+@pytest.mark.parametrize("legacy_value", [True, False])
+def test_legacy_boolean_window_position_migrates_to_free(legacy_value):
+    example_path = Path(__file__).resolve().parents[4] / "assets/config/config.example.yaml"
+    loaded_config = YAML().load(example_path.read_text(encoding="utf-8"))
+    loaded_config["set_win_position"] = legacy_value
+    config = object.__new__(Config)
 
     _upgrade_without_legacy_backup_files(config, loaded_config, version=0)
 
     assert loaded_config["set_win_position"] == "free"
+    ConfigModel(**loaded_config)
+
+
+def test_legacy_migration_preserves_window_position_preset():
+    config = object.__new__(Config)
+    loaded_config = {"set_win_position": "center"}
+
+    _upgrade_without_legacy_backup_files(config, loaded_config, version=0)
+
+    assert loaded_config["set_win_position"] == "center"
 
 
 def test_legacy_history_migrates_every_selected_team():

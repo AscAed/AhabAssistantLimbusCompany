@@ -9,6 +9,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from module.domain_constants import MAX_OBSERVE_GIFT_SELECTIONS
+
 # 体系值与下拉框选项保持一致，用于校验配置是否合法。
 OBSERVE_SYSTEM_KEYS = (
     "burn",
@@ -26,7 +28,6 @@ OBSERVE_SYSTEM_KEYS = (
 OBSERVE_LEVEL_VALUES = (1, 2, 3)
 OBSERVE_ROW_VALUES = tuple(range(1, 11))
 OBSERVE_COL_VALUES = tuple(range(1, 9))
-MAX_OBSERVE_GIFT_SELECTIONS = 3
 
 _NEW_FORMAT_PATTERN = re.compile(r"^([a-z]+)_(\d+)_(\d+)_(\d+)$")
 

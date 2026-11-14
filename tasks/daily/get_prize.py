@@ -5,6 +5,7 @@ from module.decorator.decorator import begin_and_finish_time_log
 from module.logger import log
 from tasks.base import update_model_for_retry
 from tasks.base.retry import retry
+from tasks.base.screenshot import wait_for_screenshot
 from utils.image_utils import ImageUtils
 
 
@@ -14,8 +15,7 @@ def get_pass_prize():
     auto.model = "clam"
     while True:
         # 自动截图
-        if auto.take_screenshot() is None:
-            continue
+        wait_for_screenshot()
         if coordinates := auto.find_element(
             "pass/pass_coin.png", find_type="image_with_multiple_targets"
         ):
@@ -72,8 +72,7 @@ def get_mail_prize():
     auto.model = "clam"
     while True:
         # 自动截图
-        if auto.take_screenshot() is None:
-            continue
+        wait_for_screenshot()
         if retry() is False:
             return False
         if auto.click_element("mail/get_mail_prize_confirm.png"):

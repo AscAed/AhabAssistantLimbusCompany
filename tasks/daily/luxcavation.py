@@ -3,6 +3,7 @@ from time import sleep
 from module.automation import auto
 from module.config import cfg
 from module.logger import log
+from tasks.base.screenshot import wait_for_screenshot
 
 
 def _prepare_continuous_combat_count(
@@ -52,8 +53,7 @@ def EXP_luxcavation(combat_count: int = 1):
     auto.model = "clam"
     while True:
         # 自动截图
-        if auto.take_screenshot() is None:
-            continue
+        wait_for_screenshot()
         if auto.find_element("teams/identify_assets.png"):
             break
         if (
@@ -155,8 +155,7 @@ def thread_luxcavation(combat_count: int = 1):
     auto.model = "clam"
     while True:
         # 自动截图
-        if auto.take_screenshot() is None:
-            continue
+        wait_for_screenshot()
         if auto.find_element("teams/identify_assets.png"):
             break
         if (

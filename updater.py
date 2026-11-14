@@ -103,10 +103,12 @@ class Updater:
         else:
             try:
                 shutil.rmtree(self.delete_folder_path)
-            except FileNotFoundError:
+            except FileNotFoundError as e:
+                if os.path.lexists(self.delete_folder_path):
+                    raise RuntimeError(f"删除旧资源文件失败: {e}") from e
                 print("待删除目录不存在，跳过")
             except Exception as e:
-                print(f"删除旧资源文件失败: {e}")
+                raise RuntimeError(f"删除旧资源文件失败: {e}") from e
             print("开始覆盖安装...")
             last_error = None
             for attempt in range(1, 4):
@@ -248,6 +250,23 @@ class Updater:
     def _get_staged_updater_path(self):
         return os.path.join(self.temp_path, self.apply_updater_name)
 
+    def _get_apply_complete_path(self):
+        extract_path = Path(self.extract_folder_path)
+        return str(extract_path.parent / f".{extract_path.name}.applied")
+
+    def _write_apply_complete_marker(self):
+        marker_path = self._get_apply_complete_path()
+        temporary_path = f"{marker_path}.tmp"
+        try:
+            with open(temporary_path, "w", encoding="utf-8") as marker:
+                marker.write(getattr(self, "file_name", "") or "")
+                marker.flush()
+                os.fsync(marker.fileno())
+            os.replace(temporary_path, marker_path)
+        except Exception:
+            self._cleanup_file(temporary_path, "临时完成标记")
+            raise
+
     def _prepare_update_payload(self, apply_mode):
         if apply_mode and os.path.isdir(self.extract_folder_path):
             print("检测到已解压的更新包，使用新更新器继续更新...")
@@ -289,66 +308,103 @@ class Updater:
         """终止相关进程以准备更新。"""
         print("开始终止进程...")
         for proc in psutil.process_iter(attrs=["pid", "name"]):
-            if proc.info["name"] in self.process_names or any(name in proc.info["name"] for name in self.process_names):
+            process_name = proc.info.get("name")
+            if not isinstance(process_name, str) or not any(
+                name in process_name for name in self.process_names
+            ):
+                continue
+
+            try:
+                proc.terminate()
                 try:
-                    proc.terminate()
-                    try:
-                        proc.wait(timeout=10)  # 等待最多10秒
-                    except psutil.TimeoutExpired:
-                        proc.kill()  # 超时强制终止
-                        proc.wait(timeout=5)  # 再次等待
-                except psutil.AccessDenied:
-                    print(f"无权限终止进程 PID: {proc.info['pid']}")
-                except psutil.NoSuchProcess:
-                    print(f"进程 PID: {proc.info['pid']} 已退出")
+                    proc.wait(timeout=10)  # 等待最多10秒
+                except psutil.TimeoutExpired:
+                    proc.kill()  # 超时强制终止
+                    proc.wait(timeout=5)  # 再次等待
+            except psutil.AccessDenied:
+                print(f"无权限终止进程 PID: {proc.info['pid']}")
+            except psutil.NoSuchProcess:
+                print(f"进程 PID: {proc.info['pid']} 已退出")
         print("终止进程完成")
 
     def cleanup(self):
         """清理下载和解压的临时文件。"""
         print("开始清理...")
-        self._cleanup_file(self.download_file_path, "下载文件")
-        self._cleanup_tree(self.extract_folder_path, "提取目录")
-        self._cleanup_file(self.changes_file_path, "变更清单文件")
-        print("清理完成")
+        if self._cleanup_applied_update():
+            print("清理完成")
+            return True
+        print("清理未完成，保留完成标记以便恢复")
+        return False
+
+    def _cleanup_applied_update(self, preserve_download=False):
+        results = []
+        if not preserve_download:
+            results.append(self._cleanup_file(self.download_file_path, "下载文件"))
+        results.append(self._cleanup_tree(self.extract_folder_path, "提取目录"))
+        results.append(self._cleanup_file(self.changes_file_path, "变更清单文件"))
+
+        if not all(results):
+            return False
+        return self._cleanup_file(self._get_apply_complete_path(), "更新完成标记")
 
     @staticmethod
     def _cleanup_file(path, label):
         if not path:
-            return
+            return True
         try:
             os.remove(path)
         except FileNotFoundError:
             print(f"{label}不存在，跳过")
         except Exception as e:
             print(f"清理{label}失败: {e}")
+            return False
+        return True
 
     @staticmethod
     def _cleanup_tree(path, label):
         if not path:
-            return
+            return True
         try:
             shutil.rmtree(path)
         except FileNotFoundError:
             print(f"{label}不存在，跳过")
         except Exception as e:
             print(f"清理{label}失败: {e}")
+            return False
+        return True
 
     def run(self, apply_mode=False):
         """运行更新流程。"""
-        try:
-            self._prepare_update_payload(apply_mode)
-        except Exception as e:
-            print(f"更新准备失败：{e}")
-            return False
-        if not apply_mode and self._handoff_to_new_updater():
-            return
-        self.terminate_processes()
-        try:
-            self.cover_folder()
-        except Exception as error:
-            print(f"应用更新失败，保留更新包以便恢复: {error}")
-            return False
-        self.cleanup()
+        applied_marker_exists = os.path.exists(self._get_apply_complete_path())
+        if applied_marker_exists and apply_mode:
+            print("检测到已应用的更新，继续清理临时文件...")
+            self.cleanup()
+        else:
+            if applied_marker_exists and not self._cleanup_applied_update(
+                preserve_download=True
+            ):
+                print("清理上次已应用更新失败，保留新更新包")
+                return False
+            try:
+                self._prepare_update_payload(apply_mode)
+            except Exception as e:
+                print(f"更新准备失败：{e}")
+                return False
+            if not apply_mode and self._handoff_to_new_updater():
+                return
+            self.terminate_processes()
+            try:
+                self.cover_folder()
+            except Exception as error:
+                print(f"应用更新失败，保留更新包以便恢复: {error}")
+                return False
+            try:
+                self._write_apply_complete_marker()
+            except Exception as error:
+                print(f"记录更新完成状态失败，保留更新包以便恢复: {error}")
+                return False
+            self.cleanup()
+
         input("已完成更新，按回车键退出并打开软件\nThe update is complete, press enter to exit and open the software")
         if subprocess.run(["cmd", "/c", "start", '""', os.path.abspath("./AALC.exe")], check=False).returncode != 0:
             subprocess.Popen(os.path.abspath("./AALC.exe"))

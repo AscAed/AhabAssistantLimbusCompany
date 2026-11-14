@@ -5,6 +5,7 @@ from module.config import cfg, theme_list
 from module.decorator.decorator import begin_and_finish_time_log
 from module.logger import log
 from tasks.base.back_init_menu import back_init_menu
+from tasks.mirror.in_shop import wait_for_screenshot
 from utils.image_utils import ImageUtils
 from utils.path_manager import path_manager
 
@@ -43,9 +44,7 @@ def select_theme_pack(
         if auto.find_element("mirror/road_in_mir/legend_assets.png"):
             return
     while True:
-        # 自动截图
-        if auto.take_screenshot() is None:
-            continue
+        wait_for_screenshot()
 
         if (
             difficulty is None

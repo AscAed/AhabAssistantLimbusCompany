@@ -15,6 +15,7 @@ from module.logger import log
 from module.ocr import ocr
 from tasks import sins
 from tasks.base.retry import retry
+from tasks.base.screenshot import wait_for_screenshot
 from tasks.event import event_handling
 from utils.image_utils import ImageUtils
 from utils.utils import find_skill3
@@ -46,8 +47,10 @@ class Battle:
         click = False
         while True:
             # 自动截图
-            if auto.take_screenshot() is None:
-                continue
+            try:
+                wait_for_screenshot(max_attempts=16)
+            except RuntimeError:
+                return False
             if click and (
                 auto.find_element("battle/normal_to_battle_assets.png")
                 or auto.find_element("battle/chaim_to_battle_assets.png")
@@ -307,6 +310,7 @@ class Battle:
         total_count = 0
         fail_count = 0
         in_mirror = False
+        surrender_requested = False
         first_battle_reward = None
         event_chance = 15
         if defense_all_time:
@@ -325,8 +329,7 @@ class Battle:
             from tasks.base.retry import check_times
 
             # 自动截图
-            if auto.take_screenshot() is None:
-                continue
+            wait_for_screenshot()
             if auto.get_restore_time() is not None:
                 start_time = max(start_time, auto.get_restore_time())
             if infinite_battle is False and check_times(
@@ -365,7 +368,9 @@ class Battle:
                 continue
 
             # 如果正在交战过程
-            if auto.find_element("battle/pause_assets.png"):
+            if not surrender_requested and auto.find_element(
+                "battle/pause_assets.png"
+            ):
                 sleep(2 * waiting)  # 战斗播片中增大间隔
                 chance = self.INIT_CHANCE
                 first_turn = False
@@ -400,7 +405,7 @@ class Battle:
                     return False
                 continue
 
-            if in_mirror and not cfg.fight_to_last_man:
+            if in_mirror and not cfg.fight_to_last_man and not surrender_requested:
                 if dead_position := auto.find_element("battle/dead.png"):
                     my_scale = cfg.set_win_size / 1440
                     dead_bbox = (
@@ -411,19 +416,19 @@ class Battle:
                     )
                     ocr_result = auto.find_language_text("阵亡", "dead", dead_bbox)
                     if ocr_result is not False:
-                        while True:
-                            auto.mouse_to_blank()
-                            if auto.take_screenshot() is None:
-                                continue
-                            if auto.find_element(
-                                "mirror/road_in_mir/legend_assets.png"
-                            ):
-                                return False
-                            if auto.click_element("battle/give_up_assets.png"):
-                                sleep(2)
-                                return False
-                            if auto.click_element("battle/setting_assets.png"):
-                                continue
+                        surrender_requested = True
+
+            if surrender_requested:
+                auto.mouse_to_blank()
+                wait_for_screenshot()
+                if auto.find_element("mirror/road_in_mir/legend_assets.png"):
+                    return False
+                if auto.click_element("battle/give_up_assets.png"):
+                    sleep(2)
+                    return False
+                if auto.click_element("battle/setting_assets.png"):
+                    continue
+                continue
 
             # 如果正在战斗待机界面
             # 更新回合数

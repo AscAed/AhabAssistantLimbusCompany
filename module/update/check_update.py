@@ -1,6 +1,7 @@
 import os  # 导入os模块以便操作文件路径
 import re
 import subprocess
+import tempfile
 from enum import Enum
 from threading import Thread
 from typing import Callable
@@ -476,7 +477,9 @@ def update(assets_url):
     """
     # 检查URL是否有效
     if not is_valid_url(assets_url):
-        log.error("更新失败：获取的URL无效 ")
+        message = "更新失败：获取的URL无效。"
+        log.error(message)
+        mediator.download_failed.emit(message)
         return
 
     # 提取文件名
@@ -487,6 +490,7 @@ def update(assets_url):
         file_name = "AALC.7z"
     log.info(f"正在下载 {file_name} ...")
 
+    temp_path = None
     try:
         # 第一步：仅发起一次流式下载请求，并在同一响应对象上完成大小读取与内容落盘。
         with requests.get(assets_url, stream=True, timeout=10) as response:
@@ -498,8 +502,15 @@ def update(assets_url):
             os.makedirs("update_temp", exist_ok=True)
             file_path = os.path.join("update_temp", file_name)
 
-            # 第三步：边下载边写入本地文件，并在可计算百分比时同步上报下载进度。
-            with open(file_path, "wb") as f:
+            # Stage beside the destination so a failed download cannot truncate a prior package.
+            with tempfile.NamedTemporaryFile(
+                mode="wb",
+                dir="update_temp",
+                prefix=f".{file_name}.",
+                suffix=".part",
+                delete=False,
+            ) as f:
+                temp_path = f.name
                 for chunk in response.iter_content(chunk_size=1024):
                     if chunk:
                         f.write(chunk)
@@ -507,6 +518,11 @@ def update(assets_url):
                         if total_size > 0:
                             progress = int(downloaded / total_size * 100)
                             mediator.update_progress.emit(progress)
+                f.flush()
+                os.fsync(f.fileno())
+
+        os.replace(temp_path, file_path)
+        temp_path = None
 
         log.info("下载进度100%")
 
@@ -523,17 +539,29 @@ def update(assets_url):
                 else:
                     safe_unpack_archive(download_file_path, destination)
                 log.info("OCR解压完成，请重启AALC")
+                mediator.download_progress_finished.emit()
                 return True
             except Exception as e:
                 log.error(f"OCR 解压失败：{e}")
+                mediator.download_failed.emit("OCR 文件解压失败，请重新下载后重试。")
                 return False
         else:
             mediator.download_complete.emit(file_name)
 
     except requests.exceptions.RequestException as e:
         log.error(f"下载失败，请检查网络: {e}")
+        mediator.download_failed.emit("下载失败，请检查网络后重试。")
     except OSError as e:
         log.error(f"文件操作失败: {e}")
+        mediator.download_failed.emit("更新文件保存失败，请检查磁盘空间和权限。")
+    finally:
+        if temp_path is not None:
+            try:
+                os.remove(temp_path)
+            except FileNotFoundError:
+                pass
+            except OSError as e:
+                log.warning(f"清理下载临时文件失败：{e}")
 
 
 def start_update_thread(assets_url):
