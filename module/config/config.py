@@ -152,7 +152,8 @@ class Config(metaclass=SingletonMeta):
 
         # 旧配置类型转换
         if saved_version < 1771413380:
-            if loaded_config.get("set_win_position", True) is True:
+            legacy_position = loaded_config.get("set_win_position", True)
+            if isinstance(legacy_position, bool):
                 loaded_config["set_win_position"] = "free"
         if saved_version < 1772205660:
             # 迁移旧版结束后动作配置，按字段独立迁移，避免覆盖用户已设置的新字段

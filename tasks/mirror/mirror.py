@@ -8,6 +8,7 @@ from module.automation import auto
 from module.automation.automation import GameState, PageStateDispatcher
 from module.config import TeamSetting, cfg
 from module.decorator.decorator import begin_and_finish_time_log
+from module.domain_constants import MAX_OBSERVE_GIFT_SELECTIONS
 from module.logger import log
 from module.my_error.my_error import (
     InputAttributeError,
@@ -118,10 +119,8 @@ class Mirror:
         loop_count = 30
         auto.model = "clam"
         self.first_battle = True
-        while True:
-            # 自动截图
-            if auto.take_screenshot() is None:
-                continue
+        for _ in range(31):
+            wait_for_screenshot()
             auto.mouse_to_blank()
             if retry() is False:
                 return False
@@ -197,6 +196,9 @@ class Mirror:
                 log.error("无法进入镜牢,尝试回到初始界面")
                 back_init_menu()
                 break
+        else:
+            log.error("进入镜牢识别超过最大次数，尝试回到初始界面")
+            back_init_menu()
 
     def check_and_recover_process(self) -> bool:
         """
@@ -249,11 +251,10 @@ class Mirror:
                 main_loop_count = self.LOOP_COUNT
                 continue
 
-            # 自动截图
-            if auto.take_screenshot() is None:
-                continue
+            wait_for_screenshot()
 
-            retry()
+            if retry() is False:
+                continue
 
             if cfg.floor_3_exit and self.floor >= 4:
                 if auto.click_element(
@@ -547,10 +548,7 @@ class Mirror:
         auto.model = "clam"
         failed = None
         while True:
-            # 自动截图
-            if auto.take_screenshot() is None:
-                auto.mouse_to_blank()
-                continue
+            wait_for_screenshot()
             if (
                 not auto.find_element(
                     "mirror/claim_reward/complete_mirror_100%_assets.png"
@@ -836,9 +834,7 @@ class Mirror:
         loop_count = 30
         auto.model = "clam"
         while True:
-            # 自动截图
-            if auto.take_screenshot() is None:
-                continue
+            wait_for_screenshot()
 
             if auto.find_element("mirror/road_to_mir/bleed_gift_assets.png"):
                 break
@@ -927,9 +923,7 @@ class Mirror:
             team_system = all_systems[self.opening_items_system]
         log.debug("开始选择初始EGO")
         while True:
-            # 自动截图
-            if auto.take_screenshot() is None:
-                continue
+            wait_for_screenshot()
 
             if auto.click_element("mirror/road_in_mir/ego_gift_get_confirm_assets.png"):
                 auto.mouse_to_blank()
@@ -957,9 +951,12 @@ class Mirror:
                 or team_system == "pierce"
                 or team_system == "blunt"
             ) and not scroll:
-                while slash_button := auto.find_element(
-                    "mirror/road_to_mir/slash_gift_1.png"
-                ):
+                for _ in range(12):
+                    slash_button = auto.find_element(
+                        "mirror/road_to_mir/slash_gift_1.png"
+                    )
+                    if not slash_button:
+                        break
                     auto.mouse_drag(
                         slash_button[0], slash_button[1], drag_time=0.2, dx=0, dy=-400
                     )
@@ -970,6 +967,10 @@ class Mirror:
                     ):
                         scroll = True
                         break
+                else:
+                    raise cannotOperateGameError(
+                        "无法滚动定位初始EGO饰品，请手动检查镜牢界面后重试"
+                    )
 
             if (
                 auto.click_element(f"mirror/road_to_mir/{team_system}_gift_assets.png")
@@ -1113,25 +1114,45 @@ class Mirror:
         )
 
         selected_count = 0
+        system_indexes = {system: index for index, system in observe_system.items()}
+        valid_systems = set(system_indexes) | {"general"}
+        valid_selection_count = 0
         # 选择观测饰品
         for gift_id in self.observe_ego_gift_selected:
-            gm = re.match(r"^([a-z]+)_", gift_id)
-            if not gm:
-                log.warning(f"无法解析饰品体系：{gift_id}，跳过")
+            gift_match = (
+                re.fullmatch(r"([a-z]+)_(\d+)_(\d+)_(\d+)", gift_id)
+                if isinstance(gift_id, str)
+                else None
+            )
+            if not gift_match:
+                log.warning(f"无法解析观测饰品配置：{gift_id!r}，跳过")
                 continue
-            file_system = gm.group(1)
-            gift_information = gift_id.split("_")[1:]
-            gift_level = int(gift_information[0])
-            gift_row = int(gift_information[1])
-            gift_col = int(gift_information[2])
+            file_system = gift_match.group(1)
+            try:
+                gift_level, gift_row, gift_col = map(int, gift_match.groups()[1:])
+            except ValueError:
+                log.warning(f"无法解析观测饰品配置：{gift_id!r}，跳过")
+                continue
+            if (
+                file_system not in valid_systems
+                or not 1 <= gift_level <= 3
+                or not 1 <= gift_row <= 10
+                or not 1 <= gift_col <= 8
+            ):
+                log.warning(f"观测饰品配置超出有效范围：{gift_id!r}，跳过")
+                continue
+            if valid_selection_count >= MAX_OBSERVE_GIFT_SELECTIONS:
+                log.warning(
+                    f"观测饰品配置超过最多选择数 {MAX_OBSERVE_GIFT_SELECTIONS}，忽略后续配置"
+                )
+                break
+            valid_selection_count += 1
 
             # 选择体系
             if file_system == "general":
                 system_index = 10
             else:
-                system_index = [
-                    k for k, v in observe_system.items() if v == file_system
-                ][0]
+                system_index = system_indexes[file_system]
             # 选择体系
             auto.mouse_click(
                 benchmark_point[0] + 110 * system_index * my_scale, benchmark_point[1]
@@ -1323,14 +1344,13 @@ class Mirror:
         while True:
             from tasks.base.retry import check_times
 
-            # 自动截图
-            if auto.take_screenshot() is None:
-                continue
             if auto.get_restore_time() is not None:
                 start_time = max(start_time, auto.get_restore_time())
             if check_times(start_time):
                 back_init_menu()
                 return False
+            if auto.take_screenshot() is None:
+                continue
             auto.mouse_to_blank()
             if auto.click_element("mirror/road_in_mir/enter_assets.png"):
                 return True
@@ -1353,9 +1373,7 @@ class Mirror:
 
     def re_start(self):
         while True:
-            # 自动截图
-            if auto.take_screenshot() is None:
-                continue
+            wait_for_screenshot()
             if auto.click_element(
                 "mirror/road_in_mir/towindow&forfeit_confirm_assets.png"
             ):
@@ -1381,10 +1399,7 @@ class Mirror:
         auto.model = "clam"
         event_chance = 15
         while True:
-            # 自动截图
-            if auto.take_screenshot() is None:
-                continue
-
+            wait_for_screenshot()
             if retry() is False:
                 return False
 
@@ -1704,9 +1719,7 @@ class Mirror:
         main_loop_count = 20
         auto.model = "clam"
         while True:
-            if auto.take_screenshot() is None:
-                auto.mouse_to_blank()
-                continue
+            wait_for_screenshot()
             # 如果回到主界面，退出循环
             if auto.click_element("mirror/claim_reward/rewards_acquired_assets.png"):
                 return True

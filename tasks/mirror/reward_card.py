@@ -4,6 +4,7 @@ from module.automation import auto
 from module.decorator.decorator import begin_and_finish_time_log
 from module.logger import log
 from tasks.base.retry import retry
+from tasks.mirror.in_shop import wait_for_screenshot
 
 reward_card_model = {
     0: [
@@ -48,9 +49,7 @@ def get_reward_card(model=0):
     auto.model = "clam"
     reward_card = reward_card_model[model]
     while True:
-        # 自动截图
-        if auto.take_screenshot() is None:
-            continue
+        wait_for_screenshot()
         auto.mouse_to_blank()
         if auto.find_element("mirror/road_in_mir/legend_assets.png"):
             return True

@@ -90,6 +90,9 @@ class BattleWorker(QThread):
             )
         except userStopError:
             return
+        except Exception as e:
+            log.exception("自动战斗执行失败")
+            self.error_occurred.emit(f"战斗执行错误: {str(e)}")
 
     def _set_win(self):
         try:

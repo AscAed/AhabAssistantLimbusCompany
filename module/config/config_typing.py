@@ -377,7 +377,7 @@ class ConfigModel(BaseModel):
     """设置使用的分辨率"""
 
     set_win_position: str
-    """是否自动设置窗口的位置"""
+    """窗口位置预设"""
 
     set_reduce_miscontact: bool
     """是否防止误触"""

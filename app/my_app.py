@@ -599,6 +599,13 @@ class MainWindow(FramelessWindow):
     def show_warning(self, warning: str):
         MessageBoxWarning(self.tr("警告！"), warning, self).exec()
 
+    def hide_download_progress(self):
+        self.progress_ring.hide()
+
+    def handle_download_failed(self, message: str):
+        self.hide_download_progress()
+        self.show_warning(message)
+
     def show_tasks_warning(self):
         MessageBoxWarning(
             self.tr("任务设置出错"),
@@ -613,7 +620,9 @@ class MainWindow(FramelessWindow):
         mediator.save_warning.connect(self.show_save_warning)
         mediator.tasks_warning.connect(self.show_tasks_warning)
         mediator.update_progress.connect(self.set_progress_ring)
+        mediator.download_progress_finished.connect(self.hide_download_progress)
         mediator.download_complete.connect(self.download_and_install)
+        mediator.download_failed.connect(self.handle_download_failed)
         mediator.warning.connect(self.show_warning)
         # 由任务线程发起请求、由主窗口执行前台切换，避免执行层直接耦合 UI。
         mediator.request_focus.connect(self._force_foreground)
@@ -677,6 +686,7 @@ class MainWindow(FramelessWindow):
             self.help_interface.load_markdown(url)
 
     def download_and_install(self, file_name):
+        self.hide_download_progress()
         messages_box = MessageBoxConfirm(
             self.tr("更新提醒"), self.tr("下载已经完成，是否开始更新"), self.window()
         )

@@ -68,6 +68,29 @@ def test_take_screenshot_stop_request_interrupts_retry():
     assert capture.call_count == 1
 
 
+@pytest.mark.parametrize(
+    "failure_kind",
+    ["empty-frame", "backend-exception"],
+)
+def test_take_screenshot_background_failure_is_bounded(failure_kind):
+    auto = _capture_automation()
+    capture_error = RuntimeError("backend capture failed")
+    with patch("module.automation.automation.cfg") as mock_cfg, patch(
+        "module.automation.automation.ScreenShot.take_screenshot"
+    ) as capture, patch("module.automation.automation.time.sleep"):
+        mock_cfg.operation_mode = "background_window"
+        mock_cfg.screenshot_interval = 0.1
+        if failure_kind == "empty-frame":
+            capture.return_value = None
+        else:
+            capture.side_effect = capture_error
+
+        with pytest.raises(RuntimeError, match="后台模式连续截图失败"):
+            auto.take_screenshot()
+
+    assert capture.call_count == 3
+
+
 def test_take_screenshot_stop_during_throttle_skips_capture():
     auto = _capture_automation()
     auto.last_screenshot_time = 99.5

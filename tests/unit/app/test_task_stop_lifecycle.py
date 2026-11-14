@@ -192,6 +192,18 @@ def test_battle_worker_does_not_start_actions_after_stop_during_initialization()
     worker.battle.fight.assert_not_called()
 
 
+def test_battle_worker_reports_runtime_failure_from_fight():
+    worker = BattleWorker()
+    worker.initialized = True
+    worker.battle.fight = Mock(side_effect=RuntimeError("等待截图超时"))
+    errors = []
+    worker.error_occurred.connect(errors.append)
+
+    worker._run_battle_worker()
+
+    assert errors == ["战斗执行错误: 等待截图超时"]
+
+
 def test_production_worker_does_not_start_actions_after_stop_during_initialization():
     worker = ProductionWork()
     worker._back_init_menu_with_tool_policy = Mock(side_effect=AssertionError("action after stop"))

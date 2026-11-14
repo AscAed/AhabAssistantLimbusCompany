@@ -102,13 +102,15 @@ def test_mirror_stops_when_initial_formation_fails():
 
     with patch("tasks.mirror.mirror.PageStateDispatcher", return_value=dispatcher), patch(
         "tasks.mirror.mirror.auto"
-    ) as auto, patch("tasks.mirror.mirror.cfg") as cfg, patch(
+    ) as auto, patch("tasks.mirror.in_shop.auto") as screenshot_auto, patch(
+        "tasks.mirror.mirror.cfg"
+    ) as cfg, patch(
         "tasks.mirror.mirror.retry"
     ), patch("tasks.mirror.mirror.team_formation", return_value=False):
         cfg.floor_3_exit = False
         auto.click_element.return_value = False
         auto.find_element.return_value = False
-        auto.take_screenshot.return_value = object()
+        screenshot_auto.take_screenshot.return_value = object()
         with patch.object(mirror, "check_and_recover_process", return_value=False):
             with pytest.raises(unableToFindTeamError):
                 mirror.run()

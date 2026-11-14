@@ -2,6 +2,8 @@
 
 Date: 2026-11-13. Checkout: `codex/project-maintenance-2026-11-12` at `dc7339fb02907d96d56230621fedc896e0e2fa00`.
 
+The inventory below records that initial source snapshot. A current-main continuation is appended after the snapshot findings; do not treat the original test count as the present worktree count.
+
 ## Inventory
 
 The core inventory covers tracked test and source paths plus the bundled Mirror image-resource directory. The additional image spot check searches raster filenames under `assets/` and `tests/`. Neither pass inspects local logs, caches, personal configuration, or game data.
@@ -49,3 +51,35 @@ For later visual batches, collect only approved, sanitized full frames and recor
 - `python -m pytest -q -p no:cacheprovider tests/unit/tasks/mirror` passed: `25 passed in 2.27s` in an isolated source copy with the project `.venv` interpreter.
 - `rg --files tests | rg -i "\.(png|jpg|jpeg|bmp|webp)$"` returned no image paths.
 - A recursive file count under `assets/images/default/share/mirror` reported 250 files with the group counts above.
+
+## Current Worktree Continuation
+
+Date: 2026-11-13. Source HEAD: `main` at `895c8bbe539a7f6ab30507bdc73093824d98453d`; this worktree also contains uncommitted documentation and regression changes.
+
+The current Mirror test tree has **39 collected test cases across 35 test functions** in five files: shop basics (16 functions, 20 cases), shop capture recovery (1), EGO gift selection (2), road branches (14), and team-selection recovery (2). Twelve previously unbounded screenshot-`None` loops in `Shop` now call the shared bounded helper. Aggressive-fusion result handling also stops after 15 no-match iterations. Mock regressions cover these new bounds across EGO power-up, buying, fusion entry/selection/results, selling, enhancement and shop entry/exit. The shop basics file passed **20 tests**; the complete Mirror subset passed **39 tests in 2.21s**.
+
+This does not establish which gifts are detected or selected correctly, coordinate accuracy, normal/system fusion outcomes, UI recovery after three gifts have already been selected, or behavior across resolutions and layouts. One raw screenshot-`None` check remains inside the finite four-attempt aggressive-fusion grid scan. The shared helper limits attempts but does not enforce a wall-clock deadline. No representative full-frame gameplay fixture is present under `tests/`.
+
+The full offline worktree suite after this continuation collected **302 items** and completed with **300 passed, 2 skipped in 25.20s**. The skips are Windows symlink-creation cases. Full-repository Ruff passed. These checks qualify the mocked failure paths and offline code only, not live-game behavior.
+
+## Orchestration Capture Continuation
+
+Date: 2026-11-13. Source HEAD remains `895c8bbe539a7f6ab30507bdc73093824d98453d`; the working tree has further uncommitted capture-boundary and test changes.
+
+Eight previously unbounded screenshot-failure continues in `Mirror` orchestration now use the bounded waiter. Reward-card and theme-pack selection use it as well. Nine new tests cover those terminal paths and confirm no later input is sent after a mocked capture timeout. The full Mirror test tree now has **48 cases across 44 test functions in six files**: shop basics (16 functions, 20 cases), Mirror capture recovery (9), shop capture recovery (1), EGO gift selection (2), road branches (14), and team-selection recovery (2). All 48 passed in 1.99s.
+
+Existing finite loops remain local: observation-gift scan is bounded to 12 attempts and transition confirmation to five; the search-road fallback checks the freeze/restart timeout before its capture retry; initial route-search capture failures return `False`; aggressive-fusion grid scan is bounded to four attempts. The helper's 300-attempt cap is not a wall-clock deadline, and native capture may block within an attempt.
+
+The latest full offline suite collected **311 items** and completed with **309 passed, 2 skipped in 22.70s** using the authorized path in a disposable copy. Both skips require Windows symlink creation. Full Ruff, targeted `compileall`, and `git diff --check` passed. No visual recognition, coordinate, layout, live-game or package-launch claim is established by these mocks.
+
+## 2026-11-14 Continuation: Aggressive Fusion Anchor
+
+An offline mocked path in `Shop.fuse_gift()` showed that aggressive fusion can return from its grid scan without initializing `the_first_line_position`, then continue into ordinary fusion. If ordinary fusion detects any candidate gift, `_processing_coordinates()` compared the y-coordinate to `None` and raised `TypeError`. It now returns no candidates in that state, so no gift-selection click is issued without the required row cutoff.
+
+The regression `test_standard_fusion_skips_candidates_without_aggressive_row_anchor` failed on the old code with the `int >= None` `TypeError`. The updated Mirror unit suite passed **53 tests**, and the current full offline suite passed **360 passed, 2 Windows symlink skips**. This covers a source-level fail-closed boundary only. It does not confirm the row anchor, visual recognition, selection coordinates, or successful fusion on a real game frame. The tests tree still contains no raster gameplay fixtures.
+
+## 2026-11-14 Continuation: Second-System Fusion Flag
+
+`TeamSetting.second_system_action` is a `List[int]`; validation normalizes an enabled boolean to integer `1`. Two `Shop` branches used `is True`, so the configured second-system Level IV mode fell through and fusion entry selected the primary-system keyword. Both checks now accept the typed flag's truth value. Red regressions verified the policy transition and keyword choice failed before the fix.
+
+The Mirror unit suite now passes **55 tests** and the full offline suite passes **362 passed, 2 Windows symlink skips**. These tests exercise typed configuration and mocked control flow only; visual selection and actual fusion remain unverified, and the tests tree still has no representative full-frame gameplay fixtures.

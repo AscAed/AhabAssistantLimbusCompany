@@ -7,22 +7,19 @@ from module.config import TeamSetting, cfg
 from module.logger import log
 from module.ocr import ocr
 from tasks import all_sinners_name, all_sinners_name_zh, all_systems, system_cn_zh
-from tasks.base.back_init_menu import back_init_menu
 from tasks.base.retry import retry
+from tasks.base.screenshot import (
+    DEFAULT_SCREENSHOT_ATTEMPTS,
+)
+from tasks.base.screenshot import (
+    wait_for_screenshot as _wait_for_screenshot,
+)
 from tasks.mirror import fusion_result, must_be_abandoned, must_purchase
 from utils.image_utils import ImageUtils
 
-_SCREENSHOT_MAX_ATTEMPTS = 300
 
-
-def wait_for_screenshot(max_attempts: int = _SCREENSHOT_MAX_ATTEMPTS):
-    """Block until a non-empty screenshot is available, with a bounded retry limit."""
-    for _ in range(max_attempts):
-        screenshot = auto.take_screenshot()
-        if screenshot is not None:
-            return screenshot
-    log.error("等待截图超时")
-    raise RuntimeError("等待截图超时")
+def wait_for_screenshot(max_attempts: int = DEFAULT_SCREENSHOT_ATTEMPTS):
+    return _wait_for_screenshot(max_attempts, automation=auto)
 
 
 def _is_protected_coordinate(
@@ -119,7 +116,10 @@ class Shop:
             ):
                 unique_list.append(coord)
 
-        if self.fuse_aggressive_switch:
+        if self.fuse_aggressive_switch and unique_list:
+            if self.the_first_line_position is None:
+                log.warning("无法确定激进合成首行位置，跳过饰品选择")
+                return []
             unique_list = [
                 items
                 for items in unique_list
@@ -136,8 +136,7 @@ class Shop:
         auto.model = "clam"
         while True:
             # 自动截图
-            if auto.take_screenshot() is None:
-                continue
+            wait_for_screenshot()
             auto.mouse_to_blank()
             if auto.click_element("mirror/shop/power_up_assets.png"):
                 auto.mouse_to_blank()
@@ -217,8 +216,7 @@ class Shop:
         complete_count = 0
         while True:
             # 自动截图
-            if auto.take_screenshot() is None:
-                continue
+            wait_for_screenshot()
             if self.shopping_strategy is False or (
                 self.shopping_strategy and self.shopping_strategy_select in (0, 1, 5)
             ):
@@ -586,10 +584,10 @@ class Shop:
         fuse = False
         loop_times = 15
         fuse_use_starlight_chance = 5
-        while True:
+        while loop_times > 0:
             auto.mouse_to_blank()
-            if auto.take_screenshot() is None:
-                continue
+            wait_for_screenshot()
+            loop_times -= 1
 
             if ego_gift_get_confirm := auto.find_element(
                 "mirror/road_in_mir/ego_gift_get_confirm_assets.png"
@@ -628,9 +626,6 @@ class Shop:
                 model="normal",
             ):
                 sleep(2)
-                if loop_times <= 0:
-                    break
-                loop_times -= 1
                 continue
 
             if retry() is False:
@@ -661,8 +656,7 @@ class Shop:
         block = True
         while True:
             auto.mouse_to_blank()
-            if auto.take_screenshot() is None:
-                continue
+            wait_for_screenshot()
 
             fuse = False
             select_gifts = False
@@ -723,8 +717,7 @@ class Shop:
                 fuse_IV = False
                 while True:
                     auto.mouse_to_blank()
-                    if auto.take_screenshot() is None:
-                        continue
+                    wait_for_screenshot()
 
                     if loop_times < 0:
                         break
@@ -872,8 +865,7 @@ class Shop:
 
             chance = 5
             while fusion:
-                if auto.take_screenshot() is None:
-                    continue
+                wait_for_screenshot()
 
                 if chance < 0:
                     if len(fusion_pos) > 0:
@@ -921,8 +913,7 @@ class Shop:
         log.debug("开始执行饰品出售模块")
         while True:
             # 自动截图
-            if auto.take_screenshot() is None:
-                continue
+            wait_for_screenshot()
 
             gift_sell = False
 
@@ -1005,14 +996,13 @@ class Shop:
         auto.mouse_to_blank()
         log.debug("开始执行饰品合成前置模块")
         while True:
-            if auto.take_screenshot() is None:
-                continue
+            wait_for_screenshot()
 
             if (
                 self.fuse_IV is True
                 and self.second_system is True
                 and self.fuse_second_IV is False
-                and self.second_system_action[0] is True
+                and self.second_system_action[0]
                 and self.fuse_aggressive_switch is True
             ):
                 if auto.click_element(
@@ -1198,8 +1188,7 @@ class Shop:
         loop_try_count = 10
         while True:
             # 自动截图
-            if auto.take_screenshot() is None:
-                continue
+            wait_for_screenshot()
             if button := auto.find_element("mirror/shop/sort_button_assets.png"):
                 auto.mouse_click(button[0], button[1])
                 auto.mouse_click(button[0], button[1] + 200 * my_scale)
@@ -1225,8 +1214,7 @@ class Shop:
         stale_count = 0
         while True:
             # 自动截图
-            if auto.take_screenshot() is None:
-                continue
+            wait_for_screenshot()
 
             next_gift = True
 
@@ -1340,7 +1328,7 @@ class Shop:
                 self.after_level_IV_select == 2
                 and self.second_system is True
                 and self.fuse_second_IV is False
-                and self.second_system_action[0] is True
+                and self.second_system_action[0]
             ):
                 self.fuse_aggressive_switch = True
                 log.debug("合成四级，切换到第二体系四级合成")
@@ -1529,8 +1517,7 @@ class Shop:
                     break
 
                 # 自动截图
-                if auto.take_screenshot() is None:
-                    continue
+                wait_for_screenshot()
 
                 auto.mouse_click_blank(times=3)
                 auto.click_element("mirror/shop/return_assets.png")
@@ -1599,8 +1586,7 @@ class Shop:
             auto.model = "clam"
             while True:
                 # 自动截图
-                if auto.take_screenshot() is None:
-                    continue
+                wait_for_screenshot()
 
                 if retry() is False:
                     raise self.RestartGame()
@@ -1623,6 +1609,8 @@ class Shop:
                     auto.mouse_click_blank(times=3)
                 if loop_count < 0:
                     log.error("无法退出商店,尝试回到初始界面")
+                    from tasks.base.back_init_menu import back_init_menu
+
                     back_init_menu()
                     break
         except self.RestartGame:
