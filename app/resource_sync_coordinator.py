@@ -43,6 +43,7 @@ class ResourceSyncCoordinator(QObject):
         continue_startup: Callable[[], None],
         set_progress: Callable[[int], None],
         has_running_script: Callable[[], bool],
+        skip_startup_network_checks: bool = False,
         service: ResourceSyncService | None = None,
     ) -> None:
         """初始化资源同步协调类。
@@ -54,6 +55,7 @@ class ResourceSyncCoordinator(QObject):
             continue_startup: 资源同步后后续的回调
             set_progress: 更新主窗口进度环的回调，参数为 0 到 100 的进度值。
             has_running_script: 判断主脚本当前是否仍在运行中的回调。
+            skip_startup_network_checks: 是否跳过启动时的软件版本和资源清单检查。
             service: 可选的资源同步服务对象；未传入时内部创建默认实例。
         """
         super().__init__(window)
@@ -63,6 +65,7 @@ class ResourceSyncCoordinator(QObject):
         self._continue_startup = continue_startup
         self._set_progress = set_progress
         self._has_running_script_callback = has_running_script
+        self._skip_startup_network_checks = skip_startup_network_checks
 
         # 第二阶段：初始化资源同步编排过程中需要持续维护的状态。
         self._resource_sync_service = service or ResourceSyncService()
@@ -74,7 +77,14 @@ class ResourceSyncCoordinator(QObject):
         self._resource_sync_status_kind = "hidden"
 
     def start_startup_check(self) -> None:
-        """触发启动阶段的资源同步门禁检查。"""
+        """触发启动阶段的远端版本与资源清单检查，或跳过这些检查。"""
+        if self._skip_startup_network_checks:
+            log.info(
+                "已按命令行参数跳过启动阶段的软件版本和图片资源清单远端检查"
+            )
+            QTimer.singleShot(0, self._continue_startup_sequence_once)
+            return
+
         # 对外暴露的启动入口
         self._start_resource_sync_gate_check(trigger="startup")
 

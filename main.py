@@ -44,6 +44,7 @@ import pyuac  # noqa: E402
 
 from app.language_manager import LanguageManager  # noqa: E402
 from app.my_app import MainWindow  # noqa: E402
+from app.startup_options import filter_startup_network_checks_arg  # noqa: E402
 from module.config import cfg  # noqa: E402
 
 if not pyuac.isUserAdmin():
@@ -123,7 +124,7 @@ if __name__ == "__main__":
     lang_manager = LanguageManager()
     lang = lang_manager.init_language()
 
-    app = QApplication(sys.argv)
+    app = QApplication(filter_startup_network_checks_arg(sys.argv))
     app.setAttribute(Qt.AA_DontCreateNativeWidgetSiblings)
 
     # 创建主窗口

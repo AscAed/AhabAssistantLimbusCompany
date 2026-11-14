@@ -45,6 +45,10 @@ from app.language_manager import LanguageManager
 from app.page_card import MarkdownViewer
 from app.resource_sync_coordinator import ResourceSyncCoordinator
 from app.setting_interface import SettingInterface
+from app.startup_options import (
+    filter_startup_network_checks_arg,
+    has_skip_startup_network_checks,
+)
 from app.team_setting_card import TeamSettingCard
 from app.tools_interface import ToolsInterface
 from module.after_completion_types import (
@@ -91,6 +95,7 @@ class TrayRoundMenu(RoundMenu):
 class MainWindow(FramelessWindow):
     def __init__(self, argv: list[str]):
         super().__init__()
+        self._skip_startup_network_checks = has_skip_startup_network_checks(argv)
 
         # 应用全局字体配置
         apply_font_config()
@@ -170,6 +175,7 @@ class MainWindow(FramelessWindow):
             continue_startup=lambda: self._continue_main_startup_sequence(list(argv)),
             set_progress=self.set_progress_ring,
             has_running_script=self._has_running_script,
+            skip_startup_network_checks=self._skip_startup_network_checks,
         )
         # 设置页只负责发信号，由协调类统一接管手动资源同步入口。
         self.setting_interface.manualResourceSyncRequested.connect(
@@ -274,8 +280,11 @@ class MainWindow(FramelessWindow):
         继续执行启动链路。
         """
 
-        self.show_announcement_board()
-        self.command_start(argv)
+        if self._skip_startup_network_checks:
+            log.info("已按命令行参数跳过启动公告请求")
+        else:
+            self.show_announcement_board()
+        self.command_start(filter_startup_network_checks_arg(argv))
         self.init_system_tray()
 
     def _has_running_script(self) -> bool:

@@ -174,3 +174,6 @@ Currently supported commands:
 Example: `AALC.exe start --exit 6`
 
 In the current version, this will exit both AALC and the game after completion.
+
+- Global startup option: `--skip-startup-network-checks`
+  - Skips startup version, remote image-manifest, and announcement requests. Manual updates, manual resource sync, and later tasks may still use the network; this option does not remove the administrator prompt or local file writes.
