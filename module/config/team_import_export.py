@@ -10,6 +10,11 @@ from module.logger import log
 from utils.file_utils import sanitize_filename
 
 
+def parse_team_settings_yaml(yaml_text: str) -> object:
+    """Parse externally supplied team settings while rejecting unknown YAML tags."""
+    return YAML(typ="safe").load(yaml_text)
+
+
 def generate_team_export_filename(team_num: int) -> str:
     """生成队伍设置导出文件名"""
     team_setting = cfg.config.teams.get(str(team_num))
@@ -78,9 +83,8 @@ def import_team_settings(
         - missing_fields: 缺失的必需字段列表，如果所有字段都存在则为空列表
     """
     try:
-        yaml = YAML()
         with open(file_path, "r", encoding="utf-8") as f:
-            data = yaml.load(f)
+            data = parse_team_settings_yaml(f.read())
 
         if not data:
             return None, None, ["文件为空"]

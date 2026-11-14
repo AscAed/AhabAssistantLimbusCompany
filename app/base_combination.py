@@ -292,6 +292,7 @@ class MirrorTeamCombination(QFrame):
         self.remark_name.setAlignment(Qt.AlignCenter)
         self.remark_name.setPlaceholderText("备注名")
         self.remark_name.setMaximumWidth(100)
+        self.remark_name.setClearButtonEnabled(True)
         self.remark_name.textChanged.connect(self.remark_name_changed)
 
         self.order = LineEdit()
@@ -356,11 +357,11 @@ class MirrorTeamCombination(QFrame):
             )
             return
 
-        data: dict = cfg.yaml.load(setting)
         from module.config import TeamSetting
+        from module.config.team_import_export import parse_team_settings_yaml
 
         try:
-            team_config = TeamSetting(**data)
+            team_config = TeamSetting(**parse_team_settings_yaml(setting))
         except Exception:
             BaseInfoBar.error(
                 title=QT_TRANSLATE_NOOP("BaseInfoBar", "导入数据失败，可能是因为设置版本过旧或过新"),
@@ -1359,6 +1360,7 @@ class HotkeyEditCard(MessageBox):
     def __init__(self, title: str, hotkeys: dict[str, str], parent=None):
         super().__init__(title, "", parent)
         self.yesButton.setText(self.tr("返回"))
+        self.yesButton.setCursor(Qt.CursorShape.PointingHandCursor)
         self.textLayout.removeWidget(self.contentLabel)
         self.contentLabel.deleteLater()
         self.cancelButton.setParent(None)
@@ -1404,8 +1406,10 @@ class HotketInputCard(MessageBox):
         self.yesButton.setText(self.tr("保存"))
         self.resetButton = PushButton(self.tr("重置"))
         self.resetButton.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.yesButton.setCursor(Qt.CursorShape.PointingHandCursor)
         self.buttonLayout.insertWidget(1, self.resetButton, 1, Qt.AlignVCenter)
         self.cancelButton.setText(self.tr("取消"))
+        self.cancelButton.setCursor(Qt.CursorShape.PointingHandCursor)
         self.contentLabel.setText(self.tr("按下键盘以设置快捷键, 部分特殊按键可能无法使用"))
 
         self.key_widget = QWidget()
