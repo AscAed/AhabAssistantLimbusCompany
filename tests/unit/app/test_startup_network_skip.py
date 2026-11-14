@@ -45,6 +45,23 @@ def test_startup_network_flag_is_detected_and_removed_from_qt_args():
     assert not has_skip_startup_network_checks(["AALC.exe", "start"])
 
 
+def test_startup_network_flag_does_not_hide_forwarded_exit_value():
+    args = [
+        "aalc",
+        "start",
+        SKIP_STARTUP_NETWORK_CHECKS_ARG,
+        "--exit",
+        "6",
+    ]
+
+    assert filter_startup_network_checks_arg(args) == [
+        "aalc",
+        "start",
+        "--exit",
+        "6",
+    ]
+
+
 def test_skip_startup_checks_defers_continuation_without_starting_remote_work(
     qapp, monkeypatch
 ):

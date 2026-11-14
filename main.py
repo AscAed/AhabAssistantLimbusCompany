@@ -136,7 +136,7 @@ if __name__ == "__main__":
     def handle_args(args):
         # 处理新参数的逻辑
         args.insert(0, "aalc")
-        ui.command_start(args)
+        ui.command_start(filter_startup_network_checks_arg(args))
         ui.showNormal()
         ui.activateWindow()
         ui.raise_()
