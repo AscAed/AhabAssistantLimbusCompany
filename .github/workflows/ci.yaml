@@ -48,6 +48,8 @@ jobs:
 
   test:
     runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@main

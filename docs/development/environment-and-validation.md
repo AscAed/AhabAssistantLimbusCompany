@@ -9,6 +9,14 @@ uv sync --frozen
 uv run python main.py
 ```
 
+For a local startup check that skips the automatic version, image-manifest, and announcement requests, use:
+
+```powershell
+uv run python main.py --skip-startup-network-checks
+```
+
+This option is limited to those startup requests. It does not disable manually requested updates or resource sync, network activity from later tasks, administrator elevation, or local config/log/resource writes.
+
 The application performs desktop and game-window operations. Unit tests must use offline fixtures and mocks; do not run the live game as a validation step.
 
 ## Checks

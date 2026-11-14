@@ -169,3 +169,6 @@ AALC.exe <command_name> command_args extra_args
 示例: `AALC.exe start --exit 6`
 
 在当前版本会在结束后退出AALC与游戏
+
+- 全局启动选项 `--skip-startup-network-checks`
+  - 跳过启动时的软件版本、远端图片资源清单和公告请求。手动更新、手动资源同步及后续任务仍可能联网；此参数不会取消管理员权限要求或本地文件写入。
