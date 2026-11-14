@@ -264,6 +264,57 @@ def test_mirror_death_wait_uses_outer_battle_timeout():
     mock_back_init_menu.assert_called_once()
 
 
+def test_mirror_surrender_retries_after_settings_overlay_hides_death_marker():
+    battle = _battle()
+    battle.INIT_CHANCE = 16
+    settings_open = False
+    give_up_attempts = 0
+
+    def fake_find_element(target, *args, **kwargs):
+        if target == "battle/in_mirror_assets.png":
+            return True
+        if target == "battle/dead.png":
+            return None if settings_open else (100, 100)
+        if target == "battle/pause_assets.png":
+            return settings_open
+        return None
+
+    def fake_click_element(target):
+        nonlocal settings_open, give_up_attempts
+        if target == "battle/give_up_assets.png":
+            give_up_attempts += 1
+            return settings_open and give_up_attempts == 2
+        if target == "battle/setting_assets.png":
+            settings_open = True
+            return True
+        return False
+
+    with (
+        patch("tasks.battle.battle.cfg") as mock_cfg,
+        patch("tasks.battle.battle.auto") as mock_auto,
+        patch("tasks.base.screenshot.auto", new=mock_auto),
+        patch(
+            "tasks.base.retry.check_times",
+            return_value=False,
+        ) as mock_check_times,
+        patch("tasks.base.back_init_menu.back_init_menu") as mock_back_init_menu,
+    ):
+        mock_cfg.fight_to_last_man = False
+        mock_cfg.set_win_size = 1440
+        mock_auto.get_restore_time.return_value = None
+        mock_auto.take_screenshot.side_effect = [object() for _ in range(4)]
+        mock_auto.find_element.side_effect = fake_find_element
+        mock_auto.find_language_text.return_value = "dead"
+        mock_auto.click_element.side_effect = fake_click_element
+
+        assert battle.fight() is False
+
+    assert mock_check_times.call_count == 2
+    assert mock_auto.find_language_text.call_count == 1
+    assert give_up_attempts == 2
+    mock_back_init_menu.assert_not_called()
+
+
 def test_to_battle_stops_when_screenshot_wait_exhausts():
     with patch(
         "tasks.battle.battle.wait_for_screenshot",

@@ -141,15 +141,19 @@ def test_update_ocr_unpack_error_emits_download_failure(tmp_path, monkeypatch):
         download_complete=MagicMock(),
         download_failed=MagicMock(),
     )
+    seven_zip_path = tmp_path / "assets" / "binary" / "7za.exe"
+    seven_zip_path.parent.mkdir(parents=True)
+    seven_zip_path.write_bytes(b"")
     with patch("module.update.check_update.requests.get", return_value=response):
         with patch(
             "module.update.check_update.subprocess.run",
             side_effect=RuntimeError("extract failed"),
-        ):
+        ) as mock_subprocess_run:
             with patch("module.update.check_update.mediator", signals):
                 result = update("https://example.test/OCR.7z")
 
     assert result is False
+    mock_subprocess_run.assert_called_once()
     assert (tmp_path / "update_temp" / "OCR.7z").read_bytes() == b"complete"
     signals.download_complete.emit.assert_not_called()
     signals.download_failed.emit.assert_called_once_with(

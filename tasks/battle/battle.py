@@ -310,6 +310,7 @@ class Battle:
         total_count = 0
         fail_count = 0
         in_mirror = False
+        surrender_requested = False
         first_battle_reward = None
         event_chance = 15
         if defense_all_time:
@@ -367,7 +368,9 @@ class Battle:
                 continue
 
             # 如果正在交战过程
-            if auto.find_element("battle/pause_assets.png"):
+            if not surrender_requested and auto.find_element(
+                "battle/pause_assets.png"
+            ):
                 sleep(2 * waiting)  # 战斗播片中增大间隔
                 chance = self.INIT_CHANCE
                 first_turn = False
@@ -402,7 +405,7 @@ class Battle:
                     return False
                 continue
 
-            if in_mirror and not cfg.fight_to_last_man:
+            if in_mirror and not cfg.fight_to_last_man and not surrender_requested:
                 if dead_position := auto.find_element("battle/dead.png"):
                     my_scale = cfg.set_win_size / 1440
                     dead_bbox = (
@@ -413,16 +416,19 @@ class Battle:
                     )
                     ocr_result = auto.find_language_text("阵亡", "dead", dead_bbox)
                     if ocr_result is not False:
-                        auto.mouse_to_blank()
-                        wait_for_screenshot()
-                        if auto.find_element("mirror/road_in_mir/legend_assets.png"):
-                            return False
-                        if auto.click_element("battle/give_up_assets.png"):
-                            sleep(2)
-                            return False
-                        if auto.click_element("battle/setting_assets.png"):
-                            continue
-                        continue
+                        surrender_requested = True
+
+            if surrender_requested:
+                auto.mouse_to_blank()
+                wait_for_screenshot()
+                if auto.find_element("mirror/road_in_mir/legend_assets.png"):
+                    return False
+                if auto.click_element("battle/give_up_assets.png"):
+                    sleep(2)
+                    return False
+                if auto.click_element("battle/setting_assets.png"):
+                    continue
+                continue
 
             # 如果正在战斗待机界面
             # 更新回合数
