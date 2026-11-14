@@ -138,3 +138,50 @@ def test_task_engine_stops_after_task_returns_failure():
 
     assert ran == ["failure"]
     assert first.status == TaskStatus.FAILED
+
+
+def test_task_engine_does_not_run_task_after_failed_state_recovery():
+    ran = []
+
+    class RecordingTask(Task):
+        def run(self, _engine):
+            ran.append(self.name)
+            return True
+
+    engine = TaskEngine()
+    task = RecordingTask("state-check", ["MAIN_MENU"])
+    engine.add_task(task)
+    states = iter(["UNKNOWN", "UNKNOWN"])
+    engine.dispatcher.detect_state = lambda: next(states)
+
+    with patch(
+        "tasks.base.back_init_menu.back_init_menu", return_value=False
+    ) as recover:
+        with pytest.raises(RuntimeError, match="不属于允许的起始状态"):
+            engine.run()
+
+    recover.assert_called_once_with(allow_restart=True)
+    assert ran == []
+    assert task.status == TaskStatus.FAILED
+    assert isinstance(task.error, RuntimeError)
+
+
+def test_task_engine_runs_task_when_recovery_reaches_allowed_state():
+    ran = []
+
+    class RecordingTask(Task):
+        def run(self, _engine):
+            ran.append(self.name)
+            return True
+
+    engine = TaskEngine()
+    task = RecordingTask("state-check", ["MAIN_MENU"])
+    engine.add_task(task)
+    states = iter(["UNKNOWN", "MAIN_MENU"])
+    engine.dispatcher.detect_state = lambda: next(states)
+
+    with patch("tasks.base.back_init_menu.back_init_menu", return_value=False):
+        engine.run()
+
+    assert ran == ["state-check"]
+    assert task.status == TaskStatus.SUCCESS

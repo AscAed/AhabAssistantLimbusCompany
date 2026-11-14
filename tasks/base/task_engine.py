@@ -129,6 +129,14 @@ class TaskEngine:
                     from tasks.base.back_init_menu import back_init_menu
                     back_init_menu(allow_restart=True)
                     state = self.dispatcher.detect_state()
+                    if state not in task.allowed_start_states:
+                        error = RuntimeError(
+                            f"任务 [{task.name}] 的恢复页面 [{state}] 不属于允许的起始状态"
+                        )
+                        task.status = TaskStatus.FAILED
+                        task.error = error
+                        log.error("==> 任务引擎：%s", error)
+                        raise error
 
                 # 2. 执行任务
                 try:

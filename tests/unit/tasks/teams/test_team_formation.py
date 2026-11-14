@@ -219,3 +219,24 @@ def test_team_selection_ignores_changes_outside_scroll_pane():
     assert state["value"] == "fallback_visible"
     assert call(1, 1) in mock_auto.mouse_click.call_args_list
     assert call(150.0, 485.0) not in mock_auto.mouse_click.call_args_list
+
+
+def test_team_selection_uses_single_scroll_when_batch_scroll_unavailable():
+    frame = _frame_with_team_list()
+    with patch("tasks.teams.team_formation.auto") as mock_auto, patch(
+        "tasks.teams.team_formation.cfg"
+    ) as mock_cfg, patch("tasks.teams.team_formation.sleep"):
+        mock_cfg.set_win_size = 1440
+        mock_cfg.select_team_by_order = True
+        _team_selection_auto(mock_auto)
+        mock_auto.batch_mouse_scroll = None
+        mock_auto.take_screenshot.return_value = frame
+        mock_auto.find_language_text.return_value = (150, 635)
+        mock_auto.mouse_scroll.return_value = True
+
+        assert select_battle_team(1) is True
+
+    assert mock_auto.mouse_scroll.call_count == 30
+    assert mock_auto.mouse_scroll.call_args_list == [call(1, 150, 635)] * 30
+    mock_auto.mouse_drag.assert_not_called()
+    mock_auto.report_background_input_result.assert_not_called()

@@ -39,6 +39,17 @@ from tasks.teams.team_formation import (
 )
 from utils.image_utils import ImageUtils
 
+_MAX_SETUP_ITERATIONS = 31
+_MAX_EGO_GIFT_ITERATIONS = 31
+_MAX_RESTART_ITERATIONS = 31
+_MAX_EVENT_HANDLING_ITERATIONS = 31
+_MAX_FLOOR_EXIT_ACTIONS = 31
+_MAX_FLOOR_EXIT_NO_ACTION_ITERATIONS = 31
+_MAX_EMPTY_SINNER_RECOVERIES = 3
+_MAX_EGO_GIFT_CONFIRM_ACTIONS = 31
+_MAX_INFINITY_MIRROR_POPUP_ITERATIONS = 31
+_MAX_ROAD_MAP_NO_MARKER_ITERATIONS = 31
+
 
 # 输出时间统计
 def to_log_with_time(msg, elapsed_time):
@@ -242,6 +253,23 @@ class Mirror:
 
         main_loop_count = self.LOOP_COUNT
         back_menu_count = 0
+        empty_sinner_recovery_attempts = 0
+        floor_exit_action_count = 0
+        floor_exit_no_action_count = 0
+        ego_gift_confirm_action_count = 0
+        road_map_no_marker_count = 0
+        ego_gift_confirm_asset = "mirror/road_in_mir/ego_gift_get_confirm_assets.png"
+        infinity_popup_iterations = 0
+        infinity_popup_asset = "mirror/infinity_mirror_assets.png"
+
+        def click_ego_gift_confirm():
+            nonlocal ego_gift_confirm_action_count
+            if auto.click_element(ego_gift_confirm_asset):
+                ego_gift_confirm_action_count += 1
+                return True
+            ego_gift_confirm_action_count = 0
+            return False
+
         # 未到达奖励页不会停止
         while True:
             if main_loop_count >= 50:
@@ -249,11 +277,36 @@ class Mirror:
 
             if self.check_and_recover_process():
                 main_loop_count = self.LOOP_COUNT
+                empty_sinner_recovery_attempts = 0
+                floor_exit_no_action_count = 0
+                road_map_no_marker_count = 0
                 continue
 
             wait_for_screenshot()
 
+            if ego_gift_confirm_action_count:
+                if auto.find_element(ego_gift_confirm_asset):
+                    if ego_gift_confirm_action_count >= _MAX_EGO_GIFT_CONFIRM_ACTIONS:
+                        raise cannotOperateGameError(
+                            "EGO饰品确认操作次数超限，请手动操作重试"
+                        )
+                else:
+                    ego_gift_confirm_action_count = 0
+
+            infinity_popup_visible = auto.find_element(infinity_popup_asset)
+            if infinity_popup_visible:
+                if infinity_popup_iterations >= _MAX_INFINITY_MIRROR_POPUP_ITERATIONS:
+                    raise cannotOperateGameError(
+                        "无限镜牢弹窗关闭操作次数超限，请手动操作重试"
+                    )
+                infinity_popup_iterations += 1
+            else:
+                infinity_popup_iterations = 0
+
             if retry() is False:
+                empty_sinner_recovery_attempts = 0
+                floor_exit_no_action_count = 0
+                road_map_no_marker_count = 0
                 continue
 
             if cfg.floor_3_exit and self.floor >= 4:
@@ -261,13 +314,26 @@ class Mirror:
                     "mirror/road_in_mir/towindow&forfeit_confirm_assets.png"
                 ):
                     break
+                if floor_exit_action_count >= _MAX_FLOOR_EXIT_ACTIONS:
+                    raise cannotOperateGameError(
+                        "只打三层退出操作次数超限，请手动操作重试"
+                    )
                 if auto.click_element("mirror/road_in_mir/forfeit_assets.png"):
+                    floor_exit_action_count += 1
+                    floor_exit_no_action_count = 0
                     continue
                 if auto.click_element("mirror/road_in_mir/setting_assets.png"):
+                    floor_exit_action_count += 1
+                    floor_exit_no_action_count = 0
                     continue
 
             # Page detection control flow using dispatcher
             state = self.dispatcher.detect_state()
+            if state != GameState.ROAD_MAP:
+                floor_exit_no_action_count = 0
+                road_map_no_marker_count = 0
+            if state not in {GameState.BATTLE_FORMATION, GameState.UNKNOWN}:
+                empty_sinner_recovery_attempts = 0
 
             if state == GameState.CLAIM_REWARD:
                 if auto.find_element("mirror/claim_reward/battle_statistics_assets.png"):
@@ -331,17 +397,29 @@ class Mirror:
                 continue
 
             elif state == GameState.ROAD_MAP:
+                if cfg.floor_3_exit and self.floor >= 4:
+                    if (
+                        floor_exit_no_action_count
+                        >= _MAX_FLOOR_EXIT_NO_ACTION_ITERATIONS
+                    ):
+                        raise cannotOperateGameError(
+                            "只打三层连续未识别退出操作次数超限，请手动操作重试"
+                        )
+                    floor_exit_no_action_count += 1
+                else:
+                    floor_exit_no_action_count = 0
                 auto.mouse_to_blank()
                 wait_for_screenshot()
-                if auto.click_element(
-                    "mirror/road_in_mir/ego_gift_get_confirm_assets.png"
-                ):
+                if click_ego_gift_confirm():
+                    road_map_no_marker_count = 0
                     continue
                 if auto.find_element("teams/identify_assets.png"):
+                    road_map_no_marker_count = 0
                     continue
                 if auto.find_element(
                     "mirror/shop/shop_coins_assets.png", model="normal"
                 ):
+                    road_map_no_marker_count = 0
                     continue
                 if auto.find_element(
                     "mirror/claim_reward/claim_rewards_assets.png"
@@ -354,12 +432,23 @@ class Mirror:
                     self.get_which_floor()
 
                 if cfg.floor_3_exit and self.floor >= 4:
+                    road_map_no_marker_count = 0
                     continue
+                floor_exit_no_action_count = 0
 
                 wait_for_screenshot()
-                if auto.find_element("mirror/road_in_mir/legend_assets.png") or auto.find_element("mirror/road_in_mir/to_window_assets.png"):
+                if auto.find_element(
+                    "mirror/road_in_mir/legend_assets.png"
+                ) or auto.find_element("mirror/road_in_mir/to_window_assets.png"):
+                    road_map_no_marker_count = 0
                     _, elapsed = self._time_call(self.search_road)
                     self.find_road_total_time += elapsed
+                else:
+                    if road_map_no_marker_count >= _MAX_ROAD_MAP_NO_MARKER_ITERATIONS:
+                        raise cannotOperateGameError(
+                            "镜牢路线图连续未识别路线标记次数超限，请手动操作重试"
+                        )
+                    road_map_no_marker_count += 1
                 continue
 
             elif state == GameState.MIRROR_TEAM_SELECT:
@@ -374,9 +463,18 @@ class Mirror:
                         )
                     self.first_battle = False
                     continue
-                if auto.click_element("teams/none_sinner_assets.png", model="clam"):
+                empty_sinner_asset = "teams/none_sinner_assets.png"
+                if empty_sinner_recovery_attempts >= _MAX_EMPTY_SINNER_RECOVERIES:
+                    if auto.find_element(empty_sinner_asset, model="clam"):
+                        raise cannotOperateGameError(
+                            "镜牢队伍编队空位修复次数超限，请手动操作重试"
+                        )
+                    empty_sinner_recovery_attempts = 0
+                if auto.click_element(empty_sinner_asset, model="clam"):
+                    empty_sinner_recovery_attempts += 1
                     self.first_battle = True
                     continue
+                empty_sinner_recovery_attempts = 0
                 if not (
                     auto.find_element("teams/12_sinner_live_assets.png")
                     or auto.find_element("teams/11_sinner_live_assets.png")
@@ -385,6 +483,7 @@ class Mirror:
                     continue_mirror = check_team()
                     if continue_mirror is False and self.first_battle is False:
                         self.re_start()
+                        empty_sinner_recovery_attempts = 0
                 if auto.click_element(
                     "battle/chaim_to_battle_assets.png"
                 ) or auto.click_element("battle/normal_to_battle_assets.png"):
@@ -450,7 +549,13 @@ class Mirror:
                 self.re_start()
                 continue
 
-            if auto.find_element("battle/select_none_assets.png"):
+            unselected_sinner_asset = "battle/select_none_assets.png"
+            if auto.find_element(unselected_sinner_asset):
+                if empty_sinner_recovery_attempts >= _MAX_EMPTY_SINNER_RECOVERIES:
+                    raise cannotOperateGameError(
+                        "镜牢队伍编队空位修复次数超限，请手动操作重试"
+                    )
+                empty_sinner_recovery_attempts += 1
                 auto.mouse_click_blank()
                 self.first_battle = True
                 continue
@@ -477,7 +582,7 @@ class Mirror:
                 self.acquire_ego_gift(type=2)
                 continue
 
-            if auto.click_element("mirror/road_in_mir/ego_gift_get_confirm_assets.png"):
+            if click_ego_gift_confirm():
                 continue
 
             if auto.find_element(
@@ -507,7 +612,7 @@ class Mirror:
                 self.select_observe_ego_gift()
                 continue
 
-            if auto.find_element("mirror/infinity_mirror_assets.png"):
+            if infinity_popup_visible:
                 auto.click_element("mirror/infinity_mirror_close_assets.png")
                 continue
 
@@ -547,7 +652,7 @@ class Mirror:
         main_loop_count = 20
         auto.model = "clam"
         failed = None
-        while True:
+        for _ in range(31):
             wait_for_screenshot()
             if (
                 not auto.find_element(
@@ -718,6 +823,8 @@ class Mirror:
                 log.debug("识别模式切换到激进模式")
             if main_loop_count < 0:
                 raise cannotOperateGameError("镜牢奖励领取出错,请手动操作重试")
+        else:
+            raise cannotOperateGameError("镜牢奖励领取出错,请手动操作重试")
 
         if failed:
             return False
@@ -832,8 +939,14 @@ class Mirror:
         starlights_Y = [first_starlight[1] + (i // 5) * 480 * scale for i in range(10)]
 
         loop_count = 30
+        iteration_count = 0
         auto.model = "clam"
         while True:
+            iteration_count += 1
+            if iteration_count > _MAX_SETUP_ITERATIONS:
+                raise cannotOperateGameError(
+                    "无法进入镜牢，操作次数超限，请手动操作重试"
+                )
             wait_for_screenshot()
 
             if auto.find_element("mirror/road_to_mir/bleed_gift_assets.png"):
@@ -916,6 +1029,7 @@ class Mirror:
         scroll = False
         select_system = False
         loop_count = 30
+        iteration_count = 0
         auto.model = "clam"
 
         team_system = self.system
@@ -923,6 +1037,11 @@ class Mirror:
             team_system = all_systems[self.opening_items_system]
         log.debug("开始选择初始EGO")
         while True:
+            iteration_count += 1
+            if iteration_count > _MAX_SETUP_ITERATIONS:
+                raise cannotOperateGameError(
+                    "选择初始EGO饰品操作次数超限，请手动操作重试"
+                )
             wait_for_screenshot()
 
             if auto.click_element("mirror/road_in_mir/ego_gift_get_confirm_assets.png"):
@@ -1372,7 +1491,7 @@ class Mirror:
                 return False
 
     def re_start(self):
-        while True:
+        for _ in range(_MAX_RESTART_ITERATIONS):
             wait_for_screenshot()
             if auto.click_element(
                 "mirror/road_in_mir/towindow&forfeit_confirm_assets.png"
@@ -1388,6 +1507,8 @@ class Mirror:
             time.sleep(1)
             if retry() is False:
                 return False
+        else:
+            raise cannotOperateGameError("重新开始操作次数超限，请手动操作重试")
         to_log_with_time("满 身 疮 痍 ！ 重 开 ！此次战败", time.time() - self.start_time)
         self.first_battle = True
         self.start_time = time.time()
@@ -1396,6 +1517,7 @@ class Mirror:
         # 遇到有SKIP的情况
         event_start_time = time.time()
         loop_count = 30
+        iteration_count = 0
         auto.model = "clam"
         event_chance = 15
         while True:
@@ -1408,6 +1530,12 @@ class Mirror:
                 break
             if auto.find_element("mirror/road_in_mir/legend_assets.png"):
                 break
+
+            if iteration_count >= _MAX_EVENT_HANDLING_ITERATIONS:
+                log.error("事件处理操作次数超限，尝试回到初始界面")
+                back_init_menu()
+                break
+            iteration_count += 1
 
             if event_chance == 0:
                 if key_word_position := auto.find_language_text("判定", "check"):
@@ -1545,7 +1673,7 @@ class Mirror:
             if retry() is False:
                 return False
             return
-        while True:
+        for _ in range(_MAX_EGO_GIFT_ITERATIONS):
             wait_for_screenshot()
 
             if auto.click_element("mirror/road_in_mir/ego_gift_get_confirm_assets.png"):
@@ -1714,11 +1842,13 @@ class Mirror:
             except Exception as e:
                 log.error(e)
                 continue
+        else:
+            raise cannotOperateGameError("获取EGO饰品操作次数超限，请手动操作重试")
 
     def get_reward_in_road(self):
         main_loop_count = 20
         auto.model = "clam"
-        while True:
+        for _ in range(31):
             wait_for_screenshot()
             # 如果回到主界面，退出循环
             if auto.click_element("mirror/claim_reward/rewards_acquired_assets.png"):
@@ -1789,6 +1919,7 @@ class Mirror:
                 log.debug("识别模式切换到激进模式")
             if main_loop_count < 0:
                 raise cannotOperateGameError("镜牢奖励领取出错,请手动操作重试")
+        raise cannotOperateGameError("镜牢奖励领取出错,请手动操作重试")
 
     @begin_and_finish_time_log(task_name="镜牢商店")
     def in_shop(self):

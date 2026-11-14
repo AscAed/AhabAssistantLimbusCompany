@@ -33,6 +33,11 @@ class AbstractInput:
         else:
             self._stop_context.callback = previous
 
+    def _raise_if_stop_requested(self) -> None:
+        stop_check = getattr(getattr(self, "_stop_context", None), "callback", None)
+        if stop_check is not None and stop_check():
+            raise userStopError("用户主动终止程序")
+
     def set_pause(self) -> None:
         """
         设置暂停状态
@@ -50,19 +55,13 @@ class AbstractInput:
         """
         pause_identity = False
         while self.is_pause:
-            stop_check = getattr(
-                getattr(self, "_stop_context", None), "callback", None
-            )
-            if stop_check is not None and stop_check():
-                raise userStopError("用户主动终止程序")
+            self._raise_if_stop_requested()
             if pause_identity is not False:
                 log.info("AALC 已暂停")
                 pause_identity = True
             sleep(1)
             self.restore_time = time()
-        stop_check = getattr(getattr(self, "_stop_context", None), "callback", None)
-        if stop_check is not None and stop_check():
-            raise userStopError("用户主动终止程序")
+        self._raise_if_stop_requested()
 
     def mouse_click(self, x, y, times=1, move_back=False) -> bool:
         """在指定坐标上执行点击操作

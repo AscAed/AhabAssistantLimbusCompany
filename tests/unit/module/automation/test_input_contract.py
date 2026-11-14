@@ -16,6 +16,7 @@ from module.automation.input_handlers.input import (
 from module.automation.input_handlers.simulator.mumu_control import MumuControl
 from module.automation.input_handlers.simulator.simulator_control import SimulatorControl
 from module.game_and_screen.screen import WindowVisibilitySnapshot
+from module.my_error.my_error import userStopError
 
 
 def _simulator_instance():
@@ -291,6 +292,37 @@ def test_window_move_click_wait_timeout_does_not_activate_or_send(mock_cfg, mock
         patch.object(handler, "_send_mouse_input") as send_input:
         assert handler.mouse_click(300, 400) is False
 
+    activate.assert_not_called()
+    send_input.assert_not_called()
+
+
+@patch("module.automation.input_handlers.input.screen")
+def test_window_move_click_stop_during_idle_wait_aborts_before_input(mock_screen):
+    handler = _lease_handler(mock_screen)
+    stop_requested = {"value": False}
+    elapsed_reads = {"count": 0}
+
+    def get_last_input_elapsed_ms():
+        elapsed_reads["count"] += 1
+        return 0 if elapsed_reads["count"] == 1 else 600
+
+    def request_stop(_seconds):
+        stop_requested["value"] = True
+
+    handler._push_stop_check(lambda: stop_requested["value"])
+    handler._get_last_input_elapsed_ms = get_last_input_elapsed_ms
+    with patch(
+        "module.automation.input_handlers.input.win32gui.GetForegroundWindow",
+        return_value=2000,
+    ), patch.object(handler, "get_mouse_position", return_value=(500, 400)), patch(
+        "module.automation.input_handlers.input.sleep", side_effect=request_stop
+    ), patch.object(handler, "_set_window_pos") as move_window, patch.object(
+        handler, "_activate_for_lease"
+    ) as activate, patch.object(handler, "_send_mouse_input") as send_input:
+        with pytest.raises(userStopError):
+            handler.mouse_click(300, 400)
+
+    move_window.assert_not_called()
     activate.assert_not_called()
     send_input.assert_not_called()
 

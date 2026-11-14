@@ -2,6 +2,7 @@ from unittest.mock import patch
 
 import pytest
 
+from module.my_error.my_error import cannotOperateGameError
 from tasks.mirror.mirror import Mirror
 
 
@@ -48,3 +49,36 @@ def test_acquire_ego_gift_refuse_path_returns_none(mock_cfg, mock_auto, mock_sle
         "mirror/road_in_mir/acquire_ego_gift_select_assets.png",
         model="normal",
     )
+
+
+@patch("tasks.mirror.mirror.wait_for_screenshot", return_value=None)
+@patch("tasks.mirror.mirror.auto")
+@patch("tasks.mirror.mirror.cfg")
+def test_acquire_ego_gift_bounds_repeated_recognition_errors(mock_cfg, mock_auto, mock_wait):
+    mock_cfg.set_win_size = 1440
+    mock_auto.click_element.return_value = False
+    mock_auto.find_element.side_effect = RuntimeError("recognition failed")
+    mirror = object.__new__(Mirror)
+
+    with pytest.raises(cannotOperateGameError, match="操作次数超限"):
+        mirror.acquire_ego_gift()
+
+    assert mock_wait.call_count == 31
+    assert mock_auto.click_element.call_count == 31
+    assert mock_auto.find_element.call_count == 31
+
+
+@patch("tasks.mirror.mirror.wait_for_screenshot", return_value=None)
+@patch("tasks.mirror.mirror.auto")
+@patch("tasks.mirror.mirror.cfg")
+def test_acquire_ego_gift_accepts_confirmation_on_last_iteration(mock_cfg, mock_auto, mock_wait):
+    mock_cfg.set_win_size = 1440
+    mock_auto.click_element.side_effect = [False] * 30 + [True]
+    mock_auto.find_element.side_effect = RuntimeError("recognition failed")
+    mirror = object.__new__(Mirror)
+
+    assert mirror.acquire_ego_gift() is None
+
+    assert mock_wait.call_count == 31
+    assert mock_auto.click_element.call_count == 31
+    assert mock_auto.find_element.call_count == 30
