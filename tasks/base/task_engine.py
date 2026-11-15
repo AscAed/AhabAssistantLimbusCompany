@@ -56,8 +56,7 @@ class GetRewardTask(Task):
 
     def run(self, engine) -> bool:
         from tasks.base.script_task_scheme import to_get_reward
-        to_get_reward()
-        return True
+        return to_get_reward() is not False
 
 
 class BuyEnkephalinTask(Task):
@@ -66,8 +65,7 @@ class BuyEnkephalinTask(Task):
 
     def run(self, engine) -> bool:
         from tasks.base.script_task_scheme import Buy_enkephalin
-        Buy_enkephalin()
-        return True
+        return Buy_enkephalin() is not False
 
 
 class MirrorDungeonTask(Task):
@@ -81,8 +79,7 @@ class MirrorDungeonTask(Task):
 
     def run(self, engine) -> bool:
         from tasks.base.script_task_scheme import Mirror_task
-        Mirror_task(thread=engine.thread)
-        return True
+        return Mirror_task(thread=engine.thread) is not False
 
 
 class TaskEngine:

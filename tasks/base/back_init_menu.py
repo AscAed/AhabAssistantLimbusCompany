@@ -12,11 +12,13 @@ from tasks.base.retry import (
 from tasks.mirror.reward_card import get_reward_card
 
 LOOP_COUNT = 30
+MAX_RESTART_ATTEMPTS = 3
 
 
 @begin_and_finish_time_log(task_name="返回主界面")
 def back_init_menu(*, allow_restart: bool = True):
     loop_count = LOOP_COUNT
+    restart_count = 0
     auto.model = "clam"
     while True:
         loop_count -= 1
@@ -25,11 +27,15 @@ def back_init_menu(*, allow_restart: bool = True):
             if not allow_restart:
                 log.warning("无法返回主界面，本次调用禁用内部重启，返回失败")
                 return False
+            if restart_count >= MAX_RESTART_ATTEMPTS:
+                log.error("返回主界面失败，已达到最大重启次数")
+                return False
             from tasks.base.retry import kill_game, restart_game
 
             log.error("无法返回主界面，尝试重启游戏")
             kill_game()
             restart_game()
+            restart_count += 1
             loop_count = 30
             auto.model = "clam"
             sleep(1)
@@ -51,6 +57,9 @@ def back_init_menu(*, allow_restart: bool = True):
             from tasks.base.retry import kill_game, restart_game
             from utils.utils import get_day_of_week
 
+            if allow_restart and restart_count >= MAX_RESTART_ATTEMPTS:
+                log.error("检测到维护提示，已达到最大重启次数")
+                return False
             kill_game()
             if get_day_of_week() == 4:
                 seoul_tz = ZoneInfo("Asia/Seoul")
@@ -72,6 +81,9 @@ def back_init_menu(*, allow_restart: bool = True):
                 log.warning("检测到维护提示且本次调用禁用内部重启，返回失败")
                 return False
             restart_game()
+            restart_count += 1
+            loop_count = LOOP_COUNT
+            auto.model = "clam"
             continue
 
         if auto.click_element("mirror/road_in_mir/towindow&forfeit_confirm_assets.png"):

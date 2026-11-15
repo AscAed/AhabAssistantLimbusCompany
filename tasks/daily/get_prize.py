@@ -8,12 +8,14 @@ from tasks.base.retry import retry
 from tasks.base.screenshot import wait_for_screenshot
 from utils.image_utils import ImageUtils
 
+_MAX_REWARD_NAVIGATION_ITERATIONS = 31
+
 
 @begin_and_finish_time_log(task_name="收取日常/周常", calculate_time=False)
 def get_pass_prize():
     loop_count = 15
     auto.model = "clam"
-    while True:
+    for _ in range(_MAX_REWARD_NAVIGATION_ITERATIONS):
         # 自动截图
         wait_for_screenshot()
         if coordinates := auto.find_element(
@@ -46,11 +48,15 @@ def get_pass_prize():
         update_model_for_retry(loop_count, normal_at=10, aggressive_at=5)
         if loop_count < 0:
             log.error("无法收取日常/周常")
-            return
+            return False
+    else:
+        log.error("通行证导航操作次数超限，无法收取日常/周常")
+        return False
+
     auto.click_element("pass/weekly_assets.png")
     loop_count = 15
     auto.model = "clam"
-    while True:
+    for _ in range(_MAX_REWARD_NAVIGATION_ITERATIONS):
         if coordinates := auto.find_element(
             "pass/pass_coin.png",
             find_type="image_with_multiple_targets",
@@ -60,32 +66,35 @@ def get_pass_prize():
                 auto.mouse_click(coordinate[0], coordinate[1])
                 if retry() is False:
                     return False
-            break
+            return True
         loop_count -= 1
         update_model_for_retry(loop_count, normal_at=10, aggressive_at=5)
         if loop_count < 0:
             log.error("无法收取日常/周常")
-            break
+            return False
+
+    log.error("通行证奖励识别次数超限，无法收取日常/周常")
+    return False
 
 
 @begin_and_finish_time_log(task_name="收取邮箱", calculate_time=False)
 def get_mail_prize():
     loop_count = 15
     auto.model = "clam"
-    while True:
+    for _ in range(_MAX_REWARD_NAVIGATION_ITERATIONS):
         # 自动截图
         wait_for_screenshot()
         if retry() is False:
             return False
         if auto.click_element("mail/get_mail_prize_confirm.png"):
             auto.click_element("mail/close_assets.png")
-            break
+            return True
         if auto.click_element("mail/claim_all_assets.png"):
             sleep(3)
             if retry() is False:
                 return False
             auto.click_element("mail/close_assets.png")
-            break
+            return True
         if auto.click_element("home/mail_assets.png"):
             continue
         auto.mouse_to_blank()
@@ -93,4 +102,7 @@ def get_mail_prize():
         update_model_for_retry(loop_count, normal_at=20, aggressive_at=10)
         if loop_count < 0:
             log.error("无法收取邮箱")
-            break
+            return False
+
+    log.error("邮箱导航操作次数超限，无法收取奖励")
+    return False

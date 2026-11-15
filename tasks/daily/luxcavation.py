@@ -5,6 +5,8 @@ from module.config import cfg
 from module.logger import log
 from tasks.base.screenshot import wait_for_screenshot
 
+_MAX_LUXCAVATION_NAVIGATION_ITERATIONS = 31
+
 
 def _prepare_continuous_combat_count(
     combat_count: int,
@@ -51,11 +53,11 @@ def _prepare_continuous_combat_count(
 def EXP_luxcavation(combat_count: int = 1):
     loop_count = 30
     auto.model = "clam"
-    while True:
+    for _ in range(_MAX_LUXCAVATION_NAVIGATION_ITERATIONS):
         # 自动截图
         wait_for_screenshot()
         if auto.find_element("teams/identify_assets.png"):
-            break
+            return True
         if (
             auto.find_element("home/first_prompt_assets.png", model="clam")
             and auto.find_element("home/back_assets.png", model="normal")
@@ -112,7 +114,8 @@ def EXP_luxcavation(combat_count: int = 1):
             auto.click_element("base/renew_confirm_assets.png")
             from tasks.base.back_init_menu import back_init_menu
 
-            back_init_menu()
+            if back_init_menu() is False:
+                return False
             continue
         if auto.click_element("home/drive_assets.png"):
             sleep(0.5)
@@ -126,7 +129,10 @@ def EXP_luxcavation(combat_count: int = 1):
             auto.model = "aggressive"
         if loop_count < 0:
             log.error("无法进入经验本,不能进行下一步,此次经验本无效")
-            break
+            return False
+
+    log.error("经验本导航操作次数超限，此次经验本无效")
+    return False
 
 
 def thread_luxcavation(combat_count: int = 1):
@@ -153,11 +159,11 @@ def thread_luxcavation(combat_count: int = 1):
     loop_count = 30
     continuous_combat_set = False
     auto.model = "clam"
-    while True:
+    for _ in range(_MAX_LUXCAVATION_NAVIGATION_ITERATIONS):
         # 自动截图
         wait_for_screenshot()
         if auto.find_element("teams/identify_assets.png"):
-            break
+            return True
         if (
             auto.find_element("home/first_prompt_assets.png", model="clam")
             and auto.find_element("home/back_assets.png", model="normal")
@@ -252,7 +258,8 @@ def thread_luxcavation(combat_count: int = 1):
             auto.click_element("base/renew_confirm_assets.png")
             from tasks.base.back_init_menu import back_init_menu
 
-            back_init_menu()
+            if back_init_menu() is False:
+                return False
             continue
         if auto.click_element("home/drive_assets.png"):
             sleep(0.5)
@@ -265,4 +272,7 @@ def thread_luxcavation(combat_count: int = 1):
             auto.model = "aggressive"
         if loop_count < 0:
             log.error("无法进入纽本,不能进行下一步,此次纽本无效")
-            break
+            return False
+
+    log.error("纽本导航操作次数超限，此次纽本无效")
+    return False
