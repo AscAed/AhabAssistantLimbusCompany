@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
+from PIL import Image
 
 from module.my_error.my_error import backMainWinError
 from tasks.base import script_task_scheme
@@ -249,7 +250,7 @@ def test_pass_reward_navigation_stops_after_repeated_mission_clicks():
         result = get_pass_prize()
 
     assert result is False
-    assert click_count == 31
+    assert click_count == 1
 
 
 def test_mail_reward_navigation_stops_after_repeated_mail_clicks():
@@ -293,50 +294,95 @@ def test_pass_reward_returns_success_after_daily_and_weekly_claims():
 
 
 def test_pass_reward_returns_success_when_daily_and_weekly_pages_have_no_claims():
-    selected_page = None
+    automation = []
+    screenshots = iter(
+        [
+            Image.new("L", (100, 100), 0),
+            Image.new("L", (100, 100), 80),
+            Image.new("L", (100, 100), 80),
+            Image.new("L", (100, 100), 160),
+            Image.new("L", (100, 100), 160),
+        ]
+    )
+
+    def wait_for_screenshot():
+        automation[0].screenshot = next(screenshots)
 
     def find(target, *args, **kwargs):
         if target == "pass/pass_coin.png":
             return None
-        if target == "pass/pass_missions_assets.png":
-            return selected_page == "daily"
-        if target == "pass/weekly_assets.png":
-            return selected_page in {"daily", "weekly"}
         return False
 
     def click(target, *args, **kwargs):
-        nonlocal selected_page
-        if target == "pass/pass_missions_assets.png":
-            selected_page = "daily"
-            return True
-        if target == "pass/weekly_assets.png":
-            selected_page = "weekly"
-            return True
-        return False
+        return target in {
+            "pass/pass_missions_assets.png",
+            "pass/weekly_assets.png",
+        }
 
-    with patch("tasks.daily.get_prize.wait_for_screenshot"), patch(
+    with patch(
+        "tasks.daily.get_prize.wait_for_screenshot",
+        side_effect=wait_for_screenshot,
+    ), patch(
         "tasks.daily.get_prize.auto"
     ) as mock_auto:
+        automation.append(mock_auto)
         mock_auto.find_element.side_effect = find
         mock_auto.click_element.side_effect = click
 
         assert get_pass_prize() is True
 
 
-def test_pass_reward_does_not_accept_stale_daily_page_as_empty_weekly_page():
+def test_pass_reward_does_not_accept_stale_pass_screen_as_empty_daily_page():
+    automation = []
+    screenshots = iter([Image.new("L", (100, 100), 0)] * 31)
+
+    def wait_for_screenshot():
+        automation[0].screenshot = next(screenshots)
+
     def find(target, *args, **kwargs):
-        if target == "pass/pass_coin.png":
-            return None
+        return None
+
+    with patch(
+        "tasks.daily.get_prize.wait_for_screenshot",
+        side_effect=wait_for_screenshot,
+    ), patch(
+        "tasks.daily.get_prize.auto"
+    ) as mock_auto:
+        automation.append(mock_auto)
+        mock_auto.find_element.side_effect = find
+        mock_auto.click_element.return_value = True
+
+        assert get_pass_prize() is False
+        mock_auto.click_element.assert_called_once_with("pass/pass_missions_assets.png")
+
+
+def test_pass_reward_does_not_accept_stale_weekly_page_as_empty_weekly_page():
+    automation = []
+    initial_frame = Image.new("L", (100, 100), 0)
+    daily_frame = Image.new("L", (100, 100), 80)
+    screenshots = iter([initial_frame, daily_frame, daily_frame] + [daily_frame] * 31)
+
+    def wait_for_screenshot():
+        automation[0].screenshot = next(screenshots)
+
+    def find(target, *args, **kwargs):
+        return None
+
+    def click(target, *args, **kwargs):
         return target in {
             "pass/pass_missions_assets.png",
             "pass/weekly_assets.png",
         }
 
-    with patch("tasks.daily.get_prize.wait_for_screenshot"), patch(
+    with patch(
+        "tasks.daily.get_prize.wait_for_screenshot",
+        side_effect=wait_for_screenshot,
+    ), patch(
         "tasks.daily.get_prize.auto"
     ) as mock_auto:
+        automation.append(mock_auto)
         mock_auto.find_element.side_effect = find
-        mock_auto.click_element.return_value = True
+        mock_auto.click_element.side_effect = click
 
         assert get_pass_prize() is False
 
