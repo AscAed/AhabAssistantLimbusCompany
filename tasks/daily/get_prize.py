@@ -76,7 +76,13 @@ def get_pass_prize():
                 if retry() is False:
                     return False
             return True
-        if auto.find_element("pass/weekly_assets.png", take_screenshot=False):
+        weekly_page_selected = auto.find_element(
+            "pass/weekly_assets.png", take_screenshot=False
+        )
+        daily_page_selected = auto.find_element(
+            "pass/pass_missions_assets.png", take_screenshot=False
+        )
+        if weekly_page_selected and not daily_page_selected:
             log.info("通行证周常页面已确认，没有可领取的周常奖励")
             return True
 

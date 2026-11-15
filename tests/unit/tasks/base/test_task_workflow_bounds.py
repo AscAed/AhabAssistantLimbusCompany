@@ -293,15 +293,40 @@ def test_pass_reward_returns_success_after_daily_and_weekly_claims():
 
 
 def test_pass_reward_returns_success_when_daily_and_weekly_pages_have_no_claims():
+    selected_page = None
+
     def find(target, *args, **kwargs):
         if target == "pass/pass_coin.png":
             return None
-        return target in {
-            "pass/pass_missions_assets.png",
-            "pass/weekly_assets.png",
-        }
+        if target == "pass/pass_missions_assets.png":
+            return selected_page == "daily"
+        if target == "pass/weekly_assets.png":
+            return selected_page in {"daily", "weekly"}
+        return False
 
     def click(target, *args, **kwargs):
+        nonlocal selected_page
+        if target == "pass/pass_missions_assets.png":
+            selected_page = "daily"
+            return True
+        if target == "pass/weekly_assets.png":
+            selected_page = "weekly"
+            return True
+        return False
+
+    with patch("tasks.daily.get_prize.wait_for_screenshot"), patch(
+        "tasks.daily.get_prize.auto"
+    ) as mock_auto:
+        mock_auto.find_element.side_effect = find
+        mock_auto.click_element.side_effect = click
+
+        assert get_pass_prize() is True
+
+
+def test_pass_reward_does_not_accept_stale_daily_page_as_empty_weekly_page():
+    def find(target, *args, **kwargs):
+        if target == "pass/pass_coin.png":
+            return None
         return target in {
             "pass/pass_missions_assets.png",
             "pass/weekly_assets.png",
@@ -311,9 +336,9 @@ def test_pass_reward_returns_success_when_daily_and_weekly_pages_have_no_claims(
         "tasks.daily.get_prize.auto"
     ) as mock_auto:
         mock_auto.find_element.side_effect = find
-        mock_auto.click_element.side_effect = click
+        mock_auto.click_element.return_value = True
 
-        assert get_pass_prize() is True
+        assert get_pass_prize() is False
 
 
 def test_mail_reward_returns_success_after_confirmation():
