@@ -2,6 +2,7 @@
 
 ## Identity
 
+- **Current checkout (2026-11-15):** `main` is at `d59a3e5140bcdfde22efa41027577363637ce69a` (PR #139 merge). The exact reviewed PR head tree was independently checked against its CI package; see the [implementation handoff](audits/2026-11-14-implementation-handoff.md). Package inspection does not qualify startup or deployment because neither executable was launched.
 - Project: AhabAssistantLimbusCompany (AALC), a Windows desktop automation application for Limbus Company.
 - This checkout is a maintenance fork. It is a stability and diagnostics project, not a general game AI or a proof of optimal play.
 - Documentation assessment on 2026-11-14 inspected `main` at `d6c481df` (PR #128 merge). A complete tracked-tree diff from the previously tested `4fdb201` snapshot lists only four documentation files; this comparison does not rerun tests, establish environment equivalence, or identify an installed build. See the [current stage assessment](audits/2026-11-14-stage-assessment.md).
