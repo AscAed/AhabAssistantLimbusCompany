@@ -11,6 +11,98 @@ from tasks.mirror.mirror import (
 )
 
 
+@pytest.mark.parametrize("retry_result", [None, False])
+def test_network_recovery_does_not_restart_game_again(retry_result):
+    with (
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.base.retry.retry", return_value=retry_result) as mock_retry,
+        patch("tasks.base.retry.kill_game") as mock_kill_game,
+        patch("tasks.base.retry.restart_game") as mock_restart_game,
+        patch("utils.utils.check_game_running", return_value=True),
+    ):
+        mock_auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            target == "base/connecting_assets.png"
+        )
+        mirror = object.__new__(Mirror)
+        mirror.road_to_mir = lambda: pytest.fail(
+            "network recovery should return to the outer state loop"
+        )
+
+        assert mirror.check_and_recover_process() is True
+
+    mock_retry.assert_called_once_with()
+    mock_kill_game.assert_not_called()
+    mock_restart_game.assert_not_called()
+
+
+def test_mirror_run_starts_fresh_road_map_cycle_after_restart():
+    screenshot_count = 0
+    floor_checks = 0
+
+    def wait_for_screenshot():
+        nonlocal screenshot_count
+        screenshot_count += 1
+        if screenshot_count == 3:
+            raise RuntimeError("fresh state cycle reached")
+
+    def get_which_floor():
+        nonlocal floor_checks
+        floor_checks += 1
+
+    with (
+        patch(
+            "tasks.mirror.mirror.wait_for_screenshot",
+            side_effect=wait_for_screenshot,
+        ),
+        patch("tasks.mirror.mirror.retry", side_effect=[None, False]),
+        patch("tasks.mirror.mirror.PageStateDispatcher") as dispatcher_type,
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.mirror.mirror.cfg") as mock_cfg,
+    ):
+        dispatcher_type.return_value.detect_state.return_value = GameState.ROAD_MAP
+        mock_cfg.floor_3_exit = False
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.return_value = False
+        mirror = object.__new__(Mirror)
+        mirror.LOOP_COUNT = 250
+        mirror.check_and_recover_process = lambda: False
+        mirror.floor = 0
+        mirror.get_floor_num = True
+        mirror.get_which_floor = get_which_floor
+
+        with pytest.raises(RuntimeError, match="fresh state cycle reached"):
+            mirror.run()
+
+    assert screenshot_count == 3
+    assert floor_checks == 0
+
+
+def test_mirror_run_skips_retry_fallback_actions_after_restart():
+    with (
+        patch("tasks.mirror.mirror.wait_for_screenshot") as mock_wait,
+        patch(
+            "tasks.mirror.mirror.retry",
+            side_effect=[None, False, RuntimeError("fresh state cycle reached")],
+        ),
+        patch("tasks.mirror.mirror.PageStateDispatcher") as dispatcher_type,
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.mirror.mirror.cfg") as mock_cfg,
+    ):
+        dispatcher_type.return_value.detect_state.return_value = GameState.UNKNOWN
+        mock_cfg.floor_3_exit = False
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.return_value = False
+        mirror = object.__new__(Mirror)
+        mirror.LOOP_COUNT = 75
+        mirror.check_and_recover_process = lambda: False
+
+        with pytest.raises(RuntimeError, match="fresh state cycle reached"):
+            mirror.run()
+
+    assert mock_wait.call_count == 2
+    mock_auto.mouse_to_blank.assert_not_called()
+
+
 @patch("tasks.mirror.mirror.sleep", return_value=None)
 @patch("tasks.mirror.mirror.wait_for_screenshot", return_value=None)
 @patch("tasks.mirror.mirror.auto")
@@ -736,6 +828,76 @@ def test_event_handling_caps_repeated_continue_clicks(transition_after_limit):
     assert mirror.event_times == 1
 
 
+@pytest.mark.parametrize(
+    ("restart_iteration", "expected_unknown_event_clicks"),
+    [(10, 9), (13, 12)],
+)
+def test_event_handling_stops_after_retry_restarts_game(
+    restart_iteration, expected_unknown_event_clicks
+):
+    screenshot_count = 0
+    retry_count = 0
+    unknown_event_clicks = 0
+
+    def wait_for_screenshot():
+        nonlocal screenshot_count
+        screenshot_count += 1
+
+    def retry_game():
+        nonlocal retry_count
+        retry_count += 1
+        return retry_count != restart_iteration + 1
+
+    def find_element(target, *args, **kwargs):
+        if target == "event/select_first_option_assets.png":
+            if kwargs.get("find_type") == "image_with_multiple_targets":
+                if screenshot_count == restart_iteration:
+                    return [(10, 20), (30, 40)]
+                return None
+            if restart_iteration == 13 and screenshot_count == 12:
+                return True
+        if target == "event/choices_assets.png":
+            return restart_iteration == 13 and screenshot_count == 12
+        return False
+
+    def click_element(target, *args, **kwargs):
+        nonlocal unknown_event_clicks
+        if target == "event/unknown_event.png":
+            unknown_event_clicks += 1
+            return unknown_event_clicks <= 10
+        return False
+
+    with (
+        patch(
+            "tasks.mirror.mirror.wait_for_screenshot",
+            side_effect=wait_for_screenshot,
+        ),
+        patch("tasks.mirror.mirror.retry", side_effect=retry_game),
+        patch("tasks.mirror.mirror.back_init_menu"),
+        patch("tasks.mirror.mirror.ImageUtils") as mock_image_utils,
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+    ):
+        mock_auto.find_element.side_effect = find_element
+        mock_auto.click_element.side_effect = click_element
+        mock_auto.find_language_text.return_value = False
+        mock_auto.find_text_element.return_value = False
+        mock_image_utils.get_bbox.return_value = (0, 0, 100, 100)
+        mock_image_utils.load_image.return_value = object()
+        mirror = object.__new__(Mirror)
+        mirror.event_total_time = 0
+        mirror.event_times = 0
+
+        assert mirror.event_handling() is False
+
+    assert screenshot_count == restart_iteration
+    assert retry_count == restart_iteration + 1
+    assert unknown_event_clicks == expected_unknown_event_clicks
+    assert mock_auto.mouse_click.call_args_list == [
+        ((10, 20), {}),
+        ((30, 40), {}),
+    ]
+
+
 def test_observe_gift_selection_skips_invalid_config_values():
     with (
         patch("tasks.mirror.mirror.auto") as mock_auto,
@@ -809,6 +971,130 @@ def test_road_reward_collection_bounds_repeated_confirm_clicks():
 
     assert wait.call_count == 31
     assert sum(call.args[0] == confirm_asset for call in mock_auto.click_element.call_args_list) == 31
+
+
+def test_road_reward_collection_returns_after_retry_restarts_game():
+    with (
+        patch("tasks.mirror.mirror.wait_for_screenshot") as mock_wait,
+        patch("tasks.mirror.mirror.retry", return_value=False),
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.mirror.mirror.cfg") as mock_cfg,
+    ):
+        mock_cfg.no_weekly_bonuses = False
+        mock_cfg.hard_mirror_single_bonuses = False
+        mock_auto.click_element.return_value = False
+        mirror = object.__new__(Mirror)
+        mirror.hard_switch = False
+
+        assert mirror.get_reward_in_road() is False
+
+    mock_wait.assert_called_once_with()
+
+
+def test_mirror_run_propagates_previous_reward_restart():
+    with (
+        patch("tasks.mirror.mirror.wait_for_screenshot"),
+        patch("tasks.mirror.mirror.retry", return_value=None),
+        patch("tasks.mirror.mirror.PageStateDispatcher") as dispatcher_type,
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.mirror.mirror.cfg") as mock_cfg,
+    ):
+        dispatcher_type.return_value.detect_state.return_value = GameState.CLAIM_REWARD
+        mock_cfg.floor_3_exit = False
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            target
+            in {
+                "mirror/claim_reward/claim_rewards_assets.png",
+                "mirror/claim_reward/complete_mirror_100%_assets.png",
+            }
+        )
+        mirror = object.__new__(Mirror)
+        mirror.LOOP_COUNT = 250
+        mirror.check_and_recover_process = lambda: False
+        mirror.floor = 0
+        mirror.bequest_from_the_previous_game = True
+        mirror.get_reward_in_road = lambda: False
+
+        assert mirror.run() is False
+
+
+def test_mirror_run_stops_reward_loop_after_retry_restarts_game():
+    complete_asset = "mirror/claim_reward/complete_mirror_100%_assets.png"
+    with (
+        patch("tasks.mirror.mirror.wait_for_screenshot") as mock_wait,
+        patch("tasks.mirror.mirror.retry", side_effect=[None, False]),
+        patch("tasks.mirror.mirror.PageStateDispatcher") as dispatcher_type,
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.mirror.mirror.cfg") as mock_cfg,
+    ):
+        dispatcher_type.return_value.detect_state.return_value = GameState.CLAIM_REWARD
+        mock_cfg.floor_3_exit = False
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            target
+            in {
+                "mirror/claim_reward/claim_rewards_assets.png",
+                complete_asset,
+            }
+        )
+        mirror = object.__new__(Mirror)
+        mirror.LOOP_COUNT = 250
+        mirror.check_and_recover_process = lambda: False
+        mirror.floor = 0
+        mirror.bequest_from_the_previous_game = False
+        mirror.hard_switch = False
+        mirror.pass_coins = None
+
+        assert mirror.run() is False
+
+    assert mock_wait.call_count == 2
+    mock_auto.mouse_to_blank.assert_not_called()
+
+
+def test_mirror_run_stops_after_reward_action_retry_restarts_game():
+    complete_asset = "mirror/claim_reward/complete_mirror_100%_assets.png"
+    with (
+        patch("tasks.mirror.mirror.wait_for_screenshot") as mock_wait,
+        patch(
+            "tasks.mirror.mirror.retry",
+            side_effect=[None, False, RuntimeError("unexpected reward retry")],
+        ),
+        patch("tasks.mirror.mirror.PageStateDispatcher") as dispatcher_type,
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.mirror.mirror.cfg") as mock_cfg,
+        patch("tasks.mirror.mirror.ImageUtils") as mock_image_utils,
+        patch("tasks.mirror.mirror.ocr") as mock_ocr,
+    ):
+        dispatcher_type.return_value.detect_state.return_value = GameState.CLAIM_REWARD
+        mock_cfg.floor_3_exit = False
+        mock_cfg.save_rewards = False
+        mock_cfg.no_weekly_bonuses = False
+        mock_cfg.hard_mirror_single_bonuses = False
+        mock_auto.click_element.side_effect = lambda target, *args, **kwargs: (
+            target == "mirror/claim_reward/claim_rewards_assets.png"
+        )
+        mock_auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            target
+            in {
+                "mirror/claim_reward/claim_rewards_assets.png",
+                complete_asset,
+            }
+        )
+        mock_auto.take_screenshot.return_value = object()
+        mock_ocr.run.return_value.txts = []
+        mock_image_utils.crop.return_value = object()
+        mirror = object.__new__(Mirror)
+        mirror.LOOP_COUNT = 250
+        mirror.check_and_recover_process = lambda: False
+        mirror.floor = 0
+        mirror.bequest_from_the_previous_game = False
+        mirror.hard_switch = False
+        mirror.pass_coins = 1
+
+        assert mirror.run() is False
+
+    assert mock_wait.call_count == 2
 
 
 @patch("tasks.mirror.reward_card.wait_for_screenshot", side_effect=RuntimeError("capture timeout"))

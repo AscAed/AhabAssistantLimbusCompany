@@ -56,3 +56,22 @@ def test_pass_prizes_stop_after_retry_restarts_game(
 
     mock_auto.mouse_click.assert_called_once_with(10, 20)
     mock_auto.click_element.assert_not_called()
+
+
+@patch("tasks.daily.get_prize.sleep", return_value=None)
+@patch("tasks.daily.get_prize.retry", side_effect=[None, False])
+@patch("tasks.daily.get_prize.wait_for_screenshot")
+@patch("tasks.daily.get_prize.auto")
+def test_mail_prizes_stop_after_retry_restarts_game(
+    mock_auto, _wait_for_screenshot, _retry, _sleep
+):
+    mock_auto.click_element.side_effect = lambda target, *args, **kwargs: (
+        target == "mail/claim_all_assets.png"
+    )
+
+    assert get_mail_prize() is False
+
+    assert mock_auto.click_element.call_args_list == [
+        (("mail/get_mail_prize_confirm.png",), {}),
+        (("mail/claim_all_assets.png",), {}),
+    ]
