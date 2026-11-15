@@ -157,7 +157,15 @@ class TaskEngine:
                     log.warning("==> 任务引擎：尝试进行故障恢复并返回主页面...")
                     try:
                         from tasks.base.back_init_menu import back_init_menu
-                        back_init_menu(allow_restart=False)
+                        recovery_succeeded = back_init_menu(allow_restart=False)
+                        if recovery_succeeded is False:
+                            task.recovery_error = RuntimeError(
+                                "任务失败后的局部恢复未能返回主界面"
+                            )
+                            log.error(
+                                "==> 任务引擎：任务 [%s] 故障恢复返回失败",
+                                task.name,
+                            )
                     except Exception as recovery_exc:
                         task.recovery_error = recovery_exc
                         log.exception(

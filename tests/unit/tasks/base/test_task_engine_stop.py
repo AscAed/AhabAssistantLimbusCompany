@@ -113,6 +113,28 @@ def test_task_engine_records_recovery_failure_without_masking_task_error():
     assert task.recovery_error is recovery_error
 
 
+def test_task_engine_records_false_recovery_result_without_masking_task_error():
+    class FailedTask(Task):
+        def run(self, _engine):
+            raise ValueError("task failure")
+
+    engine = TaskEngine()
+    task = FailedTask("failure", ["MAIN_MENU"])
+    engine.add_task(task)
+    engine.dispatcher.detect_state = lambda: "MAIN_MENU"
+
+    with patch(
+        "tasks.base.back_init_menu.back_init_menu", return_value=False
+    ) as recover:
+        with pytest.raises(ValueError, match="task failure"):
+            engine.run()
+
+    recover.assert_called_once_with(allow_restart=False)
+    assert task.error.args == ("task failure",)
+    assert isinstance(task.recovery_error, RuntimeError)
+    assert "返回主界面" in str(task.recovery_error)
+
+
 def test_task_engine_stops_after_task_returns_failure():
     ran = []
 

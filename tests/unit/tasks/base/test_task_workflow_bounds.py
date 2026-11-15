@@ -205,6 +205,23 @@ def test_maintenance_recovery_stops_after_three_restart_attempts():
     assert init_game.call_count == 3
 
 
+def test_maintenance_recovery_without_restart_does_not_kill_game():
+    with patch("tasks.base.back_init_menu.auto") as mock_auto, patch(
+        "tasks.base.back_init_menu.ensure_simulator_game_started",
+        return_value=False,
+    ), patch("tasks.base.back_init_menu.retry", return_value=None), patch(
+        "tasks.base.back_init_menu.update_model_for_retry"
+    ), patch("tasks.base.retry.kill_game") as kill_game:
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            target == "base/notification_close_assets.png"
+        )
+
+        assert back_init_menu(allow_restart=False) is False
+
+    kill_game.assert_not_called()
+
+
 def test_restart_game_uses_non_restarting_menu_recovery():
     with patch("tasks.base.script_task_scheme.init_game"), patch(
         "tasks.base.retry.sleep"

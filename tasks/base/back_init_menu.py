@@ -57,6 +57,9 @@ def back_init_menu(*, allow_restart: bool = True):
             from tasks.base.retry import kill_game, restart_game
             from utils.utils import get_day_of_week
 
+            if not allow_restart:
+                log.warning("检测到维护提示且本次调用禁用内部重启，返回失败")
+                return False
             if allow_restart and restart_count >= MAX_RESTART_ATTEMPTS:
                 log.error("检测到维护提示，已达到最大重启次数")
                 return False
@@ -77,9 +80,6 @@ def back_init_menu(*, allow_restart: bool = True):
                     msg = f"当前时间为Limbus周常维护时间，距离正常维护时间结束还有{total_seconds}秒，脚本程序将暂停同样时间"
                     log.info(msg)
                     auto.sleep_with_stop_check(total_seconds)
-            if not allow_restart:
-                log.warning("检测到维护提示且本次调用禁用内部重启，返回失败")
-                return False
             restart_game(recover_menu=False)
             restart_count += 1
             loop_count = LOOP_COUNT
