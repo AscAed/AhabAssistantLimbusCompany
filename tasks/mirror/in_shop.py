@@ -888,7 +888,8 @@ class Shop:
                         auto.mouse_click_blank(times=3)
                         return
                 else:
-                    retry()
+                    if retry() is False:
+                        raise self.RestartGame()
                     chance -= 1
 
                 auto.mouse_to_blank()

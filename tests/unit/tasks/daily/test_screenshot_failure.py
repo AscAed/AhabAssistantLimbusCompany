@@ -42,3 +42,17 @@ def test_daily_task_stops_when_screenshot_wait_fails(task, waiter_path, auto_pat
     waiter.assert_called_once_with()
     mock_auto.find_element.assert_not_called()
     mock_auto.click_element.assert_not_called()
+
+
+@patch("tasks.daily.get_prize.retry", return_value=False)
+@patch("tasks.daily.get_prize.wait_for_screenshot")
+@patch("tasks.daily.get_prize.auto")
+def test_pass_prizes_stop_after_retry_restarts_game(
+    mock_auto, _wait_for_screenshot, _retry
+):
+    mock_auto.find_element.return_value = [(10, 20), (30, 40)]
+
+    assert get_pass_prize() is False
+
+    mock_auto.mouse_click.assert_called_once_with(10, 20)
+    mock_auto.click_element.assert_not_called()
