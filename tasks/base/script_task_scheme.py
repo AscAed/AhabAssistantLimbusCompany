@@ -115,7 +115,14 @@ def onetime_mir_process(team_setting: TeamSetting, team_num: int):
         if mirror_adventure.run():
             del mirror_adventure
             mirror_adventure = None
-            if back_init_menu() is False:
+            try:
+                recovered = back_init_menu()
+            except userStopError:
+                raise
+            except Exception as e:
+                log.exception(f"镜牢已完成，但返回主界面时出错: {e}")
+                return MirrorRunOutcome.COMPLETED_RECOVERY_FAILED
+            if recovered is False:
                 return MirrorRunOutcome.COMPLETED_RECOVERY_FAILED
             make_enkephalin_module()
             return True

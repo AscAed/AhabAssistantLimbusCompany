@@ -42,7 +42,7 @@ def back_init_menu(*, allow_restart: bool = True):
             continue
         if ensure_simulator_game_started():
             continue
-        if retry() is False:
+        if retry(allow_restart=allow_restart) is False:
             return False
 
         if auto.click_element("home/window_assets.png") and auto.find_element(

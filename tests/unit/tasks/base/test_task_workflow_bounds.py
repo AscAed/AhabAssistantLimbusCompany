@@ -35,6 +35,66 @@ def _mirror_task_config(mirror_count=1, re_claim_rewards=False):
     )
 
 
+def _run_luxcavation_on_final_navigation_iteration(task_kind, final_signal):
+    iteration = 0
+
+    def wait_for_screenshot():
+        nonlocal iteration
+        iteration += 1
+
+    def find(target, *args, **kwargs):
+        if target == "teams/identify_assets.png":
+            return iteration == 31 and kwargs.get("take_screenshot") is False and (
+                final_signal == "team"
+            )
+        if target == "home/first_prompt_assets.png":
+            return iteration == 31 and kwargs.get("take_screenshot") is False and (
+                final_signal == "prompt"
+            )
+        if task_kind == "exp" and target == "luxcavation/exp_enter.png":
+            if kwargs.get("find_type") == "image_with_multiple_targets":
+                return [(1200, 500)]
+            return iteration == 31
+        if task_kind == "thread" and target == "luxcavation/thread_consume.png":
+            if kwargs.get("find_type") == "image_with_multiple_targets":
+                return [(1200, 900)]
+            if kwargs.get("take_screenshot") is True:
+                return (1200, 900)
+        return False
+
+    def click(target, *args, **kwargs):
+        if task_kind == "exp":
+            if target == "home/luxcavation_assets.png":
+                return iteration < 31
+            if target == "luxcavation/exp_enter.png" and kwargs.get("click") is False:
+                return (1200, 500) if iteration == 31 else None
+        else:
+            if target == "luxcavation/thread_assets.png":
+                return iteration < 31
+            if (
+                target == "luxcavation/thread_enter_assets.png"
+                and kwargs.get("click") is False
+            ):
+                return (1200, 500) if iteration == 31 else None
+        return False
+
+    task = EXP_luxcavation if task_kind == "exp" else thread_luxcavation
+    with patch(
+        "tasks.daily.luxcavation.wait_for_screenshot",
+        side_effect=wait_for_screenshot,
+    ), patch(
+        "tasks.daily.luxcavation.sleep"
+    ), patch(
+        "tasks.daily.luxcavation.cfg",
+        SimpleNamespace(set_win_size=1920),
+    ), patch(
+        "tasks.daily.luxcavation.auto"
+    ) as mock_auto:
+        mock_auto.find_element.side_effect = find
+        mock_auto.click_element.side_effect = click
+        return task()
+
+
 def test_mirror_task_stops_after_three_consecutive_dungeon_failures():
     cfg = _mirror_task_config()
     mediator = SimpleNamespace(
@@ -157,6 +217,25 @@ def test_onetime_mirror_process_preserves_main_menu_recovery_error():
             script_task_scheme.onetime_mir_process(SimpleNamespace(), 1)
 
 
+@pytest.mark.parametrize("error_type", [RuntimeError, backMainWinError])
+def test_onetime_mirror_process_counts_run_when_menu_recovery_raises(error_type):
+    with patch.object(
+        script_task_scheme,
+        "cfg",
+        SimpleNamespace(auto_hard_mirror=False),
+    ), patch.object(script_task_scheme, "Mirror") as mirror, patch.object(
+        script_task_scheme,
+        "back_init_menu",
+        side_effect=error_type("menu recovery failed"),
+    ), patch.object(script_task_scheme, "make_enkephalin_module") as make_enkephalin:
+        mirror.return_value.run.return_value = True
+
+        result = script_task_scheme.onetime_mir_process(SimpleNamespace(), 1)
+
+    assert result is script_task_scheme.MirrorRunOutcome.COMPLETED_RECOVERY_FAILED
+    make_enkephalin.assert_not_called()
+
+
 def test_mirror_task_failure_reaches_task_engine_contract():
     engine = SimpleNamespace(thread=None)
     with patch(
@@ -235,6 +314,39 @@ def test_restart_game_uses_non_restarting_menu_recovery():
         assert restart_game() is False
 
     recover_menu.assert_called_once_with(allow_restart=False)
+
+
+def test_non_restarting_menu_recovery_does_not_restart_after_loading_timeout():
+    with patch(
+        "tasks.base.back_init_menu.ensure_simulator_game_started",
+        return_value=False,
+    ), patch(
+        "tasks.base.back_init_menu.update_model_for_retry"
+    ), patch(
+        "tasks.base.retry.cfg",
+        SimpleNamespace(simulator=False, config=SimpleNamespace(simulator=True)),
+    ), patch(
+        "tasks.base.retry.auto"
+    ) as mock_auto, patch(
+        "tasks.base.retry.is_game_loading",
+        return_value=True,
+    ), patch(
+        "tasks.base.retry.LOADING_SCREEN_TIMEOUT",
+        0,
+    ), patch(
+        "tasks.base.retry._loading_started_at",
+        None,
+    ), patch(
+        "tasks.base.retry.kill_game"
+    ) as kill_game, patch(
+        "tasks.base.retry.restart_game"
+    ) as restart:
+        mock_auto.get_restore_time.return_value = None
+
+        assert back_init_menu(allow_restart=False) is False
+
+    kill_game.assert_not_called()
+    restart.assert_not_called()
 
 
 def test_main_menu_recovery_returns_after_successful_navigation():
@@ -616,6 +728,21 @@ def test_thread_dungeon_navigation_returns_on_team_screen():
         )
 
         assert thread_luxcavation() is True
+
+
+@pytest.mark.parametrize(
+    ("task_kind", "expected"),
+    [("exp", True), ("thread", True)],
+)
+def test_luxcavation_confirms_team_screen_on_final_navigation_iteration(
+    task_kind, expected
+):
+    assert _run_luxcavation_on_final_navigation_iteration(task_kind, "team") is expected
+
+
+@pytest.mark.parametrize("task_kind", ["exp", "thread"])
+def test_luxcavation_prompt_does_not_confirm_team_screen_on_final_iteration(task_kind):
+    assert _run_luxcavation_on_final_navigation_iteration(task_kind, "prompt") is False
 
 
 def test_reward_wrapper_stops_after_pass_claim_failure():
