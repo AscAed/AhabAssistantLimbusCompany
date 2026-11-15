@@ -125,6 +125,8 @@ def onetime_mir_process(team_setting: TeamSetting, team_num: int):
         raise
     except unableToFindTeamError:
         raise
+    except backMainWinError:
+        raise
     except Exception as e:
         log.exception(f"镜牢行动出错: {e}")
         return False
@@ -378,7 +380,12 @@ def Mirror_task(thread=None):
                 cfg.rotate_team_queue()
                 continue
         # 执行一次镜牢任务，根据执行结果进行处理
-        mirror_result = onetime_mir_process(team_setting, team_num)
+        try:
+            mirror_result = onetime_mir_process(team_setting, team_num)
+        except backMainWinError:
+            log.exception("镜牢无法恢复到主界面，停止后续镜牢任务")
+            failed = True
+            break
         recovery_failed = (
             mirror_result is MirrorRunOutcome.COMPLETED_RECOVERY_FAILED
         )

@@ -1,6 +1,9 @@
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
+import pytest
+
+from module.my_error.my_error import backMainWinError
 from tasks.base import script_task_scheme
 from tasks.base.back_init_menu import back_init_menu
 from tasks.base.retry import restart_game
@@ -116,6 +119,37 @@ def test_mirror_task_counts_completed_run_when_menu_recovery_fails():
     ]
     cfg.set_value.assert_called_once_with("hard_mirror_chance", 1)
     mediator.mirror_bar_kill_signal.emit.assert_called_once_with()
+
+
+def test_mirror_task_stops_after_main_menu_recovery_error():
+    cfg = _mirror_task_config(mirror_count=2)
+    mediator = SimpleNamespace(
+        mirror_signal=SimpleNamespace(emit=Mock()),
+        mirror_bar_kill_signal=SimpleNamespace(emit=Mock()),
+    )
+    with patch.object(script_task_scheme, "cfg", cfg), patch.object(
+        script_task_scheme, "mediator", mediator
+    ), patch.object(
+        script_task_scheme,
+        "onetime_mir_process",
+        side_effect=backMainWinError("无法恢复到主界面"),
+    ) as run_once:
+        assert script_task_scheme.Mirror_task() is False
+
+    run_once.assert_called_once()
+    mediator.mirror_bar_kill_signal.emit.assert_called_once_with()
+
+
+def test_onetime_mirror_process_preserves_main_menu_recovery_error():
+    with patch.object(
+        script_task_scheme,
+        "cfg",
+        SimpleNamespace(auto_hard_mirror=False),
+    ), patch.object(script_task_scheme, "Mirror") as mirror:
+        mirror.return_value.run.side_effect = backMainWinError("无法恢复到主界面")
+
+        with pytest.raises(backMainWinError, match="无法恢复到主界面"):
+            script_task_scheme.onetime_mir_process(SimpleNamespace(), 1)
 
 
 def test_mirror_task_failure_reaches_task_engine_contract():

@@ -1,8 +1,8 @@
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
-from module.my_error.my_error import cannotOperateGameError
+from module.my_error.my_error import backMainWinError, cannotOperateGameError
 from tasks.mirror.mirror import (
     _MAX_EMPTY_SINNER_RECOVERIES,
     _MAX_SETUP_ITERATIONS,
@@ -33,6 +33,39 @@ def test_network_recovery_does_not_restart_game_again(retry_result):
     mock_retry.assert_called_once_with()
     mock_kill_game.assert_not_called()
     mock_restart_game.assert_not_called()
+
+
+def test_process_recovery_stops_when_restart_cannot_reach_main_menu():
+    with (
+        patch("tasks.base.retry.kill_game") as mock_kill_game,
+        patch("tasks.base.retry.restart_game", return_value=False) as mock_restart_game,
+        patch("utils.utils.check_game_running", return_value=False),
+    ):
+        mirror = object.__new__(Mirror)
+        mirror.road_to_mir = lambda: pytest.fail(
+            "mirror navigation must stop after failed process recovery"
+        )
+
+        with pytest.raises(backMainWinError, match="无法恢复到主界面"):
+            mirror.check_and_recover_process()
+
+    mock_kill_game.assert_called_once_with()
+    mock_restart_game.assert_called_once_with()
+
+
+def test_process_recovery_resumes_mirror_route_after_successful_restart():
+    with (
+        patch("tasks.base.retry.kill_game") as mock_kill_game,
+        patch("tasks.base.retry.restart_game", return_value=True) as mock_restart_game,
+        patch("utils.utils.check_game_running", return_value=False),
+    ):
+        mirror = object.__new__(Mirror)
+        mirror.road_to_mir = Mock()
+        assert mirror.check_and_recover_process() is True
+
+    mock_kill_game.assert_called_once_with()
+    mock_restart_game.assert_called_once_with()
+    mirror.road_to_mir.assert_called_once_with()
 
 
 def test_mirror_run_starts_fresh_road_map_cycle_after_restart():

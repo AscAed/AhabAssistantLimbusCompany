@@ -222,7 +222,8 @@ class Mirror:
         if not check_game_running():
             log.warning("Game crash detected! Attempting process restart and state recovery.")
             kill_game()
-            restart_game()
+            if restart_game() is False:
+                raise backMainWinError("镜牢游戏重启后无法恢复到主界面，停止镜牢任务")
             self.road_to_mir()
             return True
 
