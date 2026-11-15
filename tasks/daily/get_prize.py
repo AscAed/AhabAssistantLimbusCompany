@@ -11,19 +11,32 @@ from tasks.base.screenshot import wait_for_screenshot
 from utils.image_utils import ImageUtils
 
 _MAX_REWARD_NAVIGATION_ITERATIONS = 31
-# Tab templates remain visible during navigation; confirm a material frame change.
+# Pass task categories change the list pane without a full-screen transition.
+_MISSION_LIST_REGION = (0.26, 0.26, 0.56, 0.88)
 _MIN_SCREEN_CHANGE_RATIO = 0.005
 _SCREEN_CHANGE_PIXEL_DELTA = 16
 _SCREEN_CHANGE_CONFIRMATIONS = 2
 
 
-def _has_meaningful_screen_change(before, after):
+def _has_meaningful_mission_list_change(before, after):
     if not isinstance(before, Image.Image) or not isinstance(after, Image.Image):
         return False
     if before.size != after.size:
         return False
 
-    difference = ImageChops.difference(before.convert("L"), after.convert("L"))
+    width, height = before.size
+    left, top, right, bottom = (
+        round(width * _MISSION_LIST_REGION[0]),
+        round(height * _MISSION_LIST_REGION[1]),
+        round(width * _MISSION_LIST_REGION[2]),
+        round(height * _MISSION_LIST_REGION[3]),
+    )
+    if right <= left or bottom <= top:
+        return False
+
+    before_list = before.crop((left, top, right, bottom)).convert("L")
+    after_list = after.crop((left, top, right, bottom)).convert("L")
+    difference = ImageChops.difference(before_list, after_list)
     histogram = difference.histogram()
     changed_pixels = sum(histogram[_SCREEN_CHANGE_PIXEL_DELTA:])
     minimum_changed_pixels = int(
@@ -50,7 +63,7 @@ def get_pass_prize():
                     return False
             break
         if mission_page_before_click is not None:
-            if _has_meaningful_screen_change(
+            if _has_meaningful_mission_list_change(
                 mission_page_before_click, auto.screenshot
             ):
                 mission_page_changed_frames += 1
@@ -106,7 +119,9 @@ def get_pass_prize():
                 if retry() is False:
                     return False
             return True
-        if _has_meaningful_screen_change(weekly_page_before_click, auto.screenshot):
+        if _has_meaningful_mission_list_change(
+            weekly_page_before_click, auto.screenshot
+        ):
             weekly_page_changed_frames += 1
         else:
             weekly_page_changed_frames = 0

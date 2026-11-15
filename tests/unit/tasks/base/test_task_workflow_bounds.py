@@ -2,14 +2,18 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from module.my_error.my_error import backMainWinError
 from tasks.base import script_task_scheme
 from tasks.base.back_init_menu import back_init_menu
 from tasks.base.retry import restart_game
 from tasks.base.task_engine import BuyEnkephalinTask, GetRewardTask, MirrorDungeonTask
-from tasks.daily.get_prize import get_mail_prize, get_pass_prize
+from tasks.daily.get_prize import (
+    _has_meaningful_mission_list_change,
+    get_mail_prize,
+    get_pass_prize,
+)
 from tasks.daily.luxcavation import EXP_luxcavation, thread_luxcavation
 
 
@@ -402,6 +406,129 @@ def test_pass_reward_does_not_accept_stale_weekly_page_as_empty_weekly_page():
         mock_auto.click_element.side_effect = click
 
         assert get_pass_prize() is False
+
+
+def test_pass_page_change_uses_mission_list_region():
+    before = Image.new("L", (100, 100), 0)
+    background_only = before.copy()
+    ImageDraw.Draw(background_only).rectangle((70, 20, 95, 90), fill=255)
+    countdown_only = before.copy()
+    ImageDraw.Draw(countdown_only).rectangle((40, 5, 55, 18), fill=255)
+    mission_list_changed = before.copy()
+    ImageDraw.Draw(mission_list_changed).rectangle((30, 30, 52, 80), fill=255)
+
+    assert _has_meaningful_mission_list_change(before, background_only) is False
+    assert _has_meaningful_mission_list_change(before, countdown_only) is False
+    assert _has_meaningful_mission_list_change(before, mission_list_changed) is True
+
+
+def test_pass_reward_does_not_accept_background_change_as_empty_daily_page():
+    initial_frame = Image.new("L", (100, 100), 0)
+    unrelated_frame = initial_frame.copy()
+    ImageDraw.Draw(unrelated_frame).rectangle((70, 20, 95, 90), fill=255)
+    screenshots = iter([initial_frame] + [unrelated_frame] * 30)
+    automation = []
+
+    def wait_for_screenshot():
+        automation[0].screenshot = next(screenshots)
+
+    def find(target, *args, **kwargs):
+        return None
+
+    with patch(
+        "tasks.daily.get_prize.wait_for_screenshot",
+        side_effect=wait_for_screenshot,
+    ), patch(
+        "tasks.daily.get_prize.auto"
+    ) as mock_auto:
+        automation.append(mock_auto)
+        mock_auto.find_element.side_effect = find
+        mock_auto.click_element.side_effect = lambda target, *args, **kwargs: (
+            target == "pass/pass_missions_assets.png"
+        )
+
+        assert get_pass_prize() is False
+        assert mock_auto.click_element.call_args_list == [
+            (("pass/pass_missions_assets.png",), {})
+        ]
+
+
+def test_pass_reward_confirms_daily_and_weekly_list_changes():
+    initial_frame = Image.new("L", (100, 100), 0)
+    daily_frame = initial_frame.copy()
+    ImageDraw.Draw(daily_frame).rectangle((30, 30, 52, 80), fill=80)
+    weekly_frame = daily_frame.copy()
+    ImageDraw.Draw(weekly_frame).rectangle((33, 35, 50, 70), fill=160)
+    screenshots = iter(
+        [initial_frame, daily_frame, daily_frame, weekly_frame, weekly_frame]
+    )
+    automation = []
+
+    def wait_for_screenshot():
+        automation[0].screenshot = next(screenshots)
+
+    def find(target, *args, **kwargs):
+        return None
+
+    def click(target, *args, **kwargs):
+        return target in {
+            "pass/pass_missions_assets.png",
+            "pass/weekly_assets.png",
+        }
+
+    with patch(
+        "tasks.daily.get_prize.wait_for_screenshot",
+        side_effect=wait_for_screenshot,
+    ), patch(
+        "tasks.daily.get_prize.auto"
+    ) as mock_auto:
+        automation.append(mock_auto)
+        mock_auto.find_element.side_effect = find
+        mock_auto.click_element.side_effect = click
+
+        assert get_pass_prize() is True
+        assert mock_auto.click_element.call_args_list == [
+            (("pass/pass_missions_assets.png",), {}),
+            (("pass/weekly_assets.png",), {}),
+        ]
+
+
+def test_pass_reward_does_not_accept_background_change_as_empty_weekly_page():
+    initial_frame = Image.new("L", (100, 100), 0)
+    daily_frame = initial_frame.copy()
+    ImageDraw.Draw(daily_frame).rectangle((30, 30, 52, 80), fill=80)
+    unrelated_frame = daily_frame.copy()
+    ImageDraw.Draw(unrelated_frame).rectangle((70, 20, 95, 90), fill=255)
+    screenshots = iter([initial_frame, daily_frame, daily_frame] + [unrelated_frame] * 31)
+    automation = []
+
+    def wait_for_screenshot():
+        automation[0].screenshot = next(screenshots)
+
+    def find(target, *args, **kwargs):
+        return None
+
+    def click(target, *args, **kwargs):
+        return target in {
+            "pass/pass_missions_assets.png",
+            "pass/weekly_assets.png",
+        }
+
+    with patch(
+        "tasks.daily.get_prize.wait_for_screenshot",
+        side_effect=wait_for_screenshot,
+    ), patch(
+        "tasks.daily.get_prize.auto"
+    ) as mock_auto:
+        automation.append(mock_auto)
+        mock_auto.find_element.side_effect = find
+        mock_auto.click_element.side_effect = click
+
+        assert get_pass_prize() is False
+        assert mock_auto.click_element.call_args_list == [
+            (("pass/pass_missions_assets.png",), {}),
+            (("pass/weekly_assets.png",), {}),
+        ]
 
 
 def test_mail_reward_returns_success_after_confirmation():
