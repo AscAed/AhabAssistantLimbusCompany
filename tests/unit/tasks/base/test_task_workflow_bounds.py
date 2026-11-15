@@ -371,6 +371,34 @@ def test_non_restarting_menu_recovery_passes_policy_to_reward_card():
     get_reward_card.assert_called_once_with(allow_restart=False)
 
 
+def test_menu_recovery_stops_when_reward_card_recovery_fails():
+    reward_asset = "mirror/road_in_mir/select_encounter_reward_card_assets.png"
+    with patch("tasks.base.back_init_menu.auto") as mock_auto, patch(
+        "tasks.base.back_init_menu.ensure_simulator_game_started",
+        return_value=False,
+    ), patch(
+        "tasks.base.back_init_menu.retry",
+        return_value=None,
+    ), patch(
+        "tasks.base.back_init_menu.update_model_for_retry"
+    ), patch(
+        "tasks.base.back_init_menu.get_reward_card",
+        return_value=False,
+    ) as get_reward_card:
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            target == reward_asset
+        )
+
+        assert back_init_menu(allow_restart=False) is False
+
+    get_reward_card.assert_called_once_with(allow_restart=False)
+    assert not any(
+        call.args and call.args[0].startswith("scenes/")
+        for call in mock_auto.click_element.call_args_list
+    )
+
+
 def test_restart_game_uses_non_restarting_menu_recovery():
     with patch("tasks.base.script_task_scheme.init_game"), patch(
         "tasks.base.retry.sleep"

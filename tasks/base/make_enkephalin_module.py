@@ -133,7 +133,7 @@ def make_enkephalin_module(cancel=True, skip=True, *, task_name: str = "体力�
         popup_recovery_count += 1
         from tasks.base.back_init_menu import back_init_menu
 
-        if back_init_menu() is False:
+        if back_init_menu(allow_restart=False) is False:
             raise EnkephalinPreparationError(f"{task_name}弹窗恢复失败")
 
     while True:

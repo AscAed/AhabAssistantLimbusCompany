@@ -102,7 +102,8 @@ def back_init_menu(*, allow_restart: bool = True):
         if auto.find_element(
             "mirror/road_in_mir/select_encounter_reward_card_assets.png"
         ):
-            get_reward_card(allow_restart=allow_restart)
+            if get_reward_card(allow_restart=allow_restart) is False:
+                return False
 
         # 在剧情中
         if auto.click_element("scenes/story_skip_confirm_assets.png"):

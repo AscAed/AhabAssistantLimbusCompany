@@ -85,7 +85,7 @@ def test_enkephalin_popup_recovery_failure_stops_preparation():
         ):
             make_enkephalin_module(skip=False)
 
-    back_init_menu.assert_called_once_with()
+    back_init_menu.assert_called_once_with(allow_restart=False)
 
 
 def test_enkephalin_popup_recovery_does_not_reset_preparation_deadline():
@@ -110,7 +110,8 @@ def test_enkephalin_popup_recovery_does_not_reset_preparation_deadline():
         ):
             make_enkephalin_module(skip=False)
 
-    back_init_menu.assert_called_once_with()
+    back_init_menu.assert_called_once_with(allow_restart=False)
+    auto.take_screenshot.assert_called_once()
 
 
 def test_enkephalin_popup_recovery_count_is_bounded():
@@ -141,6 +142,10 @@ def test_enkephalin_popup_recovery_count_is_bounded():
             make_enkephalin_module(skip=False)
 
     assert back_init_menu.call_count == MAX_ENKEPHALIN_POPUP_RECOVERIES
+    assert all(
+        call.kwargs == {"allow_restart": False}
+        for call in back_init_menu.call_args_list
+    )
 
 
 def test_lunacy_stop_after_preparation_prevents_lunacy_click():
