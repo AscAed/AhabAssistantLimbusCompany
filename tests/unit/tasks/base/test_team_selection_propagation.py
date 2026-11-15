@@ -56,6 +56,30 @@ def test_experience_run_stops_when_dungeon_navigation_fails():
     fight.assert_not_called()
 
 
+def test_experience_run_propagates_battle_failure_after_menu_recovery():
+    with patch.object(
+        script_task_scheme,
+        "cfg",
+        SimpleNamespace(targeted_teaming_EXP=False, daily_teams=3),
+    ), patch.object(
+        script_task_scheme, "EXP_luxcavation", return_value=True
+    ), patch.object(
+        script_task_scheme, "select_battle_team", return_value=True
+    ), patch.object(
+        script_task_scheme.battle, "to_battle", return_value=True
+    ), patch.object(
+        script_task_scheme.battle, "fight", return_value=False
+    ), patch.object(
+        script_task_scheme, "back_init_menu", return_value=True
+    ) as recover_menu, patch.object(
+        script_task_scheme, "make_enkephalin_module"
+    ) as make_enkephalin:
+        assert script_task_scheme.onetime_EXP_process() is False
+
+    recover_menu.assert_called_once_with()
+    make_enkephalin.assert_not_called()
+
+
 def test_thread_run_stops_when_team_selection_fails():
     with patch.object(script_task_scheme, "cfg") as cfg, patch.object(
         script_task_scheme, "thread_luxcavation"
@@ -100,6 +124,30 @@ def test_thread_run_stops_when_dungeon_navigation_fails():
     select_team.assert_not_called()
     enter_battle.assert_not_called()
     fight.assert_not_called()
+
+
+def test_thread_run_propagates_battle_failure_after_menu_recovery():
+    with patch.object(
+        script_task_scheme,
+        "cfg",
+        SimpleNamespace(targeted_teaming_thread=False, daily_teams=4),
+    ), patch.object(
+        script_task_scheme, "thread_luxcavation", return_value=True
+    ), patch.object(
+        script_task_scheme, "select_battle_team", return_value=True
+    ), patch.object(
+        script_task_scheme.battle, "to_battle", return_value=True
+    ), patch.object(
+        script_task_scheme.battle, "fight", return_value=False
+    ), patch.object(
+        script_task_scheme, "back_init_menu", return_value=True
+    ) as recover_menu, patch.object(
+        script_task_scheme, "make_enkephalin_module"
+    ) as make_enkephalin:
+        assert script_task_scheme.onetime_thread_process() is False
+
+    recover_menu.assert_called_once_with()
+    make_enkephalin.assert_not_called()
 
 
 def test_single_combat_run_stops_after_a_failed_experience_run():

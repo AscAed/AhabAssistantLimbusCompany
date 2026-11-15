@@ -3,6 +3,7 @@ from unittest.mock import Mock, patch
 
 from tasks.base import script_task_scheme
 from tasks.base.back_init_menu import back_init_menu
+from tasks.base.retry import restart_game
 from tasks.base.task_engine import BuyEnkephalinTask, GetRewardTask, MirrorDungeonTask
 from tasks.daily.get_prize import get_mail_prize, get_pass_prize
 from tasks.daily.luxcavation import EXP_luxcavation, thread_luxcavation
@@ -22,6 +23,7 @@ def _mirror_task_config(mirror_count=1, re_claim_rewards=False):
         get_value=Mock(return_value=[True]),
         normalize_and_sync_team_state=Mock(),
         rotate_team_queue=Mock(),
+        set_value=Mock(),
     )
 
 
@@ -85,6 +87,37 @@ def test_mirror_task_propagates_reward_claim_failure():
     mediator.mirror_bar_kill_signal.emit.assert_called_once_with()
 
 
+def test_mirror_task_counts_completed_run_when_menu_recovery_fails():
+    cfg = _mirror_task_config(mirror_count=1)
+    cfg.hard_mirror = True
+    cfg.auto_hard_mirror = True
+    cfg.hard_mirror_chance = 2
+    mediator = SimpleNamespace(
+        mirror_signal=SimpleNamespace(emit=Mock()),
+        mirror_bar_kill_signal=SimpleNamespace(emit=Mock()),
+    )
+    with patch.object(script_task_scheme, "cfg", cfg), patch.object(
+        script_task_scheme, "mediator", mediator
+    ), patch.object(
+        script_task_scheme,
+        "onetime_mir_process",
+        side_effect=[
+            script_task_scheme.MirrorRunOutcome.COMPLETED_RECOVERY_FAILED,
+            True,
+        ],
+    ) as run_once:
+        result = script_task_scheme.Mirror_task()
+
+    assert result is False
+    run_once.assert_called_once()
+    assert mediator.mirror_signal.emit.call_args_list == [
+        ((0, 1),),
+        ((1, 0),),
+    ]
+    cfg.set_value.assert_called_once_with("hard_mirror_chance", 1)
+    mediator.mirror_bar_kill_signal.emit.assert_called_once_with()
+
+
 def test_mirror_task_failure_reaches_task_engine_contract():
     engine = SimpleNamespace(thread=None)
     with patch(
@@ -101,7 +134,9 @@ def test_main_menu_recovery_stops_after_three_restart_attempts():
         "tasks.base.back_init_menu.update_model_for_retry"
     ), patch("tasks.base.back_init_menu.sleep"), patch(
         "tasks.base.retry.kill_game"
-    ) as kill_game, patch("tasks.base.retry.restart_game") as restart_game:
+    ) as kill_game, patch(
+        "tasks.base.script_task_scheme.init_game"
+    ) as init_game, patch("tasks.base.retry.sleep"):
         mock_auto.click_element.return_value = False
         mock_auto.find_element.return_value = False
 
@@ -109,7 +144,7 @@ def test_main_menu_recovery_stops_after_three_restart_attempts():
 
     assert result is False
     assert kill_game.call_count == 3
-    assert restart_game.call_count == 3
+    assert init_game.call_count == 3
 
 
 def test_maintenance_recovery_stops_after_three_restart_attempts():
@@ -119,8 +154,8 @@ def test_maintenance_recovery_stops_after_three_restart_attempts():
     ), patch("tasks.base.back_init_menu.retry", return_value=None), patch(
         "tasks.base.back_init_menu.update_model_for_retry"
     ), patch("tasks.base.retry.kill_game") as kill_game, patch(
-        "tasks.base.retry.restart_game"
-    ) as restart_game, patch(
+        "tasks.base.script_task_scheme.init_game"
+    ) as init_game, patch("tasks.base.retry.sleep"), patch(
         "utils.utils.get_day_of_week", return_value=1
     ):
         mock_auto.click_element.return_value = False
@@ -132,7 +167,18 @@ def test_maintenance_recovery_stops_after_three_restart_attempts():
 
     assert result is False
     assert kill_game.call_count == 3
-    assert restart_game.call_count == 3
+    assert init_game.call_count == 3
+
+
+def test_restart_game_uses_non_restarting_menu_recovery():
+    with patch("tasks.base.script_task_scheme.init_game"), patch(
+        "tasks.base.retry.sleep"
+    ), patch(
+        "tasks.base.back_init_menu.back_init_menu", return_value=False
+    ) as recover_menu:
+        assert restart_game() is False
+
+    recover_menu.assert_called_once_with(allow_restart=False)
 
 
 def test_main_menu_recovery_returns_after_successful_navigation():
@@ -210,6 +256,30 @@ def test_pass_reward_returns_success_after_daily_and_weekly_claims():
     assert mock_auto.click_element.call_args_list == [
         (("pass/weekly_assets.png",), {})
     ]
+
+
+def test_pass_reward_returns_success_when_daily_and_weekly_pages_have_no_claims():
+    def find(target, *args, **kwargs):
+        if target == "pass/pass_coin.png":
+            return None
+        return target in {
+            "pass/pass_missions_assets.png",
+            "pass/weekly_assets.png",
+        }
+
+    def click(target, *args, **kwargs):
+        return target in {
+            "pass/pass_missions_assets.png",
+            "pass/weekly_assets.png",
+        }
+
+    with patch("tasks.daily.get_prize.wait_for_screenshot"), patch(
+        "tasks.daily.get_prize.auto"
+    ) as mock_auto:
+        mock_auto.find_element.side_effect = find
+        mock_auto.click_element.side_effect = click
+
+        assert get_pass_prize() is True
 
 
 def test_mail_reward_returns_success_after_confirmation():
@@ -409,7 +479,10 @@ def test_mirror_task_stops_when_post_run_menu_recovery_fails():
     ) as make_enkephalin:
         mirror.return_value.run.return_value = True
 
-        assert script_task_scheme.onetime_mir_process(SimpleNamespace(), 1) is False
+        assert (
+            script_task_scheme.onetime_mir_process(SimpleNamespace(), 1)
+            is script_task_scheme.MirrorRunOutcome.COMPLETED_RECOVERY_FAILED
+        )
 
     make_enkephalin.assert_not_called()
 

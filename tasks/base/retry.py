@@ -251,11 +251,13 @@ def retry():
         break
 
 
-def restart_game():
+def restart_game(*, recover_menu: bool = True):
     """重启游戏"""
     from tasks.base.back_init_menu import back_init_menu
     from tasks.base.script_task_scheme import init_game
 
     init_game()
     sleep(3)
-    back_init_menu()
+    if recover_menu:
+        return back_init_menu(allow_restart=False)
+    return True

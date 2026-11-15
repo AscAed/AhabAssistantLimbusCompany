@@ -1,6 +1,7 @@
 import platform
 import random
 from datetime import datetime
+from enum import Enum
 from time import monotonic, sleep, time
 
 from playsound3 import playsound
@@ -46,6 +47,10 @@ from utils.utils import calculate_the_teams, check_hard_mirror_time, get_day_of_
 MAX_CONSECUTIVE_MIRROR_FAILURES = 3
 
 
+class MirrorRunOutcome(Enum):
+    COMPLETED_RECOVERY_FAILED = "completed_recovery_failed"
+
+
 @begin_and_finish_time_log(task_name="一次经验本")
 # 一次经验本的过程
 def onetime_EXP_process(combat_count: int = 1):
@@ -60,8 +65,11 @@ def onetime_EXP_process(combat_count: int = 1):
         return False
     if battle.to_battle() is False:
         return False
-    battle.fight(combat_count=combat_count)
+    battle_result = battle.fight(combat_count=combat_count)
     if back_init_menu() is False:
+        return False
+    if battle_result is False:
+        log.error("经验本战斗失败，已停止本次任务")
         return False
     make_enkephalin_module()
     return True
@@ -81,8 +89,11 @@ def onetime_thread_process(combat_count: int = 1):
         return False
     if battle.to_battle() is False:
         return False
-    battle.fight(combat_count=combat_count)
+    battle_result = battle.fight(combat_count=combat_count)
     if back_init_menu() is False:
+        return False
+    if battle_result is False:
+        log.error("纽本战斗失败，已停止本次任务")
         return False
     make_enkephalin_module()
     return True
@@ -105,7 +116,7 @@ def onetime_mir_process(team_setting: TeamSetting, team_num: int):
             del mirror_adventure
             mirror_adventure = None
             if back_init_menu() is False:
-                return False
+                return MirrorRunOutcome.COMPLETED_RECOVERY_FAILED
             make_enkephalin_module()
             return True
         else:
@@ -368,7 +379,10 @@ def Mirror_task(thread=None):
                 continue
         # 执行一次镜牢任务，根据执行结果进行处理
         mirror_result = onetime_mir_process(team_setting, team_num)
-        if mirror_result:
+        recovery_failed = (
+            mirror_result is MirrorRunOutcome.COMPLETED_RECOVERY_FAILED
+        )
+        if mirror_result or recovery_failed:
             consecutive_failures = 0
             cfg.rotate_team_queue()
             mir_times -= 1
@@ -383,6 +397,10 @@ def Mirror_task(thread=None):
             mediator.mirror_signal.emit(finish_times, mir_times)
             msg = f"已完成 {finish_times} 次镜牢"
             log.info(msg)
+            if recovery_failed:
+                log.error("镜牢已完成但无法返回主界面，停止后续镜牢任务")
+                failed = True
+                break
             if (
                 finish_times == 1 and cfg.re_claim_rewards
             ):  # 完成第一次镜牢后重新领取奖励

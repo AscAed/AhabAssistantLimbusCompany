@@ -34,7 +34,7 @@ def back_init_menu(*, allow_restart: bool = True):
 
             log.error("无法返回主界面，尝试重启游戏")
             kill_game()
-            restart_game()
+            restart_game(recover_menu=False)
             restart_count += 1
             loop_count = 30
             auto.model = "clam"
@@ -80,7 +80,7 @@ def back_init_menu(*, allow_restart: bool = True):
             if not allow_restart:
                 log.warning("检测到维护提示且本次调用禁用内部重启，返回失败")
                 return False
-            restart_game()
+            restart_game(recover_menu=False)
             restart_count += 1
             loop_count = LOOP_COUNT
             auto.model = "clam"

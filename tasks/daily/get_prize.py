@@ -14,6 +14,7 @@ _MAX_REWARD_NAVIGATION_ITERATIONS = 31
 @begin_and_finish_time_log(task_name="收取日常/周常", calculate_time=False)
 def get_pass_prize():
     loop_count = 15
+    mission_page_selected = False
     auto.model = "clam"
     for _ in range(_MAX_REWARD_NAVIGATION_ITERATIONS):
         # 自动截图
@@ -26,7 +27,13 @@ def get_pass_prize():
                 if retry() is False:
                     return False
             break
+        if mission_page_selected and auto.find_element(
+            "pass/pass_missions_assets.png", take_screenshot=False
+        ):
+            log.info("通行证日常页面已确认，没有可领取的日常奖励")
+            break
         if auto.click_element("pass/pass_missions_assets.png"):
+            mission_page_selected = True
             continue
         if loop_count >= 10:
             if auto.click_element("home/season_assets.png"):
@@ -53,25 +60,25 @@ def get_pass_prize():
         log.error("通行证导航操作次数超限，无法收取日常/周常")
         return False
 
-    auto.click_element("pass/weekly_assets.png")
-    loop_count = 15
+    if auto.click_element("pass/weekly_assets.png") is False:
+        log.error("无法打开通行证周常页面")
+        return False
     auto.model = "clam"
     for _ in range(_MAX_REWARD_NAVIGATION_ITERATIONS):
+        wait_for_screenshot()
         if coordinates := auto.find_element(
             "pass/pass_coin.png",
             find_type="image_with_multiple_targets",
-            take_screenshot=True,
+            take_screenshot=False,
         ):
             for coordinate in coordinates:
                 auto.mouse_click(coordinate[0], coordinate[1])
                 if retry() is False:
                     return False
             return True
-        loop_count -= 1
-        update_model_for_retry(loop_count, normal_at=10, aggressive_at=5)
-        if loop_count < 0:
-            log.error("无法收取日常/周常")
-            return False
+        if auto.find_element("pass/weekly_assets.png", take_screenshot=False):
+            log.info("通行证周常页面已确认，没有可领取的周常奖励")
+            return True
 
     log.error("通行证奖励识别次数超限，无法收取日常/周常")
     return False
