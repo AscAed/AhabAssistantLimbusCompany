@@ -21,7 +21,8 @@ def get_pass_prize():
         ):
             for coordinate in coordinates:
                 auto.mouse_click(coordinate[0], coordinate[1])
-                retry()
+                if retry() is False:
+                    return False
             break
         if auto.click_element("pass/pass_missions_assets.png"):
             continue
@@ -57,7 +58,8 @@ def get_pass_prize():
         ):
             for coordinate in coordinates:
                 auto.mouse_click(coordinate[0], coordinate[1])
-                retry()
+                if retry() is False:
+                    return False
             break
         loop_count -= 1
         update_model_for_retry(loop_count, normal_at=10, aggressive_at=5)

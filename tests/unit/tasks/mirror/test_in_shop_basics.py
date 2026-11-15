@@ -621,3 +621,30 @@ def test_system_fusion_caps_repeated_result_claims():
             shop.fuse_system_gifts()
 
     assert selections == 31
+
+
+def test_system_fusion_stops_before_clicking_after_retry_restarts_game():
+    shop = Shop(TeamSetting(team_system=0))
+    label = "mirror/shop/fuse_label.png"
+    recipe = f"mirror/shop/enhance_gifts/{shop.system}_recipe.png"
+
+    with (
+        patch.object(shop, "enter_fuse", return_value=True),
+        patch("tasks.mirror.in_shop.fusion_result", [recipe]),
+        patch("tasks.mirror.in_shop.auto") as mock_auto,
+        patch("tasks.mirror.in_shop.wait_for_screenshot", return_value=object()),
+        patch("tasks.mirror.in_shop.retry", return_value=False),
+    ):
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.side_effect = lambda image_path, *args, **kwargs: (
+            [(100, 100), (200, 200)]
+            if image_path == label
+            else (300, 150)
+            if image_path == recipe
+            else None
+        )
+
+        with pytest.raises(Shop.RestartGame):
+            shop.fuse_system_gifts()
+
+    mock_auto.click_element.assert_not_called()
