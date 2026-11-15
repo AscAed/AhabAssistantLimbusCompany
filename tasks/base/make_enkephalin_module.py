@@ -4,6 +4,12 @@ from module.decorator.decorator import begin_and_finish_time_log
 from module.logger import log
 from module.my_error.my_error import userStopError
 
+ENKEPHALIN_PREPARATION_TIMEOUT_SECONDS = 60
+
+
+class EnkephalinPreparationTimeout(TimeoutError):
+    pass
+
 
 def _check_stop_requested() -> None:
     auto.sleep_with_stop_check(0)
@@ -121,7 +127,7 @@ def make_enkephalin_module(cancel=True, skip=True, *, task_name: str = "体力�
                 msg = f"已尝试{task_name}超过{int(now_time - start_time)}秒，如果非电脑硬件配置不足，请确认是否执行了正确的语言配置"
                 log.warning(msg)
                 last_log_time = now_time
-        if now_time - start_time > 60:
+        if now_time - start_time >= ENKEPHALIN_PREPARATION_TIMEOUT_SECONDS:
             from app import mediator
 
             if first_popup_warning and (
@@ -137,6 +143,10 @@ def make_enkephalin_module(cancel=True, skip=True, *, task_name: str = "体力�
                     f"脚本卡死在{task_name}，请检查语言配置，或检查电脑配置是否支持"
                 )
                 mediator.warning.emit(message)
+            raise EnkephalinPreparationTimeout(
+                f"{task_name}资源面板确认超时"
+                f"（{ENKEPHALIN_PREPARATION_TIMEOUT_SECONDS}秒）"
+            )
         # 自动截图
         if auto.take_screenshot() is None:
             continue

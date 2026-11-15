@@ -4,6 +4,7 @@ import pytest
 
 from module.my_error.my_error import userStopError
 from tasks.base.make_enkephalin_module import (
+    EnkephalinPreparationTimeout,
     lunacy_to_enkephalin,
     make_enkephalin_module,
 )
@@ -36,6 +37,29 @@ def test_enkephalin_stop_after_capture_prevents_follow_up_input():
             make_enkephalin_module(skip=False)
 
     auto.mouse_to_blank.assert_not_called()
+    auto.click_element.assert_not_called()
+
+
+def test_enkephalin_panel_timeout_raises_after_warning():
+    with patch(
+        "tasks.base.make_enkephalin_module.ENKEPHALIN_PREPARATION_TIMEOUT_SECONDS",
+        0,
+    ), patch("tasks.base.make_enkephalin_module.auto") as auto, patch(
+        "tasks.base.make_enkephalin_module.cfg"
+    ) as cfg, patch("time.time", return_value=10.0), patch(
+        "app.mediator"
+    ) as mediator:
+        cfg.skip_enkephalin = False
+        auto.get_restore_time.return_value = None
+
+        with pytest.raises(
+            EnkephalinPreparationTimeout, match="资源面板确认超时"
+        ):
+            make_enkephalin_module(skip=False)
+
+    mediator.link_start.emit.assert_called_once_with()
+    mediator.warning.emit.assert_called_once()
+    auto.take_screenshot.assert_not_called()
     auto.click_element.assert_not_called()
 
 

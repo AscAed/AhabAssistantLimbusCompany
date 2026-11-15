@@ -247,3 +247,10 @@ The initial assessment compared Git trees and inspected source, tests, documenta
 - The current worktree returns a completed-but-postprocessing-failed outcome, records the run and chance decrement, then stops. A new integration regression reproduced three launches before the fix; after the fix, it verifies one launch and one completion update.
 - The latest isolated suite passed **497 tests, 2 skipped of 499 collected**; full Ruff and `compileall` passed. Both PyInstaller targets and independent archive/688-asset checks passed. Exact hashes and the artifact identity are recorded in the [implementation handoff](2026-11-14-implementation-handoff.md).
 - This change has not yet been committed, re-reviewed, or pushed to PR #142. Neither executable nor the game was launched; Stage 4 sample provenance/privacy/rights and Stage 5 startup/runtime qualification remain open.
+
+## Follow-up: Enkephalin Resource-panel Timeout (2026-11-15)
+
+- A third CodeRabbit review found that the 60-second timeout in `make_enkephalin_module()` only logged a warning and left its retry loop running.
+- The current worktree raises a typed timeout after preserving the existing UI warning. Existing callers stop on that exception, and the Mirror caller records the completed run before stopping the batch. Tests cover timeout exit, task accounting, and hard-mode decrement.
+- The isolated full suite passed **499 tests, 2 skipped of 501 collected**; full Ruff and `compileall` passed. Both PyInstaller targets and independent archive/688-asset checks passed. Exact evidence and hashes are in the [implementation handoff](2026-11-14-implementation-handoff.md).
+- This timeout change has not yet been committed or re-reviewed, and PR #142 has not been updated with it. Neither executable nor the game was launched; Stage 4 sample provenance/privacy/rights and Stage 5 startup/runtime qualification remain open.

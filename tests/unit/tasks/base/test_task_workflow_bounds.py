@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw
 from module.my_error.my_error import backMainWinError
 from tasks.base import script_task_scheme
 from tasks.base.back_init_menu import back_init_menu
+from tasks.base.make_enkephalin_module import EnkephalinPreparationTimeout
 from tasks.base.retry import restart_game
 from tasks.base.task_engine import BuyEnkephalinTask, GetRewardTask, MirrorDungeonTask
 from tasks.daily.get_prize import (
@@ -186,7 +187,12 @@ def test_mirror_task_counts_completed_run_when_menu_recovery_fails():
     mediator.mirror_bar_kill_signal.emit.assert_called_once_with()
 
 
-def test_mirror_task_counts_completed_run_when_resource_preparation_raises():
+@pytest.mark.parametrize(
+    "error_type", [RuntimeError, EnkephalinPreparationTimeout]
+)
+def test_mirror_task_counts_completed_run_when_resource_preparation_raises(
+    error_type,
+):
     cfg = _mirror_task_config(mirror_count=2)
     cfg.hard_mirror = True
     cfg.auto_hard_mirror = True
@@ -204,7 +210,7 @@ def test_mirror_task_counts_completed_run_when_resource_preparation_raises():
     ), patch.object(
         script_task_scheme,
         "make_enkephalin_module",
-        side_effect=RuntimeError("resource preparation failed"),
+        side_effect=error_type("resource preparation failed"),
     ) as make_enkephalin:
         mirror.return_value.run.return_value = True
 
