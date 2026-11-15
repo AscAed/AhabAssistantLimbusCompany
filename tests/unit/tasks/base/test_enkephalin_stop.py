@@ -4,6 +4,9 @@ import pytest
 
 from module.my_error.my_error import userStopError
 from tasks.base.make_enkephalin_module import (
+    MAX_ENKEPHALIN_POPUP_RECOVERIES,
+    EnkephalinPreparationError,
+    EnkephalinPreparationTimeout,
     lunacy_to_enkephalin,
     make_enkephalin_module,
 )
@@ -37,6 +40,112 @@ def test_enkephalin_stop_after_capture_prevents_follow_up_input():
 
     auto.mouse_to_blank.assert_not_called()
     auto.click_element.assert_not_called()
+
+
+def test_enkephalin_panel_timeout_raises_after_warning():
+    with patch(
+        "tasks.base.make_enkephalin_module.ENKEPHALIN_PREPARATION_TIMEOUT_SECONDS",
+        0,
+    ), patch("tasks.base.make_enkephalin_module.auto") as auto, patch(
+        "tasks.base.make_enkephalin_module.cfg"
+    ) as cfg, patch("time.time", return_value=10.0), patch(
+        "app.mediator"
+    ) as mediator:
+        cfg.skip_enkephalin = False
+        auto.get_restore_time.return_value = None
+
+        with pytest.raises(
+            EnkephalinPreparationTimeout, match="资源面板确认超时"
+        ):
+            make_enkephalin_module(skip=False)
+
+    mediator.link_start.emit.assert_called_once_with()
+    mediator.warning.emit.assert_called_once()
+    auto.take_screenshot.assert_not_called()
+    auto.click_element.assert_not_called()
+
+
+def test_enkephalin_popup_recovery_failure_stops_preparation():
+    with patch("time.time", side_effect=[0.0, 0.0, 10.0]), patch(
+        "tasks.base.make_enkephalin_module.auto"
+    ) as auto, patch(
+        "tasks.base.make_enkephalin_module.cfg"
+    ) as cfg, patch(
+        "tasks.base.back_init_menu.back_init_menu", return_value=False
+    ) as back_init_menu:
+        cfg.skip_enkephalin = False
+        auto.get_restore_time.return_value = None
+        auto.take_screenshot.return_value = object()
+        auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            target in {"base/update_close_assets.png", "home/drive_assets.png"}
+        )
+
+        with pytest.raises(
+            EnkephalinPreparationError, match="弹窗恢复失败"
+        ):
+            make_enkephalin_module(skip=False)
+
+    back_init_menu.assert_called_once_with(allow_restart=False)
+
+
+def test_enkephalin_popup_recovery_does_not_reset_preparation_deadline():
+    with patch("time.time", side_effect=[0.0, 0.0, 40.0, 61.0]), patch(
+        "tasks.base.make_enkephalin_module.auto"
+    ) as auto, patch(
+        "tasks.base.make_enkephalin_module.cfg"
+    ) as cfg, patch(
+        "tasks.base.back_init_menu.back_init_menu", return_value=True
+    ) as back_init_menu, patch(
+        "tasks.base.make_enkephalin_module.log"
+    ):
+        cfg.skip_enkephalin = False
+        auto.get_restore_time.return_value = None
+        auto.take_screenshot.return_value = object()
+        auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            target in {"base/update_close_assets.png", "home/drive_assets.png"}
+        )
+
+        with pytest.raises(
+            EnkephalinPreparationTimeout, match="资源面板确认超时"
+        ):
+            make_enkephalin_module(skip=False)
+
+    back_init_menu.assert_called_once_with(allow_restart=False)
+    auto.take_screenshot.assert_called_once()
+
+
+def test_enkephalin_popup_recovery_count_is_bounded():
+    clock_values = [
+        0.0,
+        0.0,
+        *[float(value) for value in range(10, 10 * (MAX_ENKEPHALIN_POPUP_RECOVERIES + 2), 10)],
+    ]
+    with patch("time.time", side_effect=clock_values), patch(
+        "tasks.base.make_enkephalin_module.auto"
+    ) as auto, patch(
+        "tasks.base.make_enkephalin_module.cfg"
+    ) as cfg, patch(
+        "tasks.base.back_init_menu.back_init_menu", return_value=True
+    ) as back_init_menu, patch(
+        "tasks.base.make_enkephalin_module.log"
+    ):
+        cfg.skip_enkephalin = False
+        auto.get_restore_time.return_value = None
+        auto.take_screenshot.return_value = object()
+        auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            target in {"base/update_close_assets.png", "home/drive_assets.png"}
+        )
+
+        with pytest.raises(
+            EnkephalinPreparationError, match="弹窗恢复次数超限"
+        ):
+            make_enkephalin_module(skip=False)
+
+    assert back_init_menu.call_count == MAX_ENKEPHALIN_POPUP_RECOVERIES
+    assert all(
+        call.kwargs == {"allow_restart": False}
+        for call in back_init_menu.call_args_list
+    )
 
 
 def test_lunacy_stop_after_preparation_prevents_lunacy_click():

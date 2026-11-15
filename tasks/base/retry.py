@@ -145,13 +145,14 @@ def kill_game():
         sleep(1)
 
 
-def check_times(start_time, timeout=90, logs=True):
+def check_times(start_time, timeout=90, logs=True, *, allow_restart=True):
     """检查是否卡死超时，若是则尝试关闭重启游戏。
 
     Loading screens and network-lag overlays are explicitly excluded: while
     the game is in a transient loading state, the elapsed time is not counted
     towards the freeze timeout so that normal load times never trigger a
-    spurious restart.
+    spurious restart. Callers doing non-restarting recovery can stop on timeout
+    without closing or restarting the game.
     """
     global _loading_started_at
 
@@ -164,10 +165,13 @@ def check_times(start_time, timeout=90, logs=True):
             # Still within the allowed loading window – not a freeze.
             return False
         else:
+            _loading_started_at = None
+            if not allow_restart:
+                log.warning("加载界面超过超时上限，本次恢复禁用重启，停止等待")
+                return True
             log.warning(
                 f"加载界面已持续 {int(loading_elapsed)} 秒（超过 {LOADING_SCREEN_TIMEOUT} 秒上限），判定为卡死，尝试重启游戏"
             )
-            _loading_started_at = None
             kill_game()
             restart_game()
             return True
@@ -184,6 +188,9 @@ def check_times(start_time, timeout=90, logs=True):
         )
         sleep(1)
     if elapsed > timeout:
+        if not allow_restart:
+            log.warning(f"已卡死超过{timeout}秒，本次恢复禁用重启，停止等待")
+            return True
         log.info(f"已卡死超过{timeout}秒，尝试关闭重启游戏")
         kill_game()
         restart_game()
@@ -191,7 +198,7 @@ def check_times(start_time, timeout=90, logs=True):
     return False
 
 
-def retry():
+def retry(*, allow_restart=True):
     """重试连接。
 
     为保证稳定性，retry 内循环始终刷新截图，避免复用旧帧导致误判。
@@ -210,7 +217,7 @@ def retry():
             start_time = time.time()
         if auto.get_restore_time() is not None:
             start_time = max(start_time, auto.get_restore_time())
-        if check_times(start_time):
+        if check_times(start_time, allow_restart=allow_restart):
             return False
         if auto.take_screenshot() is None:
             continue
@@ -251,11 +258,13 @@ def retry():
         break
 
 
-def restart_game():
+def restart_game(*, recover_menu: bool = True):
     """重启游戏"""
     from tasks.base.back_init_menu import back_init_menu
     from tasks.base.script_task_scheme import init_game
 
     init_game()
     sleep(3)
-    back_init_menu()
+    if recover_menu:
+        return back_init_menu(allow_restart=False)
+    return True

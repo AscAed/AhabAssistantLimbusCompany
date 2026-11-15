@@ -5,6 +5,8 @@ from module.config import cfg
 from module.logger import log
 from tasks.base.screenshot import wait_for_screenshot
 
+_MAX_LUXCAVATION_NAVIGATION_ITERATIONS = 31
+
 
 def _prepare_continuous_combat_count(
     combat_count: int,
@@ -51,15 +53,14 @@ def _prepare_continuous_combat_count(
 def EXP_luxcavation(combat_count: int = 1):
     loop_count = 30
     auto.model = "clam"
-    while True:
+    for _ in range(_MAX_LUXCAVATION_NAVIGATION_ITERATIONS):
         # 自动截图
         wait_for_screenshot()
         if auto.find_element("teams/identify_assets.png"):
-            break
+            return True
         if (
             auto.find_element("home/first_prompt_assets.png", model="clam")
             and auto.find_element("home/back_assets.png", model="normal")
-            and not auto.find_element("luxcavation/exp_enter.png", threshold=0.85)
         ):
             auto.key_press("esc")
             continue
@@ -75,7 +76,7 @@ def EXP_luxcavation(combat_count: int = 1):
                             log.debug(f"经验本第 {lv_idx + 1} 关连续战斗设置失败，降级尝试下一关")
                             continue
 
-                    select_team = False
+                    stop_level_retries = False
                     for retry in range(3):
                         log.debug(f"经验本尝试第 {lv_idx + 1} 关 (x={lv[0]}, y={lv[1]}), 第 {retry + 1}/3 次")
                         auto.mouse_click(lv[0], lv[1])
@@ -86,17 +87,20 @@ def EXP_luxcavation(combat_count: int = 1):
                             auto.take_screenshot()
                             if auto.find_element(
                                 "teams/identify_assets.png", take_screenshot=False
-                            ) or auto.find_element(
+                            ):
+                                log.debug(f"经验本第 {lv_idx + 1} 关点击成功，已进入编队界面")
+                                return True
+                            if auto.find_element(
                                 "home/first_prompt_assets.png",
                                 model="clam",
                                 take_screenshot=False,
                             ):
-                                log.debug(f"经验本第 {lv_idx + 1} 关点击成功，已进入编队界面")
-                                select_team = True
+                                log.debug("经验本检测到首次提示，留待下一轮导航处理")
+                                stop_level_retries = True
                                 break
-                        if select_team:
+                        if stop_level_retries:
                             break
-                    if select_team:
+                    if stop_level_retries:
                         break
                     log.debug(f"经验本第 {lv_idx + 1} 关 3 次尝试均未进入编队，降级尝试下一关")
         if auto.click_element("home/luxcavation_assets.png"):
@@ -112,7 +116,8 @@ def EXP_luxcavation(combat_count: int = 1):
             auto.click_element("base/renew_confirm_assets.png")
             from tasks.base.back_init_menu import back_init_menu
 
-            back_init_menu()
+            if back_init_menu() is False:
+                return False
             continue
         if auto.click_element("home/drive_assets.png"):
             sleep(0.5)
@@ -126,7 +131,10 @@ def EXP_luxcavation(combat_count: int = 1):
             auto.model = "aggressive"
         if loop_count < 0:
             log.error("无法进入经验本,不能进行下一步,此次经验本无效")
-            break
+            return False
+
+    log.error("经验本导航操作次数超限，此次经验本无效")
+    return False
 
 
 def thread_luxcavation(combat_count: int = 1):
@@ -140,29 +148,30 @@ def thread_luxcavation(combat_count: int = 1):
                 for _ in range(3):
                     # ⚡ Bolt: Take screenshot once and reuse frame to prevent 2x redundant I/O overhead on short-circuit OR failures
                     auto.take_screenshot()
-                    if auto.find_element("teams/identify_assets.png", take_screenshot=False) or auto.find_element(
+                    if auto.find_element("teams/identify_assets.png", take_screenshot=False):
+                        log.debug(f"{log_prefix}第 {lv_idx + 1} 关点击成功，已进入编队界面")
+                        return True
+                    if auto.find_element(
                         "home/first_prompt_assets.png",
                         model="clam",
                         take_screenshot=False,
                     ):
-                        log.debug(f"{log_prefix}第 {lv_idx + 1} 关点击成功，已进入编队界面")
-                        return True
+                        log.debug(f"{log_prefix}第 {lv_idx + 1} 关检测到首次提示，留待下一轮导航处理")
+                        return False
             log.debug(f"{log_prefix}第 {lv_idx + 1} 关 3 次尝试均未进入编队，降级尝试下一关")
         return False
 
     loop_count = 30
     continuous_combat_set = False
     auto.model = "clam"
-    while True:
+    for _ in range(_MAX_LUXCAVATION_NAVIGATION_ITERATIONS):
         # 自动截图
         wait_for_screenshot()
         if auto.find_element("teams/identify_assets.png"):
-            break
+            return True
         if (
             auto.find_element("home/first_prompt_assets.png", model="clam")
             and auto.find_element("home/back_assets.png", model="normal")
-            and not auto.find_element("luxcavation/thread_enter_assets.png", threshold=0.78)
-            and not auto.find_element("luxcavation/thread_consume.png")
         ):
             auto.key_press("esc")
             continue
@@ -197,7 +206,8 @@ def thread_luxcavation(combat_count: int = 1):
                 )
                 if level:
                     log.debug(f"纽本检测到 {len(level)} 个关卡入口: {level}")
-                    _click_level_targets(level, "纽本")
+                    if _click_level_targets(level, "纽本"):
+                        return True
                 else:
                     # 处理下方所有关卡未解锁的情况
                     level = None
@@ -231,7 +241,8 @@ def thread_luxcavation(combat_count: int = 1):
                         continue
 
                     log.debug(f"纽本(滑动后)检测到 {len(level)} 个关卡入口: {level}")
-                    _click_level_targets(level, "纽本(滑动后)")
+                    if _click_level_targets(level, "纽本(滑动后)"):
+                        return True
 
             else:
                 log.debug("纽本未找到关卡消耗锚点")
@@ -252,7 +263,8 @@ def thread_luxcavation(combat_count: int = 1):
             auto.click_element("base/renew_confirm_assets.png")
             from tasks.base.back_init_menu import back_init_menu
 
-            back_init_menu()
+            if back_init_menu() is False:
+                return False
             continue
         if auto.click_element("home/drive_assets.png"):
             sleep(0.5)
@@ -265,4 +277,7 @@ def thread_luxcavation(combat_count: int = 1):
             auto.model = "aggressive"
         if loop_count < 0:
             log.error("无法进入纽本,不能进行下一步,此次纽本无效")
-            break
+            return False
+
+    log.error("纽本导航操作次数超限，此次纽本无效")
+    return False

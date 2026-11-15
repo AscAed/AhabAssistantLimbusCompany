@@ -4,6 +4,17 @@ from module.decorator.decorator import begin_and_finish_time_log
 from module.logger import log
 from module.my_error.my_error import userStopError
 
+ENKEPHALIN_PREPARATION_TIMEOUT_SECONDS = 60
+MAX_ENKEPHALIN_POPUP_RECOVERIES = 3
+
+
+class EnkephalinPreparationError(RuntimeError):
+    pass
+
+
+class EnkephalinPreparationTimeout(TimeoutError):
+    pass
+
 
 def _check_stop_requested() -> None:
     auto.sleep_with_stop_check(0)
@@ -110,6 +121,20 @@ def make_enkephalin_module(cancel=True, skip=True, *, task_name: str = "体力�
     popup_marker_threshold = 0.7
     open_panel_click_cooldown = 0.5
     last_open_panel_click_time = 0.0
+    popup_recovery_count = 0
+
+    def recover_popup():
+        nonlocal popup_recovery_count
+        if popup_recovery_count >= MAX_ENKEPHALIN_POPUP_RECOVERIES:
+            raise EnkephalinPreparationError(
+                f"{task_name}弹窗恢复次数超限"
+                f"（{MAX_ENKEPHALIN_POPUP_RECOVERIES}次）"
+            )
+        popup_recovery_count += 1
+        from tasks.base.back_init_menu import back_init_menu
+
+        if back_init_menu(allow_restart=False) is False:
+            raise EnkephalinPreparationError(f"{task_name}弹窗恢复失败")
 
     while True:
         _check_stop_requested()
@@ -121,7 +146,7 @@ def make_enkephalin_module(cancel=True, skip=True, *, task_name: str = "体力�
                 msg = f"已尝试{task_name}超过{int(now_time - start_time)}秒，如果非电脑硬件配置不足，请确认是否执行了正确的语言配置"
                 log.warning(msg)
                 last_log_time = now_time
-        if now_time - start_time > 60:
+        if now_time - start_time >= ENKEPHALIN_PREPARATION_TIMEOUT_SECONDS:
             from app import mediator
 
             if first_popup_warning and (
@@ -137,6 +162,10 @@ def make_enkephalin_module(cancel=True, skip=True, *, task_name: str = "体力�
                     f"脚本卡死在{task_name}，请检查语言配置，或检查电脑配置是否支持"
                 )
                 mediator.warning.emit(message)
+            raise EnkephalinPreparationTimeout(
+                f"{task_name}资源面板确认超时"
+                f"（{ENKEPHALIN_PREPARATION_TIMEOUT_SECONDS}秒）"
+            )
         # 自动截图
         if auto.take_screenshot() is None:
             continue
@@ -147,20 +176,14 @@ def make_enkephalin_module(cancel=True, skip=True, *, task_name: str = "体力�
         ) and auto.find_element("home/drive_assets.png", model="normal"):
             _check_stop_requested()
             auto.click_element("base/update_close_assets.png")
-            from tasks.base.back_init_menu import back_init_menu
-
-            back_init_menu()
-            start_time = time.time()
+            recover_popup()
             continue
         if auto.find_element(
             "base/renew_confirm_assets.png", model="clam"
         ) and auto.find_element("home/drive_assets.png", model="normal"):
             _check_stop_requested()
             auto.click_element("base/renew_confirm_assets.png")
-            from tasks.base.back_init_menu import back_init_menu
-
-            back_init_menu()
-            start_time = time.time()
+            recover_popup()
             continue
         panel_visible = bool(
             auto.find_element(

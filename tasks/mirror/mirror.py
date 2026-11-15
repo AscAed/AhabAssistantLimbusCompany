@@ -222,7 +222,8 @@ class Mirror:
         if not check_game_running():
             log.warning("Game crash detected! Attempting process restart and state recovery.")
             kill_game()
-            restart_game()
+            if restart_game() is False:
+                raise backMainWinError("镜牢游戏重启后无法恢复到主界面，停止镜牢任务")
             self.road_to_mir()
             return True
 
@@ -638,7 +639,8 @@ class Mirror:
                 if back_menu_count > 5:
                     raise backMainWinError("镜牢道中出错,请手动操作重试")
                 log.error("镜牢道中识别失败次数达到最大值,正在返回主界面")
-                back_init_menu()
+                if back_init_menu() is False:
+                    raise backMainWinError("镜牢无法恢复到主界面，停止镜牢任务")
                 back_menu_count += 1
                 main_loop_count = 250
 

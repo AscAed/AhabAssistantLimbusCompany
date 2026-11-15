@@ -1,6 +1,7 @@
 import platform
 import random
 from datetime import datetime
+from enum import Enum
 from time import monotonic, sleep, time
 
 from playsound3 import playsound
@@ -43,6 +44,13 @@ from tasks.teams.team_formation import select_battle_team
 from utils.path_manager import path_manager
 from utils.utils import calculate_the_teams, check_hard_mirror_time, get_day_of_week
 
+MAX_CONSECUTIVE_MIRROR_FAILURES = 3
+
+
+class MirrorRunOutcome(Enum):
+    COMPLETED_RECOVERY_FAILED = "completed_recovery_failed"
+    COMPLETED_POSTPROCESS_FAILED = "completed_postprocess_failed"
+
 
 @begin_and_finish_time_log(task_name="一次经验本")
 # 一次经验本的过程
@@ -51,15 +59,21 @@ def onetime_EXP_process(combat_count: int = 1):
         team = cfg.get_value(f"EXP_day_{calculate_the_teams()}")
     else:
         team = cfg.daily_teams
-    EXP_luxcavation(combat_count)
+    if EXP_luxcavation(combat_count) is False:
+        return False
     if select_battle_team(team) is False:
         log.error("经验本队伍选择失败，已停止本次任务")
         return False
     if battle.to_battle() is False:
         return False
-    battle.fight(combat_count=combat_count)
-    back_init_menu()
+    battle_result = battle.fight(combat_count=combat_count)
+    if back_init_menu() is False:
+        return False
+    if battle_result is False:
+        log.error("经验本战斗失败，已停止本次任务")
+        return False
     make_enkephalin_module()
+    return True
 
 
 @begin_and_finish_time_log(task_name="一次纽本")
@@ -69,15 +83,21 @@ def onetime_thread_process(combat_count: int = 1):
         team = cfg.get_value(f"thread_day_{get_day_of_week()}")
     else:
         team = cfg.daily_teams
-    thread_luxcavation(combat_count)
+    if thread_luxcavation(combat_count) is False:
+        return False
     if select_battle_team(team) is False:
         log.error("纽本队伍选择失败，已停止本次任务")
         return False
     if battle.to_battle() is False:
         return False
-    battle.fight(combat_count=combat_count)
-    back_init_menu()
+    battle_result = battle.fight(combat_count=combat_count)
+    if back_init_menu() is False:
+        return False
+    if battle_result is False:
+        log.error("纽本战斗失败，已停止本次任务")
+        return False
     make_enkephalin_module()
+    return True
 
 
 @begin_and_finish_time_log(task_name="一次镜牢")
@@ -96,14 +116,30 @@ def onetime_mir_process(team_setting: TeamSetting, team_num: int):
         if mirror_adventure.run():
             del mirror_adventure
             mirror_adventure = None
-            back_init_menu()
-            make_enkephalin_module()
+            try:
+                recovered = back_init_menu()
+            except userStopError:
+                raise
+            except Exception as e:
+                log.exception(f"镜牢已完成，但返回主界面时出错: {e}")
+                return MirrorRunOutcome.COMPLETED_RECOVERY_FAILED
+            if recovered is False:
+                return MirrorRunOutcome.COMPLETED_RECOVERY_FAILED
+            try:
+                make_enkephalin_module()
+            except userStopError:
+                raise
+            except Exception as e:
+                log.exception(f"镜牢已完成，但准备后续资源时出错: {e}")
+                return MirrorRunOutcome.COMPLETED_POSTPROCESS_FAILED
             return True
         else:
             return False
     except userStopError:
         raise
     except unableToFindTeamError:
+        raise
+    except backMainWinError:
         raise
     except Exception as e:
         log.exception(f"镜牢行动出错: {e}")
@@ -112,19 +148,19 @@ def onetime_mir_process(team_setting: TeamSetting, team_num: int):
 
 def to_get_reward():
     if cfg.set_get_prize == 0:
-        back_init_menu()
-        get_pass_prize()
-        back_init_menu()
-        get_mail_prize()
-        back_init_menu()
+        if back_init_menu() is False or get_pass_prize() is False:
+            return False
+        if back_init_menu() is False or get_mail_prize() is False:
+            return False
     elif cfg.set_get_prize == 1:
-        back_init_menu()
-        get_pass_prize()
-        back_init_menu()
+        if back_init_menu() is False or get_pass_prize() is False:
+            return False
     else:
-        back_init_menu()
-        get_mail_prize()
-        back_init_menu()
+        if back_init_menu() is False or get_mail_prize() is False:
+            return False
+    if back_init_menu() is False:
+        return False
+    return True
 
 
 WINDOW_HANDLE_INIT_TIMEOUT_SECONDS = 120
@@ -280,7 +316,8 @@ def _single_combat_run(exp_times, thread_times):
 
 def Daily_task_wrapper(get_reward=None):
     def wrapper():
-        back_init_menu()
+        if back_init_menu() is False:
+            return False
         make_enkephalin_module()
         exp_times = cfg.set_EXP_count
         if get_reward and get_reward == "EXP":
@@ -304,8 +341,10 @@ def Daily_task_wrapper(get_reward=None):
 
 def Buy_enkephalin():
     times = cfg.set_lunacy_to_enkephalin
-    back_init_menu()
+    if back_init_menu() is False:
+        return False
     lunacy_to_enkephalin(times=times)
+    return True
 
 
 def Mirror_task(thread=None):
@@ -316,6 +355,8 @@ def Mirror_task(thread=None):
     if cfg.save_rewards and cfg.hard_mirror:
         mir_times = 1
     finish_times = 0
+    consecutive_failures = 0
+    failed = False
     mediator.mirror_signal.emit(0, mir_times)
     cfg.normalize_and_sync_team_state(persist=False)
     # 开始执行镜牢任务
@@ -353,8 +394,20 @@ def Mirror_task(thread=None):
                 cfg.rotate_team_queue()
                 continue
         # 执行一次镜牢任务，根据执行结果进行处理
-        mirror_result = onetime_mir_process(team_setting, team_num)
-        if mirror_result:
+        try:
+            mirror_result = onetime_mir_process(team_setting, team_num)
+        except backMainWinError:
+            log.exception("镜牢无法恢复到主界面，停止后续镜牢任务")
+            failed = True
+            break
+        recovery_failed = (
+            mirror_result is MirrorRunOutcome.COMPLETED_RECOVERY_FAILED
+        )
+        postprocess_failed = (
+            mirror_result is MirrorRunOutcome.COMPLETED_POSTPROCESS_FAILED
+        )
+        if mirror_result or recovery_failed or postprocess_failed:
+            consecutive_failures = 0
             cfg.rotate_team_queue()
             mir_times -= 1
             if cfg.hard_mirror and cfg.auto_hard_mirror:
@@ -368,14 +421,41 @@ def Mirror_task(thread=None):
             mediator.mirror_signal.emit(finish_times, mir_times)
             msg = f"已完成 {finish_times} 次镜牢"
             log.info(msg)
+            if recovery_failed:
+                log.error("镜牢已完成但无法返回主界面，停止后续镜牢任务")
+                failed = True
+                break
+            if postprocess_failed:
+                log.error("镜牢已完成但后续资源准备失败，停止后续镜牢任务")
+                failed = True
+                break
             if (
                 finish_times == 1 and cfg.re_claim_rewards
             ):  # 完成第一次镜牢后重新领取奖励
-                to_get_reward()
+                if to_get_reward() is False:
+                    log.error("镜牢奖励领取失败，停止后续镜牢任务")
+                    failed = True
+                    break
+        else:
+            consecutive_failures += 1
+            log.warning(
+                "镜牢本次运行失败，连续失败次数 %s/%s",
+                consecutive_failures,
+                MAX_CONSECUTIVE_MIRROR_FAILURES,
+            )
+            if consecutive_failures >= MAX_CONSECUTIVE_MIRROR_FAILURES:
+                log.error("镜牢连续失败次数超限，停止后续镜牢任务")
+                failed = True
+                break
 
     mediator.mirror_bar_kill_signal.emit()
+    if failed:
+        return False
     if cfg.re_claim_rewards and finish_times > 1:
-        to_get_reward()
+        if to_get_reward() is False:
+            log.error("镜牢奖励领取失败")
+            return False
+    return True
 
 
 def script_task(thread=None) -> None | int:

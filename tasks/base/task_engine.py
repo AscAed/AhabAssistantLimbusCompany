@@ -56,8 +56,7 @@ class GetRewardTask(Task):
 
     def run(self, engine) -> bool:
         from tasks.base.script_task_scheme import to_get_reward
-        to_get_reward()
-        return True
+        return to_get_reward() is not False
 
 
 class BuyEnkephalinTask(Task):
@@ -66,8 +65,7 @@ class BuyEnkephalinTask(Task):
 
     def run(self, engine) -> bool:
         from tasks.base.script_task_scheme import Buy_enkephalin
-        Buy_enkephalin()
-        return True
+        return Buy_enkephalin() is not False
 
 
 class MirrorDungeonTask(Task):
@@ -81,8 +79,7 @@ class MirrorDungeonTask(Task):
 
     def run(self, engine) -> bool:
         from tasks.base.script_task_scheme import Mirror_task
-        Mirror_task(thread=engine.thread)
-        return True
+        return Mirror_task(thread=engine.thread) is not False
 
 
 class TaskEngine:
@@ -160,7 +157,15 @@ class TaskEngine:
                     log.warning("==> 任务引擎：尝试进行故障恢复并返回主页面...")
                     try:
                         from tasks.base.back_init_menu import back_init_menu
-                        back_init_menu(allow_restart=False)
+                        recovery_succeeded = back_init_menu(allow_restart=False)
+                        if recovery_succeeded is False:
+                            task.recovery_error = RuntimeError(
+                                "任务失败后的局部恢复未能返回主界面"
+                            )
+                            log.error(
+                                "==> 任务引擎：任务 [%s] 故障恢复返回失败",
+                                task.name,
+                            )
                     except Exception as recovery_exc:
                         task.recovery_error = recovery_exc
                         log.exception(
