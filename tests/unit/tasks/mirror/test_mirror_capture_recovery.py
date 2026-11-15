@@ -1142,6 +1142,20 @@ def test_reward_card_selection_stops_after_capture_failure(mock_auto, _wait):
     mock_auto.click_element.assert_not_called()
 
 
+@patch("tasks.mirror.reward_card.retry", return_value=False)
+@patch("tasks.mirror.reward_card.wait_for_screenshot")
+@patch("tasks.mirror.reward_card.auto")
+def test_reward_card_passes_restart_policy_to_retry(mock_auto, _wait, retry):
+    from tasks.mirror.reward_card import get_reward_card
+
+    mock_auto.find_element.return_value = False
+    mock_auto.click_element.return_value = False
+
+    assert get_reward_card(allow_restart=False) is False
+
+    retry.assert_called_once_with(allow_restart=False)
+
+
 @patch("tasks.mirror.select_theme_pack.wait_for_screenshot", side_effect=RuntimeError("capture timeout"))
 @patch("tasks.mirror.select_theme_pack.auto")
 @patch("tasks.mirror.select_theme_pack.path_manager")

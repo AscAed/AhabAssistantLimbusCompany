@@ -5,6 +5,11 @@ from module.logger import log
 from module.my_error.my_error import userStopError
 
 ENKEPHALIN_PREPARATION_TIMEOUT_SECONDS = 60
+MAX_ENKEPHALIN_POPUP_RECOVERIES = 3
+
+
+class EnkephalinPreparationError(RuntimeError):
+    pass
 
 
 class EnkephalinPreparationTimeout(TimeoutError):
@@ -116,6 +121,20 @@ def make_enkephalin_module(cancel=True, skip=True, *, task_name: str = "体力�
     popup_marker_threshold = 0.7
     open_panel_click_cooldown = 0.5
     last_open_panel_click_time = 0.0
+    popup_recovery_count = 0
+
+    def recover_popup():
+        nonlocal popup_recovery_count
+        if popup_recovery_count >= MAX_ENKEPHALIN_POPUP_RECOVERIES:
+            raise EnkephalinPreparationError(
+                f"{task_name}弹窗恢复次数超限"
+                f"（{MAX_ENKEPHALIN_POPUP_RECOVERIES}次）"
+            )
+        popup_recovery_count += 1
+        from tasks.base.back_init_menu import back_init_menu
+
+        if back_init_menu() is False:
+            raise EnkephalinPreparationError(f"{task_name}弹窗恢复失败")
 
     while True:
         _check_stop_requested()
@@ -157,20 +176,14 @@ def make_enkephalin_module(cancel=True, skip=True, *, task_name: str = "体力�
         ) and auto.find_element("home/drive_assets.png", model="normal"):
             _check_stop_requested()
             auto.click_element("base/update_close_assets.png")
-            from tasks.base.back_init_menu import back_init_menu
-
-            back_init_menu()
-            start_time = time.time()
+            recover_popup()
             continue
         if auto.find_element(
             "base/renew_confirm_assets.png", model="clam"
         ) and auto.find_element("home/drive_assets.png", model="normal"):
             _check_stop_requested()
             auto.click_element("base/renew_confirm_assets.png")
-            from tasks.base.back_init_menu import back_init_menu
-
-            back_init_menu()
-            start_time = time.time()
+            recover_popup()
             continue
         panel_visible = bool(
             auto.find_element(

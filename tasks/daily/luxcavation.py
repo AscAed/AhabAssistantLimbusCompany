@@ -61,7 +61,6 @@ def EXP_luxcavation(combat_count: int = 1):
         if (
             auto.find_element("home/first_prompt_assets.png", model="clam")
             and auto.find_element("home/back_assets.png", model="normal")
-            and not auto.find_element("luxcavation/exp_enter.png", threshold=0.85)
         ):
             auto.key_press("esc")
             continue
@@ -173,8 +172,6 @@ def thread_luxcavation(combat_count: int = 1):
         if (
             auto.find_element("home/first_prompt_assets.png", model="clam")
             and auto.find_element("home/back_assets.png", model="normal")
-            and not auto.find_element("luxcavation/thread_enter_assets.png", threshold=0.78)
-            and not auto.find_element("luxcavation/thread_consume.png")
         ):
             auto.key_press("esc")
             continue

@@ -44,7 +44,7 @@ _MAX_REWARD_CARD_ITERATIONS = 31
 
 @begin_and_finish_time_log(task_name="镜牢获取奖励卡", calculate_time=False)
 # 获取奖励卡
-def get_reward_card(model=0):
+def get_reward_card(model=0, *, allow_restart: bool = True):
     loop_count = 30
     claim_retry_at = 0.0
     state = "select_reward"
@@ -102,7 +102,7 @@ def get_reward_card(model=0):
             if select_reward:
                 state = "claim_reward"
                 continue
-        if retry() is False:
+        if retry(allow_restart=allow_restart) is False:
             return False
         loop_count -= 1
         if loop_count < 20:

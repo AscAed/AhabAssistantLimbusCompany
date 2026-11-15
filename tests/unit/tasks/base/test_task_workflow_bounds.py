@@ -346,6 +346,31 @@ def test_maintenance_recovery_without_restart_does_not_kill_game():
     kill_game.assert_not_called()
 
 
+def test_non_restarting_menu_recovery_passes_policy_to_reward_card():
+    reward_asset = "mirror/road_in_mir/select_encounter_reward_card_assets.png"
+    with patch("tasks.base.back_init_menu.auto") as mock_auto, patch(
+        "tasks.base.back_init_menu.ensure_simulator_game_started",
+        return_value=False,
+    ), patch(
+        "tasks.base.back_init_menu.retry",
+        return_value=None,
+    ), patch(
+        "tasks.base.back_init_menu.update_model_for_retry"
+    ), patch(
+        "tasks.base.back_init_menu.get_reward_card",
+        side_effect=RuntimeError("reward policy reached"),
+    ) as get_reward_card:
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            target == reward_asset
+        )
+
+        with pytest.raises(RuntimeError, match="reward policy reached"):
+            back_init_menu(allow_restart=False)
+
+    get_reward_card.assert_called_once_with(allow_restart=False)
+
+
 def test_restart_game_uses_non_restarting_menu_recovery():
     with patch("tasks.base.script_task_scheme.init_game"), patch(
         "tasks.base.retry.sleep"
@@ -784,6 +809,42 @@ def test_luxcavation_confirms_team_screen_on_final_navigation_iteration(
 @pytest.mark.parametrize("task_kind", ["exp", "thread"])
 def test_luxcavation_prompt_does_not_confirm_team_screen_on_final_iteration(task_kind):
     assert _run_luxcavation_on_final_navigation_iteration(task_kind, "prompt") is False
+
+
+@pytest.mark.parametrize("task_kind", ["exp", "thread"])
+def test_luxcavation_dismisses_prompt_when_level_anchor_remains_visible(task_kind):
+    iteration = 0
+
+    def wait_for_screenshot():
+        nonlocal iteration
+        iteration += 1
+
+    def find_element(target, *args, **kwargs):
+        if target == "teams/identify_assets.png":
+            return iteration >= 2
+        if target == "home/first_prompt_assets.png":
+            return iteration == 1
+        if target == "home/back_assets.png":
+            return True
+        if target in {
+            "luxcavation/exp_enter.png",
+            "luxcavation/thread_enter_assets.png",
+            "luxcavation/thread_consume.png",
+        }:
+            return iteration == 1
+        return False
+
+    task = EXP_luxcavation if task_kind == "exp" else thread_luxcavation
+    with patch(
+        "tasks.daily.luxcavation.wait_for_screenshot",
+        side_effect=wait_for_screenshot,
+    ), patch("tasks.daily.luxcavation.auto") as mock_auto:
+        mock_auto.find_element.side_effect = find_element
+
+        assert task() is True
+
+    mock_auto.key_press.assert_called_once_with("esc")
+    mock_auto.mouse_click.assert_not_called()
 
 
 def test_reward_wrapper_stops_after_pass_claim_failure():
