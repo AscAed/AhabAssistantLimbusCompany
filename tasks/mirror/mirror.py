@@ -232,11 +232,7 @@ class Mirror:
             auto.find_element("base/retry_countdown.png")):
             log.warning("Network connection issue detected! Attempting recovery.")
             from tasks.base.retry import retry
-            if not retry():
-                log.warning("Retry failed, restarting game.")
-                kill_game()
-                restart_game()
-                self.road_to_mir()
+            retry()
             return True
         return False
 
@@ -427,7 +423,10 @@ class Mirror:
                     "mirror/claim_reward/complete_mirror_100%_assets.png"
                 ):
                     break
-                retry()
+                if retry() is False:
+                    floor_exit_no_action_count = 0
+                    road_map_no_marker_count = 0
+                    continue
                 if self.get_floor_num:
                     self.get_which_floor()
 
@@ -623,7 +622,8 @@ class Mirror:
                 continue
 
             auto.mouse_click_blank()
-            retry()
+            if retry() is False:
+                continue
             main_loop_count -= 1
             if main_loop_count % 10 == 0:
                 log.debug(f"镜牢道中识别次数剩余{main_loop_count}次")
@@ -646,7 +646,8 @@ class Mirror:
         log.info(msg)
 
         if self.bequest_from_the_previous_game:
-            self.get_reward_in_road()
+            if self.get_reward_in_road() is False:
+                return False
             return True
 
         main_loop_count = 20
@@ -800,7 +801,8 @@ class Mirror:
                         take_screenshot=True,
                     ):
                         sleep(1)
-                    retry()
+                    if retry() is False:
+                        return False
                     continue
             if auto.click_element(
                 "mirror/claim_reward/use_enkephalin_assets.png", threshold=0.75
@@ -810,7 +812,8 @@ class Mirror:
             # 处理周年活动弹出的窗口
             if auto.click_element("home/close_anniversary_event_assets.png"):
                 continue
-            retry()
+            if retry() is False:
+                return False
             main_loop_count -= 1
             if main_loop_count % 3 == 0:
                 log.debug(f"镜牢奖励识别次数剩余{main_loop_count}次")
@@ -1552,7 +1555,8 @@ class Mirror:
                 ):
                     for coordinate in coordinates:
                         auto.mouse_click(coordinate[0], coordinate[1])
-                    retry()
+                    if retry() is False:
+                        return False
                 event_chance -= 1
             if event_chance < 0:
                 finishes_bbox = ImageUtils.get_bbox(
@@ -1583,7 +1587,8 @@ class Mirror:
                 ):
                     for coordinate in coordinates:
                         auto.mouse_click(coordinate[0], coordinate[1])
-                    retry()
+                    if retry() is False:
+                        return False
                 else:
                     msg = "事件卡死，尝试返回主界面"
                     log.error(msg)
@@ -1906,7 +1911,8 @@ class Mirror:
             # 处理周年活动弹出的窗口
             if auto.click_element("home/close_anniversary_event_assets.png"):
                 continue
-            retry()
+            if retry() is False:
+                return False
             main_loop_count -= 1
             if main_loop_count % 3 == 0:
                 log.debug(f"镜牢奖励识别次数剩余{main_loop_count}次")

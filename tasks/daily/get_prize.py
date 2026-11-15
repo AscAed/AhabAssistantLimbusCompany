@@ -82,8 +82,8 @@ def get_mail_prize():
             break
         if auto.click_element("mail/claim_all_assets.png"):
             sleep(3)
-            if retry():
-                continue
+            if retry() is False:
+                return False
             auto.click_element("mail/close_assets.png")
             break
         if auto.click_element("home/mail_assets.png"):
