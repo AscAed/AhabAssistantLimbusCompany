@@ -186,6 +186,41 @@ def test_mirror_task_counts_completed_run_when_menu_recovery_fails():
     mediator.mirror_bar_kill_signal.emit.assert_called_once_with()
 
 
+def test_mirror_task_counts_completed_run_when_resource_preparation_raises():
+    cfg = _mirror_task_config(mirror_count=2)
+    cfg.hard_mirror = True
+    cfg.auto_hard_mirror = True
+    cfg.hard_mirror_chance = 2
+    mediator = SimpleNamespace(
+        mirror_signal=SimpleNamespace(emit=Mock()),
+        mirror_bar_kill_signal=SimpleNamespace(emit=Mock()),
+    )
+    with patch.object(script_task_scheme, "cfg", cfg), patch.object(
+        script_task_scheme, "mediator", mediator
+    ), patch.object(
+        script_task_scheme, "check_hard_mirror_time", return_value=False
+    ), patch.object(script_task_scheme, "Mirror") as mirror, patch.object(
+        script_task_scheme, "back_init_menu", return_value=True
+    ), patch.object(
+        script_task_scheme,
+        "make_enkephalin_module",
+        side_effect=RuntimeError("resource preparation failed"),
+    ) as make_enkephalin:
+        mirror.return_value.run.return_value = True
+
+        assert script_task_scheme.Mirror_task() is False
+
+    mirror.assert_called_once()
+    make_enkephalin.assert_called_once()
+    cfg.rotate_team_queue.assert_called_once()
+    cfg.set_value.assert_called_once_with("hard_mirror_chance", 1)
+    assert mediator.mirror_signal.emit.call_args_list == [
+        ((0, 2),),
+        ((1, 1),),
+    ]
+    mediator.mirror_bar_kill_signal.emit.assert_called_once_with()
+
+
 def test_mirror_task_stops_after_main_menu_recovery_error():
     cfg = _mirror_task_config(mirror_count=2)
     mediator = SimpleNamespace(

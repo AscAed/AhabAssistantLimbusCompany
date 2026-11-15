@@ -49,6 +49,7 @@ MAX_CONSECUTIVE_MIRROR_FAILURES = 3
 
 class MirrorRunOutcome(Enum):
     COMPLETED_RECOVERY_FAILED = "completed_recovery_failed"
+    COMPLETED_POSTPROCESS_FAILED = "completed_postprocess_failed"
 
 
 @begin_and_finish_time_log(task_name="一次经验本")
@@ -124,7 +125,13 @@ def onetime_mir_process(team_setting: TeamSetting, team_num: int):
                 return MirrorRunOutcome.COMPLETED_RECOVERY_FAILED
             if recovered is False:
                 return MirrorRunOutcome.COMPLETED_RECOVERY_FAILED
-            make_enkephalin_module()
+            try:
+                make_enkephalin_module()
+            except userStopError:
+                raise
+            except Exception as e:
+                log.exception(f"镜牢已完成，但准备后续资源时出错: {e}")
+                return MirrorRunOutcome.COMPLETED_POSTPROCESS_FAILED
             return True
         else:
             return False
@@ -396,7 +403,10 @@ def Mirror_task(thread=None):
         recovery_failed = (
             mirror_result is MirrorRunOutcome.COMPLETED_RECOVERY_FAILED
         )
-        if mirror_result or recovery_failed:
+        postprocess_failed = (
+            mirror_result is MirrorRunOutcome.COMPLETED_POSTPROCESS_FAILED
+        )
+        if mirror_result or recovery_failed or postprocess_failed:
             consecutive_failures = 0
             cfg.rotate_team_queue()
             mir_times -= 1
@@ -413,6 +423,10 @@ def Mirror_task(thread=None):
             log.info(msg)
             if recovery_failed:
                 log.error("镜牢已完成但无法返回主界面，停止后续镜牢任务")
+                failed = True
+                break
+            if postprocess_failed:
+                log.error("镜牢已完成但后续资源准备失败，停止后续镜牢任务")
                 failed = True
                 break
             if (
