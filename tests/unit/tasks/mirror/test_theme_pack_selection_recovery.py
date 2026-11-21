@@ -171,11 +171,15 @@ def test_theme_pack_selection_confirms_road_map_after_low_weight_fallback(
     def find_element(target, **kwargs):
         nonlocal road_map_lookups
         if target == feature_asset:
+            if expected_result and road_map_lookups > 0:
+                return None
             return [(100, 200)]
         if target in (
             "mirror/theme_pack/normal_assets.png",
             "mirror/theme_pack/hard_assets.png",
         ):
+            if expected_result and road_map_lookups > 0:
+                return None
             return (10, 10)
         if target == road_map_asset:
             wait_calls_at_road_map.append(mock_wait.call_count)
@@ -277,6 +281,51 @@ def test_theme_pack_selection_failure_is_bounded_when_drag_does_not_exit_page():
 
     assert result is False
     assert mock_wait.call_count == _THEME_PACK_UNCHANGED_ATTEMPTS
+
+
+@pytest.mark.parametrize(
+    "selection_indicator",
+    [
+        "mirror/theme_pack/feature_theme_pack_assets.png",
+        "mirror/theme_pack/normal_assets.png",
+        "mirror/theme_pack/hard_assets.png",
+        "mirror/theme_pack/theme_pack_features.png",
+    ],
+)
+def test_theme_pack_does_not_confirm_road_map_while_selection_indicator_is_visible(
+    selection_indicator,
+):
+    from tasks.mirror.select_theme_pack import _confirm_road_map_after_selection
+
+    selection_visible = True
+
+    def advance_frame():
+        nonlocal selection_visible
+        if mock_wait.call_count > 1:
+            selection_visible = False
+
+    def find_element(target, **_kwargs):
+        if target == selection_indicator and selection_visible:
+            return (100, 200)
+        if target == "mirror/road_in_mir/legend_assets.png":
+            return (500, 400)
+        return None
+
+    with (
+        patch("tasks.mirror.select_theme_pack.auto") as mock_auto,
+        patch("tasks.mirror.select_theme_pack.retry", return_value=None),
+        patch(
+            "tasks.mirror.select_theme_pack.wait_for_screenshot",
+            side_effect=advance_frame,
+        ) as mock_wait,
+        patch("tasks.mirror.select_theme_pack.sleep"),
+    ):
+        mock_auto.find_element.side_effect = find_element
+
+        result = _confirm_road_map_after_selection()
+
+    assert result is True
+    assert mock_wait.call_count == 2
 
 
 def test_theme_pack_selection_returns_failure_after_empty_fallback():

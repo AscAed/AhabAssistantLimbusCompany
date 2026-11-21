@@ -13,11 +13,16 @@ from utils.path_manager import path_manager
 _MAX_THEME_PACK_ITERATIONS = 32
 _ROAD_MAP_CONFIRMATION_ATTEMPTS = 60
 _THEME_PACK_UNCHANGED_ATTEMPTS = 15
+_THEME_PACK_SELECTION_INDICATORS = (
+    "mirror/theme_pack/feature_theme_pack_assets.png",
+    "mirror/theme_pack/normal_assets.png",
+    "mirror/theme_pack/hard_assets.png",
+    "mirror/theme_pack/theme_pack_features.png",
+)
 
 
 def _confirm_road_map_after_selection() -> bool:
     road_map_asset = "mirror/road_in_mir/legend_assets.png"
-    theme_pack_asset = "mirror/theme_pack/theme_pack_features.png"
     unchanged_attempts = 0
     for attempt in range(_ROAD_MAP_CONFIRMATION_ATTEMPTS):
         try:
@@ -25,11 +30,13 @@ def _confirm_road_map_after_selection() -> bool:
                 log.error("主题包拖拽后加载恢复失败，已停止后续操作")
                 return False
             wait_for_screenshot()
-            if auto.find_element(road_map_asset):
+            selection_visible = any(
+                auto.find_element(indicator)
+                for indicator in _THEME_PACK_SELECTION_INDICATORS
+            )
+            if auto.find_element(road_map_asset) and not selection_visible:
                 return True
-            if auto.find_element(
-                theme_pack_asset, find_type="image_with_multiple_targets"
-            ):
+            if selection_visible:
                 unchanged_attempts += 1
                 if unchanged_attempts >= _THEME_PACK_UNCHANGED_ATTEMPTS:
                     log.error("主题包拖拽后选择页面持续未变化，已停止后续操作")
