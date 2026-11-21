@@ -25,6 +25,10 @@ def _check_stop_requested() -> None:
 
 
 def _wait_for_grandet_timing(already_qualified: bool) -> bool:
+    if already_qualified:
+        _check_stop_requested()
+        return True
+
     start_time = time.monotonic()
     while True:
         _check_stop_requested()
@@ -38,7 +42,7 @@ def _wait_for_grandet_timing(already_qualified: bool) -> bool:
             raise EnkephalinPreparationError(
                 "葛朗台模式无法识别体力回复计时器，已停止狂气消耗"
             )
-        if timing_ready is True or already_qualified:
+        if timing_ready is True:
             return True
         auto.sleep_with_stop_check(2)
 

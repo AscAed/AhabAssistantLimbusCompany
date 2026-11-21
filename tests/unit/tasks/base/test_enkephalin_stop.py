@@ -268,6 +268,16 @@ def test_grandet_wait_has_a_total_timeout_for_persistent_not_ready_timer():
     assert sleep_calls == 1
 
 
+def test_grandet_does_not_require_a_second_timer_read_after_qualification():
+    with patch("tasks.base.make_enkephalin_module.auto") as auto, patch(
+        "tasks.base.make_enkephalin_module.get_the_timing"
+    ) as get_timing:
+        assert _wait_for_grandet_timing(already_qualified=True) is True
+
+    auto.sleep_with_stop_check.assert_called_once_with(0)
+    get_timing.assert_not_called()
+
+
 @pytest.mark.parametrize(
     ("times", "spend_asset", "expected_confirmations"),
     [
