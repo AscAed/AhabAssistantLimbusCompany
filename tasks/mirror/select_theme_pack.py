@@ -5,21 +5,37 @@ from module.config import cfg, theme_list
 from module.decorator.decorator import begin_and_finish_time_log
 from module.logger import log
 from tasks.base.back_init_menu import back_init_menu
+from tasks.base.retry import retry
 from tasks.mirror.in_shop import wait_for_screenshot
 from utils.image_utils import ImageUtils
 from utils.path_manager import path_manager
 
 _MAX_THEME_PACK_ITERATIONS = 32
-_ROAD_MAP_CONFIRMATION_ATTEMPTS = 5
+_ROAD_MAP_CONFIRMATION_ATTEMPTS = 60
+_THEME_PACK_UNCHANGED_ATTEMPTS = 15
 
 
 def _confirm_road_map_after_selection() -> bool:
     road_map_asset = "mirror/road_in_mir/legend_assets.png"
+    theme_pack_asset = "mirror/theme_pack/theme_pack_features.png"
+    unchanged_attempts = 0
     for attempt in range(_ROAD_MAP_CONFIRMATION_ATTEMPTS):
         try:
+            if attempt == 0 and retry(allow_restart=False) is False:
+                log.error("主题包拖拽后加载恢复失败，已停止后续操作")
+                return False
             wait_for_screenshot()
             if auto.find_element(road_map_asset):
                 return True
+            if auto.find_element(
+                theme_pack_asset, find_type="image_with_multiple_targets"
+            ):
+                unchanged_attempts += 1
+                if unchanged_attempts >= _THEME_PACK_UNCHANGED_ATTEMPTS:
+                    log.error("主题包拖拽后选择页面持续未变化，已停止后续操作")
+                    return False
+            else:
+                unchanged_attempts = 0
         except Exception as error:
             log.error(
                 f"主题包拖拽后路线图确认失败，已停止后续操作: {type(error).__name__}"

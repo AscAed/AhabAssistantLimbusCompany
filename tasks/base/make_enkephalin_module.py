@@ -7,9 +7,10 @@ from module.logger import log
 from module.my_error.my_error import userStopError
 
 ENKEPHALIN_PREPARATION_TIMEOUT_SECONDS = 60
-GRANDET_TIMING_TIMEOUT_SECONDS = 90
+GRANDET_TIMING_TIMEOUT_SECONDS = 420
 MAX_ENKEPHALIN_POPUP_RECOVERIES = 3
 MAX_LUNACY_SCREENSHOT_ATTEMPTS = 5
+MAX_LUNACY_CONFIRMATION_FAILURES = 3
 
 
 class EnkephalinPreparationError(RuntimeError):
@@ -264,8 +265,9 @@ def lunacy_to_enkephalin(times=0):
     auto.click_element("enkephalin/use_lunacy_assets.png")
     auto.sleep_with_stop_check(0.5)
     Grandet = False
-    remaining_times = times
-    while remaining_times > 0:
+    successful_confirmations = 0
+    confirmation_failures = 0
+    while successful_confirmations < times:
         _check_stop_requested()
         auto.mouse_to_blank(move_back=False)
         for attempt in range(MAX_LUNACY_SCREENSHOT_ATTEMPTS):
@@ -279,36 +281,33 @@ def lunacy_to_enkephalin(times=0):
                 "狂气换体连续截图失败，已停止后续操作"
             )
         _check_stop_requested()
+        spend_asset = None
         if auto.find_element("enkephalin/lunacy_spend_26_assets.png"):
-            # 葛朗台模式
-            if cfg.Dr_Grandet_mode:
-                Grandet = _wait_for_grandet_timing(Grandet)
-            _check_stop_requested()
-            auto.click_element("enkephalin/enkephalin_confirm_assets.png")
-            auto.sleep_with_stop_check(1)
-            remaining_times -= 1
-            continue
-        if remaining_times >= 2 and auto.find_element(
+            spend_asset = "enkephalin/lunacy_spend_26_assets.png"
+        elif times >= 2 and auto.find_element(
             "enkephalin/lunacy_spend_52_assets.png"
         ):
-            if cfg.Dr_Grandet_mode:
-                Grandet = _wait_for_grandet_timing(Grandet)
-            _check_stop_requested()
-            auto.click_element("enkephalin/enkephalin_confirm_assets.png")
-            auto.sleep_with_stop_check(1)
-            remaining_times -= 2
-            continue
-        if remaining_times >= 3 and auto.find_element(
+            spend_asset = "enkephalin/lunacy_spend_52_assets.png"
+        elif times >= 3 and auto.find_element(
             "enkephalin/lunacy_spend_78_assets.png"
         ):
-            if cfg.Dr_Grandet_mode:
-                Grandet = _wait_for_grandet_timing(Grandet)
-            _check_stop_requested()
-            auto.click_element("enkephalin/enkephalin_confirm_assets.png")
+            spend_asset = "enkephalin/lunacy_spend_78_assets.png"
+        if spend_asset is None:
+            break
+        if cfg.Dr_Grandet_mode:
+            Grandet = _wait_for_grandet_timing(Grandet)
+        _check_stop_requested()
+        if not auto.click_element("enkephalin/enkephalin_confirm_assets.png"):
+            confirmation_failures += 1
+            if confirmation_failures >= MAX_LUNACY_CONFIRMATION_FAILURES:
+                raise EnkephalinPreparationError(
+                    "狂气换体确认失败次数超限，已停止后续操作"
+                )
             auto.sleep_with_stop_check(1)
-            remaining_times -= 3
             continue
-        break
+        successful_confirmations += 1
+        confirmation_failures = 0
+        auto.sleep_with_stop_check(1)
     _check_stop_requested()
     auto.click_element("enkephalin/enkephalin_cancel_assets.png")
     _check_stop_requested()

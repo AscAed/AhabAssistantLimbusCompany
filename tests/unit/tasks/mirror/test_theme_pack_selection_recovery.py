@@ -134,14 +134,17 @@ def test_theme_pack_selection_returns_failure_after_menu_recovery():
     ("road_map_results", "capture_error", "expected_result"),
     [
         ([None, (500, 400)], None, True),
-        ([None, None, None, None, None], None, False),
+        ([None] * 60, None, False),
         ([], RuntimeError("capture timeout"), False),
     ],
 )
 def test_theme_pack_selection_confirms_road_map_after_low_weight_fallback(
     road_map_results, capture_error, expected_result
 ):
-    from tasks.mirror.select_theme_pack import select_theme_pack
+    from tasks.mirror.select_theme_pack import (
+        _THEME_PACK_UNCHANGED_ATTEMPTS,
+        select_theme_pack,
+    )
 
     refresh_clicks = 0
     road_map_lookups = 0
@@ -187,6 +190,7 @@ def test_theme_pack_selection_confirms_road_map_after_low_weight_fallback(
         patch("tasks.mirror.select_theme_pack.path_manager") as mock_path_manager,
         patch("tasks.mirror.select_theme_pack.auto") as mock_auto,
         patch("tasks.mirror.select_theme_pack.wait_for_screenshot") as mock_wait,
+        patch("tasks.mirror.select_theme_pack.retry", return_value=None) as mock_retry,
         patch("tasks.mirror.select_theme_pack.sleep"),
         patch("tasks.mirror.select_theme_pack.back_init_menu") as mock_back_init_menu,
     ):
@@ -208,7 +212,10 @@ def test_theme_pack_selection_confirms_road_map_after_low_weight_fallback(
     assert refresh_clicks == 4
     mock_auto.mouse_drag_down.assert_called_once_with(100, 200)
     assert len(wait_calls_at_drag) == 1
-    assert road_map_lookups == len(road_map_results)
+    assert road_map_lookups == min(
+        len(road_map_results), _THEME_PACK_UNCHANGED_ATTEMPTS
+    )
+    mock_retry.assert_called_once_with(allow_restart=False)
     mock_back_init_menu.assert_not_called()
     if road_map_results:
         assert wait_calls_at_road_map[0] == wait_calls_at_drag[0] + 1
@@ -220,6 +227,56 @@ def test_theme_pack_selection_confirms_road_map_after_low_weight_fallback(
         )
     else:
         assert mock_wait.call_count == wait_calls_at_drag[0] + 1
+
+
+def test_theme_pack_transition_can_take_longer_than_five_frames():
+    from tasks.mirror.select_theme_pack import _confirm_road_map_after_selection
+
+    road_map_results = iter([None] * 6 + [(500, 400)])
+
+    def find_element(target, **_kwargs):
+        if target == "mirror/road_in_mir/legend_assets.png":
+            return next(road_map_results)
+        return None
+
+    with (
+        patch("tasks.mirror.select_theme_pack.auto") as mock_auto,
+        patch("tasks.mirror.select_theme_pack.retry", return_value=None) as mock_retry,
+        patch("tasks.mirror.select_theme_pack.wait_for_screenshot") as mock_wait,
+        patch("tasks.mirror.select_theme_pack.sleep"),
+    ):
+        mock_auto.find_element.side_effect = find_element
+
+        result = _confirm_road_map_after_selection()
+
+    assert result is True
+    assert mock_wait.call_count == 7
+    mock_retry.assert_called_once_with(allow_restart=False)
+
+
+def test_theme_pack_selection_failure_is_bounded_when_drag_does_not_exit_page():
+    from tasks.mirror.select_theme_pack import (
+        _THEME_PACK_UNCHANGED_ATTEMPTS,
+        _confirm_road_map_after_selection,
+    )
+
+    def find_element(target, **_kwargs):
+        if target == "mirror/theme_pack/theme_pack_features.png":
+            return [(100, 200)]
+        return None
+
+    with (
+        patch("tasks.mirror.select_theme_pack.auto") as mock_auto,
+        patch("tasks.mirror.select_theme_pack.retry", return_value=None),
+        patch("tasks.mirror.select_theme_pack.wait_for_screenshot") as mock_wait,
+        patch("tasks.mirror.select_theme_pack.sleep"),
+    ):
+        mock_auto.find_element.side_effect = find_element
+
+        result = _confirm_road_map_after_selection()
+
+    assert result is False
+    assert mock_wait.call_count == _THEME_PACK_UNCHANGED_ATTEMPTS
 
 
 def test_theme_pack_selection_returns_failure_after_empty_fallback():
@@ -330,7 +387,7 @@ def test_theme_pack_difficulty_ocr_accepts_text_list(
     def find_element(target, **kwargs):
         nonlocal road_map_lookups
         if target == "mirror/theme_pack/theme_pack_features.png":
-            return [(100, 200)]
+            return [] if mock_auto.mouse_drag_down.called else [(100, 200)]
         if target == "mirror/road_in_mir/legend_assets.png":
             road_map_lookups += 1
             wait_calls_at_road_map.append(_wait.call_count)
@@ -343,7 +400,8 @@ def test_theme_pack_difficulty_ocr_accepts_text_list(
     mock_image_utils.get_bbox.return_value = (10, 20, 30, 40)
     mock_cfg.select_event_pack = True
 
-    result = select_theme_pack(hard_switch=True, floor=4)
+    with patch("tasks.mirror.select_theme_pack.retry", return_value=None):
+        result = select_theme_pack(hard_switch=True, floor=4)
 
     assert result is True
     mock_auto.find_text_element.assert_called_once()

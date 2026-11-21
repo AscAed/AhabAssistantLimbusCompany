@@ -4,7 +4,9 @@ import pytest
 
 from module.my_error.my_error import userStopError
 from tasks.base.make_enkephalin_module import (
+    GRANDET_TIMING_TIMEOUT_SECONDS,
     MAX_ENKEPHALIN_POPUP_RECOVERIES,
+    MAX_LUNACY_CONFIRMATION_FAILURES,
     MAX_LUNACY_SCREENSHOT_ATTEMPTS,
     EnkephalinPreparationError,
     EnkephalinPreparationTimeout,
@@ -255,9 +257,12 @@ def test_grandet_wait_has_a_total_timeout_for_persistent_not_ready_timer():
             if sleep_calls >= 2:
                 raise AssertionError("unbounded Grandet timing wait")
 
-    with patch("tasks.base.make_enkephalin_module.auto") as auto, patch(
+    with patch(
+        "tasks.base.make_enkephalin_module.GRANDET_TIMING_TIMEOUT_SECONDS",
+        4,
+    ), patch("tasks.base.make_enkephalin_module.auto") as auto, patch(
         "tasks.base.make_enkephalin_module.get_the_timing", return_value=False
-    ), patch("time.monotonic", side_effect=[0.0, 0.0, 91.0]):
+    ), patch("time.monotonic", side_effect=[0.0, 0.0, 4.0]):
         auto.sleep_with_stop_check.side_effect = sleep
 
         with pytest.raises(
@@ -266,6 +271,7 @@ def test_grandet_wait_has_a_total_timeout_for_persistent_not_ready_timer():
             _wait_for_grandet_timing(already_qualified=False)
 
     assert sleep_calls == 1
+    assert GRANDET_TIMING_TIMEOUT_SECONDS >= 360
 
 
 def test_grandet_does_not_require_a_second_timer_read_after_qualification():
@@ -279,29 +285,57 @@ def test_grandet_does_not_require_a_second_timer_read_after_qualification():
 
 
 @pytest.mark.parametrize(
-    ("times", "spend_asset", "expected_confirmations"),
+    ("times", "price_sequence", "expected_confirmations"),
     [
-        (1, "enkephalin/lunacy_spend_26_assets.png", 1),
-        (2, "enkephalin/lunacy_spend_26_assets.png", 2),
-        (3, "enkephalin/lunacy_spend_26_assets.png", 3),
-        (2, "enkephalin/lunacy_spend_52_assets.png", 1),
-        (3, "enkephalin/lunacy_spend_78_assets.png", 1),
+        (1, ["enkephalin/lunacy_spend_26_assets.png"], 1),
+        (
+            2,
+            [
+                "enkephalin/lunacy_spend_26_assets.png",
+                "enkephalin/lunacy_spend_52_assets.png",
+            ],
+            2,
+        ),
+        (
+            3,
+            [
+                "enkephalin/lunacy_spend_26_assets.png",
+                "enkephalin/lunacy_spend_52_assets.png",
+                "enkephalin/lunacy_spend_78_assets.png",
+            ],
+            3,
+        ),
+        (
+            2,
+            [
+                "enkephalin/lunacy_spend_52_assets.png",
+                "enkephalin/lunacy_spend_78_assets.png",
+            ],
+            1,
+        ),
+        (
+            3,
+            [
+                "enkephalin/lunacy_spend_78_assets.png",
+                None,
+            ],
+            1,
+        ),
     ],
 )
 def test_lunacy_spending_respects_configured_purchase_count(
-    times, spend_asset, expected_confirmations
+    times, price_sequence, expected_confirmations
 ):
     confirm_asset = "enkephalin/enkephalin_confirm_assets.png"
-    spend_checks = 0
+    current_price = None
+
+    def take_screenshot():
+        nonlocal current_price
+        current_price = price_sequence.pop(0)
+        return object()
 
     def find_element(target, *_args, **_kwargs):
-        nonlocal spend_checks
-        if target != spend_asset:
-            return False
-        spend_checks += 1
-        if spend_checks > expected_confirmations:
-            raise AssertionError("spending exceeded configured purchase count")
-        return True
+        return target == current_price
 
     with patch("tasks.base.make_enkephalin_module.auto") as auto, patch(
         "tasks.base.make_enkephalin_module.cfg"
@@ -309,8 +343,9 @@ def test_lunacy_spending_respects_configured_purchase_count(
         "tasks.base.make_enkephalin_module.make_enkephalin_module"
     ) as prepare:
         cfg.Dr_Grandet_mode = False
-        auto.take_screenshot.return_value = object()
+        auto.take_screenshot.side_effect = take_screenshot
         auto.find_element.side_effect = find_element
+        auto.click_element.return_value = True
 
         lunacy_to_enkephalin(times=times)
 
@@ -321,6 +356,107 @@ def test_lunacy_spending_respects_configured_purchase_count(
     ] == [confirm_asset] * expected_confirmations
     prepare.assert_any_call(cancel=False, skip=False, task_name="狂气换体")
     prepare.assert_any_call(skip=False)
+
+
+def test_lunacy_spending_counts_successful_confirmations_across_price_tiers():
+    confirm_asset = "enkephalin/enkephalin_confirm_assets.png"
+    price_assets = iter(
+        [
+            "enkephalin/lunacy_spend_26_assets.png",
+            "enkephalin/lunacy_spend_52_assets.png",
+            "enkephalin/lunacy_spend_78_assets.png",
+            None,
+        ]
+    )
+    current_price = None
+
+    def take_screenshot():
+        nonlocal current_price
+        current_price = next(price_assets)
+        return object()
+
+    def find_element(target, *_args, **_kwargs):
+        return target == current_price
+
+    with patch("tasks.base.make_enkephalin_module.auto") as auto, patch(
+        "tasks.base.make_enkephalin_module.cfg"
+    ) as cfg, patch(
+        "tasks.base.make_enkephalin_module.make_enkephalin_module"
+    ) as prepare:
+        cfg.Dr_Grandet_mode = False
+        auto.take_screenshot.side_effect = take_screenshot
+        auto.find_element.side_effect = find_element
+        auto.click_element.return_value = True
+
+        lunacy_to_enkephalin(times=3)
+
+    assert [
+        call.args[0]
+        for call in auto.click_element.call_args_list
+        if call.args[0] == confirm_asset
+    ] == [confirm_asset] * 3
+    prepare.assert_any_call(skip=False)
+
+
+def test_lunacy_confirmation_retries_transient_click_failure():
+    confirm_asset = "enkephalin/enkephalin_confirm_assets.png"
+    confirm_attempts = 0
+
+    def find_element(target, *_args, **_kwargs):
+        return target == "enkephalin/lunacy_spend_26_assets.png"
+
+    def click_element(target, *_args, **_kwargs):
+        nonlocal confirm_attempts
+        if target != confirm_asset:
+            return False
+        confirm_attempts += 1
+        return confirm_attempts == 2
+
+    with patch("tasks.base.make_enkephalin_module.auto") as auto, patch(
+        "tasks.base.make_enkephalin_module.cfg"
+    ) as cfg, patch(
+        "tasks.base.make_enkephalin_module.make_enkephalin_module"
+    ):
+        cfg.Dr_Grandet_mode = False
+        auto.take_screenshot.return_value = object()
+        auto.find_element.side_effect = find_element
+        auto.click_element.side_effect = click_element
+
+        lunacy_to_enkephalin(times=1)
+
+    assert confirm_attempts == 2
+    assert auto.take_screenshot.call_count == 2
+
+
+def test_lunacy_confirmation_failure_is_bounded():
+    confirm_asset = "enkephalin/enkephalin_confirm_assets.png"
+
+    with patch("tasks.base.make_enkephalin_module.auto") as auto, patch(
+        "tasks.base.make_enkephalin_module.cfg"
+    ) as cfg, patch(
+        "tasks.base.make_enkephalin_module.make_enkephalin_module"
+    ) as prepare:
+        cfg.Dr_Grandet_mode = False
+        auto.take_screenshot.return_value = object()
+        auto.find_element.side_effect = lambda target, *_args, **_kwargs: (
+            target == "enkephalin/lunacy_spend_26_assets.png"
+        )
+        auto.click_element.side_effect = lambda target, *_args, **_kwargs: (
+            target != confirm_asset
+        )
+
+        with pytest.raises(
+            EnkephalinPreparationError, match="确认失败次数超限"
+        ):
+            lunacy_to_enkephalin(times=1)
+
+    assert sum(
+        call.args[0] == confirm_asset for call in auto.click_element.call_args_list
+    ) == MAX_LUNACY_CONFIRMATION_FAILURES
+    assert auto.take_screenshot.call_count == MAX_LUNACY_CONFIRMATION_FAILURES
+    prepare.assert_called_once_with(
+        cancel=False, skip=False, task_name="狂气换体"
+    )
 
 
 @pytest.mark.parametrize(
