@@ -9,8 +9,34 @@ from rapidocr.utils.output import RapidOCROutput
 from module.my_error.my_error import userStopError
 from module.ocr.ocr import OCR, OCRExecutionError
 from tasks.base import script_task_scheme
-from tasks.base.make_enkephalin_module import get_current_enkephalin
+from tasks.base.make_enkephalin_module import get_current_enkephalin, get_the_timing
 from tasks.tools.production_module import ProductionModule, ProductionWork
+
+
+@pytest.mark.parametrize(
+    ("ocr_result", "return_time", "expected"),
+    [
+        (None, False, None),
+        ([], False, None),
+        (["not a timer"], False, None),
+        (["04:19"], False, False),
+        (["05:20"], False, True),
+        (["05:20"], True, 320),
+    ],
+)
+def test_get_the_timing_distinguishes_unreadable_and_not_ready(
+    ocr_result, return_time, expected
+):
+    with patch("tasks.base.make_enkephalin_module.auto") as mock_auto, patch(
+        "tasks.base.make_enkephalin_module.cfg"
+    ) as mock_cfg:
+        mock_auto.find_element.return_value = (300, 400)
+        mock_auto.find_text_element.return_value = ocr_result
+        mock_cfg.set_win_size = 1440
+
+        result = get_the_timing(return_time=return_time)
+
+    assert result == expected
 
 
 @patch("utils.image_utils.ImageUtils.crop", return_value=np.zeros((4, 4), dtype=np.uint8))

@@ -519,5 +519,5 @@ def load_team_code_in_game(team_code: str) -> bool:
             sleep(1)
 
     auto.mouse_click(100, 100)  # 点击左上角关闭
-    log.warning(f"加载编队码失败，已重试{max_retries}次: {team_code}")
+    log.warning(f"加载编队码失败，已重试{max_retries}次")
     return False

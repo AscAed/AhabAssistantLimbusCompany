@@ -36,6 +36,58 @@ def _mirror_task_config(mirror_count=1, re_claim_rewards=False):
     )
 
 
+@pytest.mark.parametrize(
+    ("selected_teams", "active_queue"),
+    [([False], [1]), ([True], [])],
+)
+def test_mirror_task_fails_when_no_eligible_team_can_run(
+    selected_teams, active_queue
+):
+    cfg = _mirror_task_config()
+    cfg.get_value.return_value = selected_teams
+    cfg.teams_active_queue = active_queue
+    mediator = SimpleNamespace(
+        mirror_signal=SimpleNamespace(emit=Mock()),
+        mirror_bar_kill_signal=SimpleNamespace(emit=Mock()),
+    )
+
+    with (
+        patch.object(script_task_scheme, "cfg", cfg),
+        patch.object(script_task_scheme, "mediator", mediator),
+        patch.object(script_task_scheme, "onetime_mir_process") as run_once,
+    ):
+        assert script_task_scheme.Mirror_task() is False
+
+    run_once.assert_not_called()
+    mediator.mirror_bar_kill_signal.emit.assert_called_once_with()
+
+
+def test_mirror_task_stops_when_active_queue_has_no_compatible_team():
+    cfg = _mirror_task_config()
+    cfg.teams_active_queue = [1, 2]
+    cfg.get_value.return_value = [True, True, True]
+    cfg.config.teams = {
+        "1": SimpleNamespace(fixed_team_use=True, fixed_team_use_select=0),
+        "2": SimpleNamespace(fixed_team_use=True, fixed_team_use_select=0),
+        "3": SimpleNamespace(fixed_team_use=False, fixed_team_use_select=0),
+    }
+    mediator = SimpleNamespace(
+        mirror_signal=SimpleNamespace(emit=Mock()),
+        mirror_bar_kill_signal=SimpleNamespace(emit=Mock()),
+    )
+
+    with (
+        patch.object(script_task_scheme, "cfg", cfg),
+        patch.object(script_task_scheme, "mediator", mediator),
+        patch.object(script_task_scheme, "onetime_mir_process") as run_once,
+    ):
+        assert script_task_scheme.Mirror_task() is False
+
+    run_once.assert_not_called()
+    assert cfg.rotate_team_queue.call_count == 1
+    mediator.mirror_bar_kill_signal.emit.assert_called_once_with()
+
+
 def _run_luxcavation_on_final_navigation_iteration(task_kind, final_signal):
     iteration = 0
 
@@ -344,6 +396,26 @@ def test_maintenance_recovery_without_restart_does_not_kill_game():
         assert back_init_menu(allow_restart=False) is False
 
     kill_game.assert_not_called()
+
+
+def test_main_menu_recovery_bounds_persistent_title_screen_without_restart():
+    clear_cache_asset = "base/clear_all_caches_assets.png"
+    with patch("tasks.base.back_init_menu.auto") as mock_auto, patch(
+        "tasks.base.back_init_menu.ensure_simulator_game_started",
+        return_value=False,
+    ), patch("tasks.base.back_init_menu.retry", return_value=None), patch(
+        "tasks.base.back_init_menu.update_model_for_retry"
+    ), patch(
+        "tasks.base.back_init_menu.click_title_screen_safely"
+    ) as click_title_screen, patch("tasks.base.back_init_menu.sleep"):
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            target == clear_cache_asset
+        )
+
+        assert back_init_menu(allow_restart=False) is False
+
+    assert click_title_screen.call_count == 30
 
 
 def test_non_restarting_menu_recovery_passes_policy_to_reward_card():

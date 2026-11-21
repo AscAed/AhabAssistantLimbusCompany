@@ -17,6 +17,7 @@ _last_simulator_alive_check_time = 0.0
 
 # How long a single loading screen is allowed to run before we consider it stuck.
 LOADING_SCREEN_TIMEOUT = 300  # 5 minutes
+MAX_SIMULATOR_START_ATTEMPTS = 3
 _loading_started_at: float | None = None
 
 
@@ -124,6 +125,11 @@ def kill_game():
         subprocess.run(["taskkill", "/F", "/PID", str(pid)], check=False)
     sleep(10)
     wait_start = time.time()
+    target_process_name = cfg.game_process_name
+    if not isinstance(target_process_name, str) or not target_process_name:
+        log.warning("未配置有效的游戏进程名，跳过进程退出等待")
+        return
+    target_process_name = target_process_name.casefold()
     while True:
         game_running = False
         for proc in psutil.process_iter(["name"]):
@@ -131,7 +137,10 @@ def kill_game():
                 # 获取进程的可执行文件名（如 "notepad.exe"）
                 proc_name = proc.info["name"]
                 # 仅当遍历后找不到任何游戏进程时，才认为游戏已退出
-                if proc_name and cfg.game_process_name.lower() in proc_name.lower():
+                if (
+                    isinstance(proc_name, str)
+                    and proc_name.casefold() == target_process_name
+                ):
                     game_running = True
                     break
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
@@ -204,12 +213,19 @@ def retry(*, allow_restart=True):
     为保证稳定性，retry 内循环始终刷新截图，避免复用旧帧导致误判。
     """
     start_time = time.time()
+    simulator_start_attempts = 0
     is_windows = not cfg.config.simulator
     if is_windows:
         saved_hwnd = screen.handle.hwnd
     while True:
-        if ensure_simulator_game_started():
+        if (
+            simulator_start_attempts < MAX_SIMULATOR_START_ATTEMPTS
+            and ensure_simulator_game_started()
+        ):
+            simulator_start_attempts += 1
             start_time = time.time()
+            if simulator_start_attempts == MAX_SIMULATOR_START_ATTEMPTS:
+                log.warning("模拟器游戏启动尝试已达上限，继续等待当前启动结果")
             continue
         if is_windows and screen.handle.hwnd != saved_hwnd:
             # 句柄发生变化则重置初始时间, 以免误判卡死

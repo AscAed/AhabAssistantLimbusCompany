@@ -4,6 +4,7 @@ from module.domain_constants import (
     ALL_SINNERS_NAME_ZH,
     ALL_SYSTEMS,
     OBSERVE_SYSTEM,
+    OPENING_EGO_GIFT_ORDERS,
     SYSTEM_CN_ZH,
 )
 
@@ -14,12 +15,7 @@ all_sinners_name_zh = ALL_SINNERS_NAME_ZH
 all_sinner = ALL_SINNER
 
 start_gift = {
-    0: [1, 2, 3],
-    1: [1, 3, 2],
-    2: [2, 1, 3],
-    3: [2, 3, 1],
-    4: [3, 1, 2],
-    5: [3, 2, 1],
+    index: list(order) for index, order in enumerate(OPENING_EGO_GIFT_ORDERS)
 }
 system_cn_zh = SYSTEM_CN_ZH
 

@@ -22,6 +22,60 @@ def test_update_check_invalid_local_version_skips_network():
     mock_mirror.assert_not_called()
 
 
+def test_update_check_network_errors_do_not_log_request_urls():
+    secret = "cdk-sentinel-should-not-appear"
+    thread = UpdateThread(timeout=5, flag=False)
+    signals = []
+    thread.updateSignal.connect(signals.append)
+
+    with (
+        patch.object(thread, "_validate_local_version", return_value=True),
+        patch.object(
+            thread,
+            "check_update_info_mirrorchyan",
+            side_effect=requests.exceptions.ConnectionError(
+                f"request failed: https://mirrorchyan.test/?cdk={secret}"
+            ),
+        ),
+        patch.object(
+            thread,
+            "check_update_info_github",
+            side_effect=requests.exceptions.ConnectionError(
+                f"request failed: https://github.test/?token={secret}"
+            ),
+        ),
+        patch("module.update.check_update.log.error") as log_error,
+    ):
+        thread.run()
+
+    assert signals == [UpdateStatus.FAILURE]
+    assert "ConnectionError" in repr(log_error.call_args_list)
+    assert secret not in repr(log_error.call_args_list)
+
+
+def test_get_assets_url_does_not_log_mirrorchyan_cdk():
+    secret = "cdk-sentinel-should-not-appear"
+    thread = UpdateThread(timeout=5, flag=False)
+
+    with (
+        patch("module.update.check_update.cfg.update_source", "MirrorChyan"),
+        patch("module.update.check_update.cfg.mirrorchyan_cdk", "encrypted-cdk"),
+        patch("module.update.check_update.decrypt_string", return_value=secret),
+        patch.object(
+            thread,
+            "check_update_info_mirrorchyan",
+            side_effect=requests.exceptions.ConnectionError(
+                f"request failed: https://mirrorchyan.test/?cdk={secret}"
+            ),
+        ),
+        patch("module.update.check_update.log.error") as log_error,
+    ):
+        assert thread.get_assets_url() is None
+
+    assert "ConnectionError" in repr(log_error.call_args_list)
+    assert secret not in repr(log_error.call_args_list)
+
+
 def test_update_interrupted_download_preserves_existing_package(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     package_dir = tmp_path / "update_temp"
@@ -95,6 +149,34 @@ def test_update_invalid_url_emits_download_failure_without_network(tmp_path, mon
 
     get.assert_not_called()
     signals.download_failed.emit.assert_called_once_with("更新失败：获取的URL无效。")
+
+
+def test_update_request_failure_does_not_log_signed_url(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    secret = "signed-download-token"
+    url = f"https://updates.example.test/AALC.zip?token={secret}"
+    signals = SimpleNamespace(
+        update_progress=MagicMock(),
+        download_progress_finished=MagicMock(),
+        download_complete=MagicMock(),
+        download_failed=MagicMock(),
+    )
+
+    with (
+        patch(
+            "module.update.check_update.requests.get",
+            side_effect=requests.exceptions.ConnectionError(f"failed: {url}"),
+        ),
+        patch("module.update.check_update.mediator", signals),
+        patch("module.update.check_update.log.error") as log_error,
+    ):
+        update(url)
+
+    assert "ConnectionError" in repr(log_error.call_args_list)
+    assert secret not in repr(log_error.call_args_list)
+    signals.download_failed.emit.assert_called_once_with(
+        "下载失败，请检查网络后重试。"
+    )
 
 
 def test_update_file_error_emits_download_failure_and_preserves_package(

@@ -46,6 +46,7 @@ _MAX_EVENT_HANDLING_ITERATIONS = 31
 _MAX_FLOOR_EXIT_ACTIONS = 31
 _MAX_FLOOR_EXIT_NO_ACTION_ITERATIONS = 31
 _MAX_EMPTY_SINNER_RECOVERIES = 3
+_MAX_NETWORK_RECOVERY_ATTEMPTS = 3
 _MAX_EGO_GIFT_CONFIRM_ACTIONS = 31
 _MAX_INFINITY_MIRROR_POPUP_ITERATIONS = 31
 _MAX_ROAD_MAP_NO_MARKER_ITERATIONS = 31
@@ -113,6 +114,7 @@ class Mirror:
         self.get_floor_num = True
         self.floor_times = [-9999.0 for i in range(5)]  # 负值代表缺失值
         self.LOOP_COUNT = 250
+        self._network_recovery_attempts = 0
 
         self.mirror_map = MirrorMap(hard_mode=self.hard_switch)
 
@@ -144,15 +146,15 @@ class Mirror:
                 self.bequest_from_the_previous_game = True
                 return True
             if auto.find_element("mirror/shop/shop_coins_assets.png"):  # 防止卡死在商店
-                break
+                return True
             if auto.find_element("mirror/road_in_mir/legend_assets.png"):
-                break
+                return True
             if auto.click_element("mirror/road_to_mir/resume_assets.png"):
-                break
+                return True
             if auto.click_element(
                 "mirror/road_to_mir/enter_mirror_assets.png", threshold=0.78
             ):
-                break
+                return True
             infinity_bbox = ImageUtils.get_bbox(
                 ImageUtils.load_image("mirror/road_to_mir/infinity_mirror_bbox.png")
             )
@@ -191,13 +193,13 @@ class Mirror:
                 sleep(0.5)
                 continue
             if auto.find_element("mirror/road_to_mir/select_team_stars_assets.png"):
-                break
+                return True
             if auto.find_element("mirror/road_to_mir/dreaming_star/coins_assets.png"):
                 # 防止卡在星光选择
-                break
+                return True
             if auto.find_element("mirror/theme_pack/feature_theme_pack_assets.png"):
                 # 防止卡死在主题包页面
-                break
+                return True
             loop_count -= 1
             if loop_count < 20:
                 auto.model = "normal"
@@ -206,10 +208,11 @@ class Mirror:
             if loop_count < 0:
                 log.error("无法进入镜牢,尝试回到初始界面")
                 back_init_menu()
-                break
+                return False
         else:
             log.error("进入镜牢识别超过最大次数，尝试回到初始界面")
             back_init_menu()
+            return False
 
     def check_and_recover_process(self) -> bool:
         """
@@ -221,20 +224,32 @@ class Mirror:
         # Check if game window handle is invalid or process not running
         if not check_game_running():
             log.warning("Game crash detected! Attempting process restart and state recovery.")
+            self._network_recovery_attempts = 0
             kill_game()
             if restart_game() is False:
                 raise backMainWinError("镜牢游戏重启后无法恢复到主界面，停止镜牢任务")
-            self.road_to_mir()
+            if self.road_to_mir() is False:
+                raise backMainWinError("镜牢游戏重启后无法恢复到镜牢流程，停止镜牢任务")
             return True
 
         # Check for network connection issues
-        if (auto.find_element("base/connecting_assets.png") or 
-            auto.find_element("base/retry.png") or 
-            auto.find_element("base/retry_countdown.png")):
-            log.warning("Network connection issue detected! Attempting recovery.")
+        network_issue_detected = (
+            auto.find_element("base/connecting_assets.png")
+            or auto.find_element("base/retry.png")
+            or auto.find_element("base/retry_countdown.png")
+        )
+        if network_issue_detected:
+            if self._network_recovery_attempts >= _MAX_NETWORK_RECOVERY_ATTEMPTS:
+                raise cannotOperateGameError("镜牢网络连接恢复次数超限，请手动检查网络后重试")
+            self._network_recovery_attempts += 1
+            log.warning(
+                "Network connection issue detected! Attempting recovery "
+                f"({self._network_recovery_attempts}/{_MAX_NETWORK_RECOVERY_ATTEMPTS})."
+            )
             from tasks.base.retry import retry
             retry()
             return True
+        self._network_recovery_attempts = 0
         return False
 
     def run(self):
@@ -363,12 +378,13 @@ class Mirror:
 
             elif state == GameState.THEME_PACK:
                 sleep(2)
-                select_theme_pack(
+                if select_theme_pack(
                     self.hard_switch,
                     self.floor,
                     self.team_order,
                     self.use_custom_theme_pack_weight,
-                )
+                ) is False:
+                    return False
                 if self.re_formation_each_floor:
                     self.first_battle = True
                 try:
@@ -389,8 +405,10 @@ class Mirror:
                 continue
 
             elif state == GameState.SHOP:
-                _, elapsed = self._time_call(self.in_shop)
+                shop_result, elapsed = self._time_call(self.in_shop)
                 self.shop_total_time += elapsed
+                if shop_result is False:
+                    return False
                 continue
 
             elif state == GameState.ROAD_MAP:
@@ -441,8 +459,10 @@ class Mirror:
                     "mirror/road_in_mir/legend_assets.png"
                 ) or auto.find_element("mirror/road_in_mir/to_window_assets.png"):
                     road_map_no_marker_count = 0
-                    _, elapsed = self._time_call(self.search_road)
+                    search_result, elapsed = self._time_call(self.search_road)
                     self.find_road_total_time += elapsed
+                    if search_result is False:
+                        return False
                 else:
                     if road_map_no_marker_count >= _MAX_ROAD_MAP_NO_MARKER_ITERATIONS:
                         raise cannotOperateGameError(
@@ -452,7 +472,8 @@ class Mirror:
                 continue
 
             elif state == GameState.MIRROR_TEAM_SELECT:
-                self.select_mirror_team()
+                if self.select_mirror_team() is False:
+                    return False
                 continue
 
             elif state == GameState.BATTLE_FORMATION:
@@ -482,7 +503,8 @@ class Mirror:
                 ):
                     continue_mirror = check_team()
                     if continue_mirror is False and self.first_battle is False:
-                        self.re_start()
+                        if self.re_start() is False:
+                            return False
                         empty_sinner_recovery_attempts = 0
                 if auto.click_element(
                     "battle/chaim_to_battle_assets.png"
@@ -498,17 +520,22 @@ class Mirror:
                 continue
 
             elif state == GameState.EGO_GIFT_SELECT:
-                self.acquire_ego_gift()
+                if self.acquire_ego_gift() is False:
+                    return False
                 continue
 
             elif state == GameState.EVENT:
                 if auto.click_element("event/skip_assets.png", times=6):
-                    self.event_handling()
+                    if self.event_handling() is False:
+                        return False
                     continue
 
             elif state == GameState.MIRROR_ENTRANCE:
                 if auto.click_element("mirror/road_to_mir/enter_assets.png"):
-                    if self.road_to_mir() and self.bequest_from_the_previous_game:
+                    road_result = self.road_to_mir()
+                    if road_result is False:
+                        return False
+                    if road_result and self.bequest_from_the_previous_game:
                         break
                     continue
 
@@ -517,7 +544,10 @@ class Mirror:
                     "home/window_assets.png"
                 ):
                     sleep(0.5)
-                    if self.road_to_mir() and self.bequest_from_the_previous_game:
+                    road_result = self.road_to_mir()
+                    if road_result is False:
+                        return False
+                    if road_result and self.bequest_from_the_previous_game:
                         break
                     continue
 
@@ -541,12 +571,14 @@ class Mirror:
                 continue
 
             if auto.find_element("mirror/road_to_mir/select_team_stars_assets.png"):
-                self.select_mirror_team()
+                if self.select_mirror_team() is False:
+                    return False
                 continue
 
             if battle.fail_times >= 5:
                 battle.fail_times = 0
-                self.re_start()
+                if self.re_start() is False:
+                    return False
                 continue
 
             unselected_sinner_asset = "battle/select_none_assets.png"
@@ -563,7 +595,8 @@ class Mirror:
             if auto.find_element(
                 "mirror/road_to_mir/dreaming_star/coins_assets.png", threshold=0.9
             ):
-                self.enter_mir_with_star()
+                if self.enter_mir_with_star() is False:
+                    return False
                 continue
 
             if (
@@ -576,10 +609,12 @@ class Mirror:
                     model="clam",
                 )
             ):
-                self.acquire_ego_gift(type=2)
+                if self.acquire_ego_gift(type=2) is False:
+                    return False
                 continue
             if main_loop_count < 30 and auto.find_language_text("拒绝饰品", "refuse"):
-                self.acquire_ego_gift(type=2)
+                if self.acquire_ego_gift(type=2) is False:
+                    return False
                 continue
 
             if click_ego_gift_confirm():
@@ -589,9 +624,11 @@ class Mirror:
                 "mirror/road_in_mir/select_encounter_reward_card_assets.png"
             ):
                 if self.reward_cards:
-                    get_reward_card(self.reward_cards_select)
+                    if get_reward_card(self.reward_cards_select) is False:
+                        return False
                 else:
-                    get_reward_card()
+                    if get_reward_card() is False:
+                        return False
                 continue
 
             if auto.find_element(
@@ -599,7 +636,8 @@ class Mirror:
             ) or auto.find_element(
                 "mirror/road_to_mir/activate_gift_search_off_assets.png"
             ):
-                self.select_init_ego_gift()
+                if self.select_init_ego_gift() is False:
+                    return False
                 continue
 
             if auto.find_element(
@@ -609,7 +647,8 @@ class Mirror:
                 "mirror/road_to_mir/observe_ego_gift/observe_burn_assets.png",
                 model="clam",
             ):
-                self.select_observe_ego_gift()
+                if self.select_observe_ego_gift() is False:
+                    return False
                 continue
 
             if infinity_popup_visible:
@@ -934,7 +973,7 @@ class Mirror:
 
         return True
 
-    def enter_mir_with_star(self):
+    def enter_mir_with_star(self) -> bool:
         coins = auto.find_element(
             "mirror/road_to_mir/dreaming_star/coins_assets.png", threshold=0.9
         )
@@ -1029,8 +1068,9 @@ class Mirror:
                 raise cannotOperateGameError(
                     "无法进入镜牢，不能进行下一步,请手动操作重试"
                 )
+        return True
 
-    def select_init_ego_gift(self):
+    def select_init_ego_gift(self) -> bool:
         scroll = False
         select_system = False
         loop_count = 30
@@ -1038,8 +1078,13 @@ class Mirror:
         auto.model = "clam"
 
         team_system = self.system
+        start_gift_order = None
         if self.opening_items:
             team_system = all_systems[self.opening_items_system]
+            start_gift_order = start_gift.get(self.opening_items_select)
+            if start_gift_order is None:
+                log.error("初始EGO饰品槽位选择顺序无效，已停止选择")
+                return False
         log.debug("开始选择初始EGO")
         while True:
             iteration_count += 1
@@ -1104,16 +1149,10 @@ class Mirror:
                 continue
 
             if self.opening_items:
-                start_gift_order = start_gift[self.opening_items_select]
-                auto.click_element(
-                    f"mirror/road_to_mir/select_init_gift/{team_system}_ego_gift_{start_gift_order[0]}.png"
-                )
-                auto.click_element(
-                    f"mirror/road_to_mir/select_init_gift/{team_system}_ego_gift_{start_gift_order[1]}.png"
-                )
-                auto.click_element(
-                    f"mirror/road_to_mir/select_init_gift/{team_system}_ego_gift_{start_gift_order[2]}.png"
-                )
+                for gift_order in start_gift_order:
+                    auto.click_element(
+                        f"mirror/road_to_mir/select_init_gift/{team_system}_ego_gift_{gift_order}.png"
+                    )
             else:
                 auto.click_element(
                     f"mirror/road_to_mir/select_init_gift/{team_system}_ego_gift_1.png"
@@ -1152,7 +1191,9 @@ class Mirror:
             if loop_count < 0:
                 log.error("无法进入镜牢,尝试回到初始界面")
                 back_init_menu()
-                break
+                return False
+
+        return True
 
     def select_observe_ego_gift(self):
         """
@@ -1229,7 +1270,7 @@ class Mirror:
             benchmark_point = (bleed_point[0] - 110 * my_scale, bleed_point[1])
 
         if not benchmark_point:
-            return
+            return False
 
         gift_box = ImageUtils.get_bbox(
             ImageUtils.load_image(
@@ -1286,7 +1327,7 @@ class Mirror:
             if _select_and_verify_gift(gift_level, gift_row, gift_col):
                 sleep(0.5)
                 # Refresh screenshot to capture the newly opened details panel
-                auto.take_screenshot()
+                wait_for_screenshot()
                 select_bbox = ImageUtils.get_bbox(
                     ImageUtils.load_image(
                         "mirror/road_to_mir/observe_ego_gift/select_gift_bbox.png"
@@ -1309,7 +1350,7 @@ class Mirror:
                 or auto.find_element("mirror/road_to_mir/observe_ego_gift/observe_burn_assets.png", model="clam")
             ):
                 log.debug("已离开观测饰品界面")
-                return
+                return True
 
             # Check if starlight consumption confirmation dialog is open
             confirm_p = auto.find_language_text("确认", "confirm")
@@ -1324,7 +1365,7 @@ class Mirror:
                     or auto.find_element("mirror/road_to_mir/observe_ego_gift/observe_burn_assets.png", model="clam")
                 ):
                     log.debug("确认后成功离开观测饰品界面")
-                    return
+                    return True
                 continue
 
             bbox = ImageUtils.get_bbox(
@@ -1341,7 +1382,7 @@ class Mirror:
                     "mirror/shop/leave_shop_confirm_assets.png", take_screenshot=True
                 ):
                     sleep(1)
-                    return
+                    return True
 
         # 兜底：处理可能的弹窗确认
         for _ in range(5):
@@ -1365,9 +1406,11 @@ class Mirror:
                     if auto.click_element(
                         "mirror/shop/leave_shop_confirm_assets.png", take_screenshot=True
                     ):
-                        return
+                        return True
 
-    def select_mirror_team(self):
+        return False
+
+    def select_mirror_team(self) -> bool:
         chance_to_select_team = 5
         while not select_battle_team(self.team_number):
             chance_to_select_team -= 1
@@ -1404,7 +1447,7 @@ class Mirror:
             if loop_count < 0:
                 log.error("无法进入镜牢,尝试回到初始界面")
                 back_init_menu()
-                break
+                return False
             if retry() is False:
                 return False
             if auto.click_element("mirror/road_to_mir/level_confirm_assets.png"):
@@ -1415,6 +1458,7 @@ class Mirror:
                 continue
 
         time.sleep(3)
+        return True
 
     @begin_and_finish_time_log(task_name="镜牢寻路")
     def search_road(self):
@@ -1495,7 +1539,7 @@ class Mirror:
             if retry() is False:
                 return False
 
-    def re_start(self):
+    def re_start(self) -> bool:
         for _ in range(_MAX_RESTART_ITERATIONS):
             wait_for_screenshot()
             if auto.click_element(
@@ -1517,6 +1561,7 @@ class Mirror:
         to_log_with_time("满 身 疮 痍 ！ 重 开 ！此次战败", time.time() - self.start_time)
         self.first_battle = True
         self.start_time = time.time()
+        return True
 
     def event_handling(self):
         # 遇到有SKIP的情况
@@ -1525,6 +1570,7 @@ class Mirror:
         iteration_count = 0
         auto.model = "clam"
         event_chance = 15
+        event_failed = False
         while True:
             wait_for_screenshot()
             if retry() is False:
@@ -1539,6 +1585,7 @@ class Mirror:
             if iteration_count >= _MAX_EVENT_HANDLING_ITERATIONS:
                 log.error("事件处理操作次数超限，尝试回到初始界面")
                 back_init_menu()
+                event_failed = True
                 break
             iteration_count += 1
 
@@ -1595,7 +1642,8 @@ class Mirror:
                     msg = "事件卡死，尝试返回主界面"
                     log.error(msg)
                     back_init_menu()
-                    return
+                    event_failed = True
+                    break
 
             # 针对不同事件进行处理，优先选???与直接获取的，再选需要判定的，再选后续事件的，最后第一个事项
             if auto.click_element("event/unknown_event.png"):
@@ -1653,6 +1701,7 @@ class Mirror:
             if loop_count < 0:
                 log.error("无法解决事件,尝试回到初始界面")
                 back_init_menu()
+                event_failed = True
                 break
 
         # 统计事件处理时间
@@ -1660,8 +1709,9 @@ class Mirror:
         event_elapsed_time = event_end_time - event_start_time
         self.event_total_time += event_elapsed_time
         self.event_times += 1
+        return not event_failed
 
-    def acquire_ego_gift(self, type: int = 1):
+    def acquire_ego_gift(self, type: int = 1) -> bool:
         my_scale = cfg.set_win_size / 1440
         auto.model = "clam"
         auto.mouse_to_blank()
@@ -1679,7 +1729,7 @@ class Mirror:
             time.sleep(2)
             if retry() is False:
                 return False
-            return
+            return True
         for _ in range(_MAX_EGO_GIFT_ITERATIONS):
             wait_for_screenshot()
 
@@ -1714,7 +1764,7 @@ class Mirror:
                         time.sleep(2)
                         if retry() is False:
                             return False
-                        return
+                        return True
                 elif len(acquire_card) == 1:
                     for button in acquire_card:
                         bbox = (
@@ -1742,7 +1792,7 @@ class Mirror:
                                     time.sleep(2)
                                     if retry() is False:
                                         return False
-                                    return
+                                    return True
                         auto.mouse_click(button[0], button[1])
                         time.sleep(1)
                         auto.click_element(
@@ -1752,7 +1802,7 @@ class Mirror:
                         time.sleep(2)
                         if retry() is False:
                             return False
-                        return
+                        return True
                 else:
                     system_nums = 0
                     for button in acquire_card:
@@ -1818,7 +1868,7 @@ class Mirror:
                     time.sleep(2)
                     if retry() is False:
                         return False
-                    return
+                    return True
                 elif auto.find_text_element(
                     ["0/2", "02", "2/2", "22", "/2"], my_crop=select_bbox
                 ):
@@ -1832,7 +1882,7 @@ class Mirror:
                     time.sleep(2)
                     if retry() is False:
                         return False
-                    return
+                    return True
                 else:
                     for gift in my_list:
                         auto.mouse_click(gift[0], gift[1])
@@ -1844,13 +1894,14 @@ class Mirror:
                     time.sleep(2)
                     if retry() is False:
                         return False
-                    return
+                    return True
 
             except Exception as e:
                 log.error(e)
                 continue
         else:
             raise cannotOperateGameError("获取EGO饰品操作次数超限，请手动操作重试")
+        return True
 
     def get_reward_in_road(self):
         main_loop_count = 20
@@ -1931,7 +1982,7 @@ class Mirror:
 
     @begin_and_finish_time_log(task_name="镜牢商店")
     def in_shop(self):
-        self.shop.in_shop(self.floor)
+        return self.shop.in_shop(self.floor)
 
     def get_which_floor(self):
         auto.click_element(

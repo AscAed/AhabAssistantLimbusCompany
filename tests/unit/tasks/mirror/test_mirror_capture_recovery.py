@@ -5,6 +5,7 @@ import pytest
 from module.my_error.my_error import backMainWinError, cannotOperateGameError
 from tasks.mirror.mirror import (
     _MAX_EMPTY_SINNER_RECOVERIES,
+    _MAX_NETWORK_RECOVERY_ATTEMPTS,
     _MAX_SETUP_ITERATIONS,
     GameState,
     Mirror,
@@ -24,6 +25,7 @@ def test_network_recovery_does_not_restart_game_again(retry_result):
             target == "base/connecting_assets.png"
         )
         mirror = object.__new__(Mirror)
+        mirror._network_recovery_attempts = 0
         mirror.road_to_mir = lambda: pytest.fail(
             "network recovery should return to the outer state loop"
         )
@@ -33,6 +35,53 @@ def test_network_recovery_does_not_restart_game_again(retry_result):
     mock_retry.assert_called_once_with()
     mock_kill_game.assert_not_called()
     mock_restart_game.assert_not_called()
+
+
+def test_network_recovery_stops_after_bounded_attempts():
+    with (
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.base.retry.retry") as mock_retry,
+        patch("utils.utils.check_game_running", return_value=True),
+    ):
+        mock_auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            target == "base/connecting_assets.png"
+        )
+        mirror = object.__new__(Mirror)
+        mirror._network_recovery_attempts = 0
+
+        for _ in range(_MAX_NETWORK_RECOVERY_ATTEMPTS):
+            assert mirror.check_and_recover_process() is True
+
+        with pytest.raises(cannotOperateGameError, match="网络连接恢复次数超限"):
+            mirror.check_and_recover_process()
+
+    assert mock_retry.call_count == _MAX_NETWORK_RECOVERY_ATTEMPTS
+
+
+def test_network_recovery_counter_resets_after_connection_recovers():
+    network_present = False
+
+    with (
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.base.retry.retry") as mock_retry,
+        patch("utils.utils.check_game_running", return_value=True),
+    ):
+        mock_auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            network_present and target == "base/connecting_assets.png"
+        )
+        mirror = object.__new__(Mirror)
+        mirror._network_recovery_attempts = _MAX_NETWORK_RECOVERY_ATTEMPTS
+
+        assert mirror.check_and_recover_process() is False
+        assert mirror._network_recovery_attempts == 0
+
+        network_present = True
+        for _ in range(_MAX_NETWORK_RECOVERY_ATTEMPTS):
+            assert mirror.check_and_recover_process() is True
+        with pytest.raises(cannotOperateGameError, match="网络连接恢复次数超限"):
+            mirror.check_and_recover_process()
+
+    assert mock_retry.call_count == _MAX_NETWORK_RECOVERY_ATTEMPTS
 
 
 def test_process_recovery_stops_when_restart_cannot_reach_main_menu():
@@ -60,11 +109,29 @@ def test_process_recovery_resumes_mirror_route_after_successful_restart():
         patch("utils.utils.check_game_running", return_value=False),
     ):
         mirror = object.__new__(Mirror)
+        mirror._network_recovery_attempts = _MAX_NETWORK_RECOVERY_ATTEMPTS
         mirror.road_to_mir = Mock()
         assert mirror.check_and_recover_process() is True
 
     mock_kill_game.assert_called_once_with()
     mock_restart_game.assert_called_once_with()
+    mirror.road_to_mir.assert_called_once_with()
+    assert mirror._network_recovery_attempts == 0
+
+
+def test_process_recovery_stops_when_mirror_entry_fails():
+    with (
+        patch("tasks.base.retry.kill_game"),
+        patch("tasks.base.retry.restart_game", return_value=True),
+        patch("utils.utils.check_game_running", return_value=False),
+    ):
+        mirror = object.__new__(Mirror)
+        mirror._network_recovery_attempts = 0
+        mirror.road_to_mir = Mock(return_value=False)
+
+        with pytest.raises(backMainWinError, match="重启后无法恢复"):
+            mirror.check_and_recover_process()
+
     mirror.road_to_mir.assert_called_once_with()
 
 
@@ -134,6 +201,271 @@ def test_mirror_run_skips_retry_fallback_actions_after_restart():
 
     assert mock_wait.call_count == 2
     mock_auto.mouse_to_blank.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("state", "team_selection_visible"),
+    [
+        (GameState.MIRROR_TEAM_SELECT, False),
+        (GameState.UNKNOWN, True),
+    ],
+)
+def test_mirror_run_stops_when_team_selection_fails(state, team_selection_visible):
+    with (
+        patch("tasks.mirror.mirror.wait_for_screenshot"),
+        patch("tasks.mirror.mirror.retry", return_value=None),
+        patch("tasks.mirror.mirror.PageStateDispatcher") as dispatcher_type,
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.mirror.mirror.cfg") as mock_cfg,
+    ):
+        dispatcher_type.return_value.detect_state.side_effect = [
+            state,
+            AssertionError("Mirror.run continued after team-selection failure"),
+        ]
+        mock_cfg.floor_3_exit = False
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            team_selection_visible
+            and target == "mirror/road_to_mir/select_team_stars_assets.png"
+        )
+        mirror = object.__new__(Mirror)
+        mirror.LOOP_COUNT = 250
+        mirror.check_and_recover_process = lambda: False
+        mirror.select_mirror_team = Mock(return_value=False)
+
+        assert mirror.run() is False
+
+    mirror.select_mirror_team.assert_called_once_with()
+    dispatcher_type.return_value.detect_state.assert_called_once_with()
+
+
+def test_mirror_run_stops_when_starlight_entry_fails():
+    with (
+        patch("tasks.mirror.mirror.wait_for_screenshot"),
+        patch("tasks.mirror.mirror.retry", return_value=None),
+        patch("tasks.mirror.mirror.PageStateDispatcher") as dispatcher_type,
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.mirror.mirror.cfg") as mock_cfg,
+    ):
+        dispatcher_type.return_value.detect_state.side_effect = [
+            GameState.UNKNOWN,
+            AssertionError("Mirror.run continued after starlight-entry failure"),
+        ]
+        mock_cfg.floor_3_exit = False
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            target == "mirror/road_to_mir/dreaming_star/coins_assets.png"
+        )
+        mirror = object.__new__(Mirror)
+        mirror.LOOP_COUNT = 250
+        mirror.check_and_recover_process = lambda: False
+        mirror.enter_mir_with_star = Mock(return_value=False)
+
+        assert mirror.run() is False
+
+    mirror.enter_mir_with_star.assert_called_once_with()
+    dispatcher_type.return_value.detect_state.assert_called_once_with()
+
+
+def test_mirror_run_stops_when_road_search_fails():
+    with (
+        patch("tasks.mirror.mirror.wait_for_screenshot"),
+        patch("tasks.mirror.mirror.retry", return_value=None),
+        patch("tasks.mirror.mirror.PageStateDispatcher") as dispatcher_type,
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.mirror.mirror.cfg") as mock_cfg,
+    ):
+        dispatcher_type.return_value.detect_state.side_effect = [
+            GameState.ROAD_MAP,
+            AssertionError("Mirror.run continued after road-search failure"),
+        ]
+        mock_cfg.floor_3_exit = False
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            target == "mirror/road_in_mir/legend_assets.png"
+        )
+        mirror = object.__new__(Mirror)
+        mirror.LOOP_COUNT = 250
+        mirror.check_and_recover_process = lambda: False
+        mirror.floor = 0
+        mirror.get_floor_num = False
+        mirror.find_road_total_time = 0
+        mirror.search_road = Mock(return_value=False)
+        mirror._time_call = lambda function, *args: (function(*args), 0)
+
+        assert mirror.run() is False
+
+    mirror.search_road.assert_called_once_with()
+    dispatcher_type.return_value.detect_state.assert_called_once_with()
+
+
+@pytest.mark.parametrize(
+    ("state", "failure_path", "loop_count"),
+    [
+        (GameState.EGO_GIFT_SELECT, "ego_gift_select", 250),
+        (GameState.EVENT, "event", 250),
+        (GameState.UNKNOWN, "refuse_box", 40),
+        (GameState.UNKNOWN, "refuse_text", 20),
+        (GameState.BATTLE_FORMATION, "team_restart", 250),
+        (GameState.UNKNOWN, "battle_restart", 250),
+    ],
+)
+def test_mirror_run_stops_when_recovery_helper_fails(state, failure_path, loop_count):
+    with (
+        patch("tasks.mirror.mirror.wait_for_screenshot"),
+        patch("tasks.mirror.mirror.retry", return_value=None),
+        patch("tasks.mirror.mirror.PageStateDispatcher") as dispatcher_type,
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.mirror.mirror.cfg") as mock_cfg,
+        patch("tasks.mirror.mirror.check_team", return_value=False),
+        patch("tasks.mirror.mirror.battle") as mock_battle,
+    ):
+        dispatcher_type.return_value.detect_state.side_effect = [
+            state,
+            AssertionError("Mirror.run continued after a recovery helper failed"),
+        ]
+        mock_cfg.floor_3_exit = False
+        mock_auto.click_element.side_effect = lambda target, *args, **kwargs: (
+            failure_path == "event" and target == "event/skip_assets.png"
+        )
+        mock_auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            failure_path == "refuse_box"
+            and target
+            in {
+                "mirror/road_in_mir/acquire_ego_gift_box_assets.png",
+                "mirror/road_in_mir/acquire_ego_gift_refuse_assets.png",
+            }
+        )
+        mock_auto.find_language_text.return_value = failure_path == "refuse_text"
+        mock_battle.fail_times = 5 if failure_path == "battle_restart" else 0
+        mirror = object.__new__(Mirror)
+        mirror.LOOP_COUNT = loop_count
+        mirror.check_and_recover_process = lambda: False
+        mirror.first_battle = False
+        mirror.acquire_ego_gift = Mock(return_value=False)
+        mirror.event_handling = Mock(return_value=False)
+        mirror.re_start = Mock(return_value=False)
+
+        assert mirror.run() is False
+
+    dispatcher_type.return_value.detect_state.assert_called_once_with()
+    if failure_path == "ego_gift_select":
+        mirror.acquire_ego_gift.assert_called_once_with()
+    elif failure_path in {"refuse_box", "refuse_text"}:
+        mirror.acquire_ego_gift.assert_called_once_with(type=2)
+    elif failure_path == "event":
+        mirror.event_handling.assert_called_once_with()
+    else:
+        mirror.re_start.assert_called_once_with()
+
+
+@pytest.mark.parametrize(
+    ("state", "entry_asset"),
+    [
+        (GameState.MIRROR_ENTRANCE, "mirror/road_to_mir/enter_assets.png"),
+        (GameState.MAIN_MENU, "home/drive_assets.png"),
+    ],
+)
+def test_mirror_run_stops_when_road_entry_fails(state, entry_asset):
+    with (
+        patch("tasks.mirror.mirror.wait_for_screenshot"),
+        patch("tasks.mirror.mirror.retry", return_value=None),
+        patch("tasks.mirror.mirror.PageStateDispatcher") as dispatcher_type,
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.mirror.mirror.cfg") as mock_cfg,
+        patch("tasks.mirror.mirror.make_enkephalin_module"),
+    ):
+        dispatcher_type.return_value.detect_state.side_effect = [
+            state,
+            AssertionError("Mirror.run continued after road entry failed"),
+        ]
+        mock_cfg.floor_3_exit = False
+        mock_auto.click_element.side_effect = lambda target, *args, **kwargs: (
+            target == entry_asset
+        )
+        mock_auto.find_element.return_value = False
+        mirror = object.__new__(Mirror)
+        mirror.LOOP_COUNT = 250
+        mirror.check_and_recover_process = lambda: False
+        mirror.bequest_from_the_previous_game = False
+        mirror.road_to_mir = Mock(return_value=False)
+
+        assert mirror.run() is False
+
+    mirror.road_to_mir.assert_called_once_with()
+    dispatcher_type.return_value.detect_state.assert_called_once_with()
+
+
+@pytest.mark.parametrize("reward_cards", [True, False])
+def test_mirror_run_stops_when_reward_card_recovery_fails(reward_cards):
+    with (
+        patch("tasks.mirror.mirror.wait_for_screenshot"),
+        patch("tasks.mirror.mirror.retry", return_value=None),
+        patch("tasks.mirror.mirror.PageStateDispatcher") as dispatcher_type,
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.mirror.mirror.cfg") as mock_cfg,
+        patch("tasks.mirror.mirror.get_reward_card", return_value=False) as reward_card,
+    ):
+        dispatcher_type.return_value.detect_state.side_effect = [
+            GameState.UNKNOWN,
+            AssertionError("Mirror.run continued after reward-card recovery failed"),
+        ]
+        mock_cfg.floor_3_exit = False
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            target == "mirror/road_in_mir/select_encounter_reward_card_assets.png"
+        )
+        mirror = object.__new__(Mirror)
+        mirror.LOOP_COUNT = 250
+        mirror.check_and_recover_process = lambda: False
+        mirror.reward_cards = reward_cards
+        mirror.reward_cards_select = "test-card"
+
+        assert mirror.run() is False
+
+    if reward_cards:
+        reward_card.assert_called_once_with("test-card")
+    else:
+        reward_card.assert_called_once_with()
+    dispatcher_type.return_value.detect_state.assert_called_once_with()
+
+
+def test_mirror_run_stops_when_shop_handler_fails():
+    with (
+        patch("tasks.mirror.mirror.wait_for_screenshot"),
+        patch("tasks.mirror.mirror.retry", return_value=True),
+        patch("tasks.mirror.mirror.PageStateDispatcher") as dispatcher_type,
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.mirror.mirror.cfg") as mock_cfg,
+    ):
+        dispatcher_type.return_value.detect_state.side_effect = [
+            GameState.SHOP,
+            AssertionError("Mirror.run continued after shop handler failed"),
+        ]
+        mock_cfg.floor_3_exit = False
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.return_value = False
+        mirror = object.__new__(Mirror)
+        mirror.LOOP_COUNT = 250
+        mirror.shop_total_time = 0
+        mirror.check_and_recover_process = lambda: False
+        mirror.in_shop = Mock(return_value=False)
+
+        assert mirror.run() is False
+
+    mirror.in_shop.assert_called_once_with()
+    dispatcher_type.return_value.detect_state.assert_called_once_with()
+
+
+def test_mirror_in_shop_returns_shop_failure():
+    mirror = object.__new__(Mirror)
+    mirror.floor = 1
+    mirror.shop = Mock()
+    mirror.shop.in_shop.return_value = False
+
+    assert mirror.in_shop() is False
+
+    mirror.shop.in_shop.assert_called_once_with(1)
 
 
 @patch("tasks.mirror.mirror.sleep", return_value=None)
@@ -216,6 +548,7 @@ def test_observe_gift_selection_respects_three_item_limit():
         patch("tasks.mirror.mirror.cfg") as mock_cfg,
         patch("tasks.mirror.mirror.ImageUtils") as mock_image_utils,
         patch("tasks.mirror.mirror.sleep"),
+        patch("tasks.mirror.mirror.wait_for_screenshot", return_value=object()),
     ):
         mock_cfg.set_win_size = 1440
         mock_auto.take_screenshot.return_value = object()
@@ -247,6 +580,44 @@ def test_observe_gift_selection_respects_three_item_limit():
         mirror.select_observe_ego_gift()
 
         assert len(selected_gift_lookups) == 3
+
+
+def test_observe_gift_selection_stops_before_ocr_when_details_capture_fails():
+    with (
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.mirror.mirror.cfg") as mock_cfg,
+        patch("tasks.mirror.mirror.ImageUtils") as mock_image_utils,
+        patch("tasks.mirror.mirror.sleep"),
+        patch(
+            "tasks.mirror.mirror.wait_for_screenshot",
+            side_effect=RuntimeError("capture timeout"),
+        ) as mock_wait_for_screenshot,
+    ):
+        mock_cfg.set_win_size = 1440
+        mock_auto.take_screenshot.return_value = object()
+        mock_image_utils.get_bbox.return_value = [100, 200, 1200, 1000]
+
+        burn_marker_calls = 0
+
+        def find_element(target, *args, **kwargs):
+            nonlocal burn_marker_calls
+            if "observe_burn_assets.png" in target:
+                burn_marker_calls += 1
+                return (200, 100) if burn_marker_calls == 1 else None
+            if "Level_I.png" in target:
+                return (500, 300)
+            return None
+
+        mock_auto.find_element.side_effect = find_element
+        mirror = object.__new__(Mirror)
+        mirror.observe_ego_gift_selected = ["burn_1_1_1"]
+
+        with pytest.raises(RuntimeError, match="capture timeout"):
+            mirror.select_observe_ego_gift()
+
+        mock_wait_for_screenshot.assert_called_once_with()
+        mock_auto.find_language_text.assert_not_called()
+        assert mock_auto.mouse_click.call_count == 2
 
 
 @patch("tasks.mirror.mirror.wait_for_screenshot", side_effect=RuntimeError("capture timeout"))
@@ -286,7 +657,7 @@ def test_road_to_mirror_bounds_repeated_successful_drive_clicks():
         mock_auto.find_text_element.return_value = True
         mirror = object.__new__(Mirror)
 
-        mirror.road_to_mir()
+        assert mirror.road_to_mir() is False
 
     assert drive_clicks == 31
     mock_back_init_menu.assert_called_once_with()
@@ -656,7 +1027,7 @@ def test_enter_mirror_with_starlight_accepts_success_on_last_iteration():
         mirror.use_starlight = False
         mirror.opening_bonus = []
 
-        assert mirror.enter_mir_with_star() is None
+        assert mirror.enter_mir_with_star() is True
 
     assert mock_wait.call_count == _MAX_SETUP_ITERATIONS
 
@@ -721,9 +1092,162 @@ def test_select_initial_ego_accepts_success_on_last_iteration():
         mirror.observe_ego_gift = False
         mirror.observe_ego_gift_selected = []
 
-        assert mirror.select_init_ego_gift() is None
+        assert mirror.select_init_ego_gift() is True
 
     assert mock_wait.call_count == _MAX_SETUP_ITERATIONS
+
+
+def test_select_initial_ego_returns_failure_after_exhausted_attempts():
+    with (
+        patch("tasks.mirror.mirror.wait_for_screenshot"),
+        patch("tasks.mirror.mirror.retry", return_value=True),
+        patch("tasks.mirror.mirror.back_init_menu", return_value=True) as back_to_menu,
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+    ):
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.return_value = None
+        mirror = object.__new__(Mirror)
+        mirror.system = "bleed"
+        mirror.opening_items = False
+        mirror.observe_ego_gift = False
+        mirror.observe_ego_gift_selected = []
+
+        assert mirror.select_init_ego_gift() is False
+
+    back_to_menu.assert_called_once_with()
+
+
+@pytest.mark.parametrize(
+    ("selection_index", "expected_order"),
+    [
+        (0, [1, 2, 3]),
+        (6, [1]),
+        (11, [1, 3]),
+    ],
+)
+def test_select_initial_ego_uses_configured_slots_in_order(
+    selection_index, expected_order
+):
+    clicked_gifts = []
+    system_selected = False
+    confirmed = False
+    system_asset = "mirror/road_to_mir/burn_gift_assets.png"
+    confirm_asset = "mirror/road_to_mir/select_init_ego_gifts_confirm_assets.png"
+
+    def click_element(target, *args, **kwargs):
+        nonlocal system_selected, confirmed
+        if target == system_asset and not system_selected:
+            system_selected = True
+            return True
+        if target.startswith(
+            "mirror/road_to_mir/select_init_gift/burn_ego_gift_"
+        ):
+            clicked_gifts.append(int(target.rsplit("_", 1)[1].split(".", 1)[0]))
+            return True
+        if target == confirm_asset:
+            confirmed = True
+            return True
+        return False
+
+    with (
+        patch("tasks.mirror.mirror.wait_for_screenshot"),
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+    ):
+        mock_auto.click_element.side_effect = click_element
+        mock_auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            confirmed
+            and target == "mirror/theme_pack/feature_theme_pack_assets.png"
+        )
+        mirror = object.__new__(Mirror)
+        mirror.system = "bleed"
+        mirror.opening_items = True
+        mirror.opening_items_system = 0
+        mirror.opening_items_select = selection_index
+        mirror.observe_ego_gift = False
+        mirror.observe_ego_gift_selected = []
+
+        assert mirror.select_init_ego_gift() is True
+
+    assert clicked_gifts == expected_order
+
+
+def test_select_initial_ego_stops_on_invalid_gift_order_before_clicking():
+    with patch("tasks.mirror.mirror.auto") as mock_auto:
+        mirror = object.__new__(Mirror)
+        mirror.system = "burn"
+        mirror.opening_items = True
+        mirror.opening_items_system = 0
+        mirror.opening_items_select = 15
+
+        assert mirror.select_init_ego_gift() is False
+
+    mock_auto.click_element.assert_not_called()
+
+
+def test_mirror_run_stops_when_initial_ego_selection_fails():
+    activate_assets = {
+        "mirror/road_to_mir/activate_gift_search_on_assets.png",
+        "mirror/road_to_mir/activate_gift_search_off_assets.png",
+    }
+    with (
+        patch("tasks.mirror.mirror.wait_for_screenshot") as mock_wait,
+        patch("tasks.mirror.mirror.retry", return_value=True),
+        patch("tasks.mirror.mirror.PageStateDispatcher") as dispatcher_type,
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.mirror.mirror.cfg") as mock_cfg,
+        patch.object(Mirror, "select_init_ego_gift", return_value=False) as select_ego,
+    ):
+        dispatcher_type.return_value.detect_state.return_value = GameState.UNKNOWN
+        mock_cfg.floor_3_exit = False
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.side_effect = lambda target, *args, **kwargs: (
+            target in activate_assets
+        )
+        mirror = object.__new__(Mirror)
+        mirror.LOOP_COUNT = 250
+        mirror.check_and_recover_process = lambda: False
+
+        assert mirror.run() is False
+
+    assert mock_wait.call_count == 1
+    select_ego.assert_called_once_with()
+
+
+def test_mirror_run_stops_when_theme_pack_selection_fails():
+    state_checks = 0
+
+    def detect_state():
+        nonlocal state_checks
+        state_checks += 1
+        if state_checks > 1:
+            raise AssertionError("Mirror dispatched another state after theme-pack failure")
+        return GameState.THEME_PACK
+
+    with (
+        patch("tasks.mirror.mirror.wait_for_screenshot") as mock_wait,
+        patch("tasks.mirror.mirror.retry", return_value=True),
+        patch("tasks.mirror.mirror.PageStateDispatcher") as dispatcher_type,
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.mirror.mirror.cfg") as mock_cfg,
+        patch("tasks.mirror.mirror.select_theme_pack", return_value=False) as select_pack,
+    ):
+        dispatcher_type.return_value.detect_state.side_effect = detect_state
+        mock_cfg.floor_3_exit = False
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.return_value = False
+        mirror = object.__new__(Mirror)
+        mirror.LOOP_COUNT = 250
+        mirror.check_and_recover_process = lambda: False
+        mirror.floor = 0
+        mirror.hard_switch = False
+        mirror.team_order = 1
+        mirror.use_custom_theme_pack_weight = False
+        mirror.re_formation_each_floor = False
+
+        assert mirror.run() is False
+
+    assert mock_wait.call_count == 1
+    select_pack.assert_called_once_with(False, 0, 1, False)
 
 
 @patch("tasks.mirror.mirror.wait_for_screenshot", side_effect=RuntimeError("capture timeout"))
@@ -799,7 +1323,7 @@ def test_restart_accepts_confirmation_on_last_attempt():
         mirror.first_battle = False
         mirror.start_time = 0
 
-        mirror.re_start()
+        assert mirror.re_start() is True
 
     assert mock_wait.call_count == max_attempts
     assert screenshot_count == max_attempts
@@ -850,14 +1374,16 @@ def test_event_handling_caps_repeated_continue_clicks(transition_after_limit):
         mock_auto.find_element.side_effect = find_element
         mock_auto.click_element.side_effect = click_element
 
-        mirror.event_handling()
+        result = mirror.event_handling()
 
     assert mock_wait.call_count == max_attempts + 1
     assert continue_clicks == max_attempts
     if transition_after_limit:
         mock_back.assert_not_called()
+        assert result is True
     else:
         mock_back.assert_called_once_with()
+        assert result is False
     assert mirror.event_times == 1
 
 

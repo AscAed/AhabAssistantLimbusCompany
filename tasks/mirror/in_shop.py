@@ -161,6 +161,7 @@ class Shop:
             if loop_count < 0:
                 log.error("无法升级ego饰品")
                 break
+        return False
 
     def buy_gifts(self):
         def sort_points(points, complete=0, threshold=40):
@@ -213,7 +214,8 @@ class Shop:
         log.debug("开始执行饰品购买模块")
         keyword_refresh_count = 0
         normal_refresh_count = 0
-        complete_count = 0
+        system_gift_complete_count = 0
+        second_system_gift_complete_count = 0
         loop_limit = (
             31
             + max(0, self.max_keyword_refresh)
@@ -240,7 +242,6 @@ class Shop:
                             if auto.click_element(
                                 "mirror/road_in_mir/ego_gift_get_confirm_assets.png"
                             ):
-                                complete_count += 1
                                 break
                             buy_chance -= 1
                             if buy_chance <= 5:
@@ -274,7 +275,6 @@ class Shop:
                             auto.click_element(
                                 "mirror/road_in_mir/ego_gift_get_confirm_assets.png"
                             )
-                            complete_count += 1
                             continue
                         else:
                             auto.mouse_click_blank()
@@ -293,7 +293,6 @@ class Shop:
                                 "mirror/road_in_mir/ego_gift_get_confirm_assets.png",
                                 take_screenshot=True,
                             )
-                            complete_count += 1
                             continue
                         else:
                             auto.mouse_click_blank()
@@ -309,7 +308,7 @@ class Shop:
                     threshold=0.85,
                     take_screenshot=True,
                 )
-                system_gift = sort_points(system_gift, complete_count)
+                system_gift = sort_points(system_gift, system_gift_complete_count)
                 while system_gift:
                     gift = system_gift.pop(0)
                     auto.mouse_action_with_pos((gift[0], gift[1]), offset=True)
@@ -329,7 +328,7 @@ class Shop:
                             "mirror/road_in_mir/ego_gift_get_confirm_assets.png",
                             take_screenshot=True,
                         )
-                        complete_count += 1
+                        system_gift_complete_count += 1
                         system_gift = re_sort_points(system_gift)
                         auto.mouse_click_blank(times=3)
                         continue
@@ -351,7 +350,9 @@ class Shop:
                         find_type="image_with_multiple_targets",
                         threshold=0.85,
                     )
-                    system_gift = sort_points(system_gift, complete_count)
+                    system_gift = sort_points(
+                        system_gift, second_system_gift_complete_count
+                    )
                     while system_gift:
                         gift = system_gift.pop(0)
                         auto.mouse_action_with_pos((gift[0], gift[1]), offset=True)
@@ -371,7 +372,7 @@ class Shop:
                                 "mirror/road_in_mir/ego_gift_get_confirm_assets.png",
                                 take_screenshot=True,
                             )
-                            complete_count += 1
+                            second_system_gift_complete_count += 1
                             system_gift = re_sort_points(system_gift)
                             auto.mouse_click_blank(times=3)
                             continue
@@ -1080,7 +1081,8 @@ class Shop:
                 and self.after_level_IV_select == 3
             ):
                 log.debug("合成四级后跳过商店，执行最后一次升级饰品")
-                self.enhance_gifts()
+                if self.enhance_gifts() is False:
+                    return False
             return
         # 普通合成
         if self.only_aggressive_fuse or self.only_system_fuse:
@@ -1110,7 +1112,8 @@ class Shop:
                 and self.after_level_IV_select == 3
             ):
                 log.debug("合成四级后跳过商店，执行最后一次升级饰品")
-                self.enhance_gifts()
+                if self.enhance_gifts() is False:
+                    return False
             return
         # 合成体系饰品
         if not self.only_aggressive_fuse and not self.do_not_system_fuse:
@@ -1118,7 +1121,7 @@ class Shop:
                 return False
             auto.mouse_click_blank(times=3)
 
-    def heal_sinner(self):
+    def heal_sinner(self) -> bool:
         # 全体治疗
         loop_count = 10
         auto.model = "clam"
@@ -1135,7 +1138,7 @@ class Shop:
                 auto.model = "aggressive"
             if loop_count < 0:
                 log.error("治疗罪人失败")
-                break
+                return False
 
             if sinner_be_heal is True and auto.click_element(
                 "mirror/shop/heal_sinner/heal_sinner_return_assets.png"
@@ -1171,6 +1174,8 @@ class Shop:
 
             if retry() is False:
                 raise self.RestartGame()
+
+        return True
 
     def enhance_gifts(self):
         _ENHANCE_SCAN_REGION_REL = {
@@ -1240,6 +1245,7 @@ class Shop:
         system_level_IV = False
         second_system_level_IV = False
         stale_count = 0
+        power_up_failed = False
         while True:
             # 自动截图
             wait_for_screenshot()
@@ -1254,6 +1260,7 @@ class Shop:
                     if check_enhanced(level_IV) is False:
                         auto.mouse_click(level_IV[0], level_IV[1])
                         if self.ego_gift_to_power_up() is False:
+                            power_up_failed = True
                             break
                         else:
                             self.enhance_gifts_list.append(level_IV)
@@ -1275,6 +1282,7 @@ class Shop:
                         if check_enhanced(level_IV_2) is False:
                             auto.mouse_click(level_IV_2[0], level_IV_2[1])
                             if self.ego_gift_to_power_up() is False:
+                                power_up_failed = True
                                 break
                             else:
                                 self.enhance_gifts_list.append(level_IV_2)
@@ -1286,6 +1294,7 @@ class Shop:
                     f"mirror/shop/enhance_gifts/big_{self.system}.png"
                 ):
                     if self.ego_gift_to_power_up() is False:
+                        power_up_failed = True
                         break
                     else:
                         self.enhance_gifts_list.append(f_gift)
@@ -1308,6 +1317,7 @@ class Shop:
                     if check_enhanced(gift) is False:
                         auto.mouse_click(gift[0], gift[1])
                         if self.ego_gift_to_power_up() is False:
+                            power_up_failed = True
                             next_gift = False
                             break
                         else:
@@ -1341,6 +1351,8 @@ class Shop:
 
         if retry() is False:
             raise self.RestartGame()
+        if power_up_failed:
+            return False
 
     def after_fuse_IV(self):
         self.fuse_IV = True
@@ -1560,7 +1572,8 @@ class Shop:
                     if self.do_not_heal:
                         heal = True
                     else:
-                        self.heal_sinner()
+                        if self.heal_sinner() is False:
+                            return False
                         heal = True
                         continue
 
@@ -1588,7 +1601,8 @@ class Shop:
                     else:
                         # 合成饰品
                         if self.fuse_switch:
-                            self.fuse_gift()
+                            if self.fuse_gift() is False:
+                                return False
                         fuse = True
                         continue
 
@@ -1602,7 +1616,8 @@ class Shop:
                         enhance = True
                     else:
                         # 升级体系ego饰品
-                        self.enhance_gifts()
+                        if self.enhance_gifts() is False:
+                            return False
                         enhance = True
                         continue
 
@@ -1640,15 +1655,16 @@ class Shop:
                     from tasks.base.back_init_menu import back_init_menu
 
                     back_init_menu()
-                    break
+                    return False
             else:
                 log.error("退出商店操作次数超限，尝试回到初始界面")
                 from tasks.base.back_init_menu import back_init_menu
 
                 back_init_menu()
+                return False
         except self.RestartGame:
             log.error("执行商店操作期间出现错误，尝试重启游戏")
-            return
+            return False
 
     def _get_cost(self, in_heal=False) -> int:
         _MONEY_OCR_TRANSLATION = str.maketrans(

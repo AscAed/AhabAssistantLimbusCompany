@@ -82,10 +82,13 @@ def test_shop_fusion_aggressive(mock_image_utils, mock_cfg, mock_auto, mock_slee
     gift_clicks = [(x, y) for x, y in clicked_coords if (x, y) in LEVEL3_CELLS.values()]
     assert len(gift_clicks) == 3, f"Expected 3 gift clicks, got {len(gift_clicks)}: {clicked_coords}"
 
+@patch("tasks.mirror.mirror.wait_for_screenshot", return_value=object())
 @patch("tasks.mirror.mirror.auto")
 @patch("tasks.mirror.mirror.cfg")
 @patch("tasks.mirror.mirror.ImageUtils")
-def test_select_observe_ego_gift(mock_image_utils, mock_cfg, mock_auto, mock_team_setting):
+def test_select_observe_ego_gift(
+    mock_image_utils, mock_cfg, mock_auto, _mock_wait_for_screenshot, mock_team_setting
+):
     mock_cfg.set_win_size = 1440
     mirror = Mirror(mock_team_setting, 1)
     
@@ -110,10 +113,13 @@ def test_select_observe_ego_gift(mock_image_utils, mock_cfg, mock_auto, mock_tea
     # Check that system tab is clicked directly
     mock_auto.mouse_click.assert_any_call(310, 100)
 
+@patch("tasks.mirror.mirror.wait_for_screenshot", return_value=object())
 @patch("tasks.mirror.mirror.auto")
 @patch("tasks.mirror.mirror.cfg")
 @patch("tasks.mirror.mirror.ImageUtils")
-def test_select_observe_ego_gift_bleed_fallback(mock_image_utils, mock_cfg, mock_auto, mock_team_setting):
+def test_select_observe_ego_gift_bleed_fallback(
+    mock_image_utils, mock_cfg, mock_auto, _mock_wait_for_screenshot, mock_team_setting
+):
     # Tests the fallback behaviour when burn assets are missing but bleed assets are found.
     mock_cfg.set_win_size = 1440
     mirror = Mirror(mock_team_setting, 1)

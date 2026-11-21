@@ -22,6 +22,33 @@ def test_search_road_default_screenshot_failure_stops():
     assert mock_auto.take_screenshot.call_count == 1
 
 
+def test_search_road_default_stops_repositioning_after_freeze_timeout():
+    with patch("tasks.mirror.search_road.auto") as mock_auto, patch(
+        "tasks.mirror.search_road.cfg"
+    ) as mock_cfg, patch(
+        "tasks.mirror.search_road.retry", return_value=True
+    ), patch(
+        "tasks.base.retry.check_times", return_value=True
+    ) as check_times, patch(
+        "tasks.base.back_init_menu.back_init_menu", return_value=False
+    ) as back_init_menu:
+        mock_cfg.set_win_size = 1440
+        mock_auto.take_screenshot.return_value = np.zeros(
+            (1080, 1920, 3), dtype=np.uint8
+        )
+        mock_auto.get_restore_time.return_value = None
+        mock_auto.find_element.side_effect = lambda target, **kwargs: (
+            (500, 500) if target == "mirror/mybus_default_distance.png" else False
+        )
+
+        assert search_road_default_distance() is False
+
+    check_times.assert_called_once()
+    assert check_times.call_args.kwargs == {"logs": False}
+    back_init_menu.assert_called_once_with()
+    mock_auto.mouse_drag.assert_not_called()
+
+
 def test_search_road_farthest_screenshot_failure_stops():
     with patch("tasks.mirror.search_road.auto") as mock_auto, patch(
         "tasks.mirror.search_road.cfg"

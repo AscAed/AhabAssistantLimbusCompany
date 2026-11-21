@@ -307,10 +307,12 @@ class Updater:
     def terminate_processes(self):
         """终止相关进程以准备更新。"""
         print("开始终止进程...")
+        target_process_names = {name.casefold() for name in self.process_names}
         for proc in psutil.process_iter(attrs=["pid", "name"]):
             process_name = proc.info.get("name")
-            if not isinstance(process_name, str) or not any(
-                name in process_name for name in self.process_names
+            if (
+                not isinstance(process_name, str)
+                or process_name.casefold() not in target_process_names
             ):
                 continue
 
@@ -417,10 +419,10 @@ def check_temp_dir_and_run():
         sys.exit(1)
 
     temp_path = os.path.abspath("./update_temp")
-    file_path = sys.argv[0]
+    file_path = os.path.abspath(sys.argv[0])
     destination_path = os.path.join(temp_path, os.path.basename(file_path))
 
-    if file_path != destination_path:
+    if os.path.normcase(file_path) != os.path.normcase(destination_path):
         if os.path.exists("./Update.exe"):
             os.remove("./Update.exe")
         os.makedirs(temp_path, exist_ok=True)

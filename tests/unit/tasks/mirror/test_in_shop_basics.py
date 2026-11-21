@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -185,6 +186,35 @@ def test_fuse_gift_stops_when_system_fusion_entry_fails():
 
     mock_auto.find_element.assert_not_called()
     mock_auto.mouse_click_blank.assert_not_called()
+
+
+@pytest.mark.parametrize("disable_fusion_during_regular_pass", [False, True])
+def test_fuse_gift_propagates_final_enhancement_failure(
+    disable_fusion_during_regular_pass,
+):
+    shop = Shop(
+        TeamSetting(
+            team_system=0,
+            shop_strategy=1,
+            after_level_IV=True,
+            after_level_IV_select=3,
+        )
+    )
+    shop.fuse_IV = True
+    shop.fuse_switch = disable_fusion_during_regular_pass
+
+    def complete_regular_fusion():
+        shop.fuse_switch = False
+
+    with (
+        patch.object(shop, "enter_fuse", return_value=True),
+        patch.object(shop, "fuse_useless_gifts", side_effect=complete_regular_fusion),
+        patch.object(shop, "enhance_gifts", return_value=False) as mock_enhance_gifts,
+        patch("tasks.mirror.in_shop.auto"),
+    ):
+        assert shop.fuse_gift() is False
+
+    mock_enhance_gifts.assert_called_once_with()
 
 
 @patch("tasks.mirror.in_shop.retry", return_value=True)
@@ -392,6 +422,94 @@ def test_shop_action_stops_when_initial_screenshot_wait_fails(action):
     mock_auto.click_element.assert_not_called()
 
 
+def test_ego_power_up_reports_failure_after_bounded_attempts():
+    shop = Shop(TeamSetting(team_system=0))
+
+    with (
+        patch("tasks.mirror.in_shop.auto") as mock_auto,
+        patch("tasks.mirror.in_shop.sleep"),
+        patch(
+            "tasks.mirror.in_shop.wait_for_screenshot", return_value=object()
+        ) as mock_wait_for_screenshot,
+    ):
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.return_value = None
+
+        assert shop.ego_gift_to_power_up() is False
+
+    assert mock_wait_for_screenshot.call_count == 31
+
+
+def test_heal_sinner_reports_failure_after_bounded_attempts():
+    shop = object.__new__(Shop)
+    shop._get_cost = lambda in_heal=False: 1000
+
+    with (
+        patch("tasks.mirror.in_shop.auto") as mock_auto,
+        patch("tasks.mirror.in_shop.wait_for_screenshot", return_value=object()),
+        patch("tasks.mirror.in_shop.retry", return_value=True),
+    ):
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.return_value = None
+
+        assert shop.heal_sinner() is False
+
+
+@pytest.mark.parametrize(
+    "gift_kind",
+    [
+        "primary_level_iv",
+        "second_system_level_iv",
+        "big_gift",
+        "regular_gift",
+    ],
+)
+def test_enhance_gifts_propagates_power_up_failure(gift_kind):
+    team = TeamSetting(
+        team_system=0,
+        second_system=gift_kind == "second_system_level_iv",
+        second_system_select=1,
+        second_system_setting=1,
+        second_system_action=[0, 0, 0, 1],
+    )
+    shop = Shop(team)
+    target_paths = {
+        "primary_level_iv": (
+            f"mirror/shop/level_IV_gifts/{shop.system}_level_IV.png"
+        ),
+        "second_system_level_iv": (
+            f"mirror/shop/level_IV_gifts/{shop.second_system_select}_level_IV.png"
+        ),
+        "big_gift": f"mirror/shop/enhance_gifts/big_{shop.system}.png",
+        "regular_gift": f"mirror/shop/enhance_gifts/{shop.system}.png",
+    }
+    target_path = target_paths[gift_kind]
+
+    def find_element(image_path, *args, **kwargs):
+        if image_path == "mirror/shop/sort_button_assets.png":
+            return (100, 100)
+        if image_path == target_path:
+            return [(800, 400)] if gift_kind == "regular_gift" else (800, 400)
+        return None
+
+    with (
+        patch("tasks.mirror.in_shop.cfg") as mock_cfg,
+        patch("tasks.mirror.in_shop.auto") as mock_auto,
+        patch("tasks.mirror.in_shop.wait_for_screenshot", return_value=object()),
+        patch("tasks.mirror.in_shop.sleep"),
+        patch("tasks.mirror.in_shop.retry", return_value=True) as mock_retry,
+        patch.object(shop, "ego_gift_to_power_up", return_value=False) as mock_power_up,
+    ):
+        mock_cfg.set_win_size = 1440
+        mock_auto.find_element.side_effect = find_element
+        mock_auto.screenshot = SimpleNamespace(size=(1440, 810))
+
+        assert shop.enhance_gifts() is False
+
+    mock_power_up.assert_called_once_with()
+    mock_retry.assert_called_once_with()
+
+
 def test_enhance_gifts_stops_when_main_loop_screenshot_wait_fails():
     shop = Shop(TeamSetting(team_system=0))
 
@@ -459,6 +577,106 @@ def test_shop_exit_stops_when_screenshot_wait_fails():
     mock_auto.click_element.assert_not_called()
 
 
+def test_shop_stops_when_fusion_returns_failure():
+    shop = Shop(TeamSetting(team_system=0))
+    shop.do_not_heal = True
+    shop.do_not_sell = True
+    shop.do_not_buy = True
+    shop.do_not_enhance = True
+    shop.fuse_switch = True
+
+    with (
+        patch("tasks.mirror.in_shop.auto") as mock_auto,
+        patch("tasks.mirror.in_shop.wait_for_screenshot", return_value=object()),
+        patch("tasks.mirror.in_shop.sleep"),
+        patch("tasks.mirror.in_shop.retry", return_value=True),
+        patch.object(shop, "fuse_gift", return_value=False) as mock_fuse_gift,
+        patch("tasks.base.back_init_menu.back_init_menu") as mock_back_init_menu,
+    ):
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.return_value = True
+
+        assert shop.in_shop(1) is False
+
+    mock_fuse_gift.assert_called_once_with()
+    mock_auto.find_element.assert_not_called()
+    mock_back_init_menu.assert_not_called()
+
+
+def test_shop_stops_when_healing_returns_failure():
+    shop = Shop(TeamSetting(team_system=0))
+    shop.skill_replacement = False
+    shop.do_not_heal = False
+    shop.do_not_sell = True
+    shop.do_not_buy = True
+    shop.do_not_fuse = True
+    shop.do_not_enhance = True
+
+    with (
+        patch("tasks.mirror.in_shop.auto") as mock_auto,
+        patch("tasks.mirror.in_shop.wait_for_screenshot", return_value=object()),
+        patch("tasks.mirror.in_shop.sleep"),
+        patch("tasks.mirror.in_shop.retry", return_value=True),
+        patch.object(shop, "heal_sinner", return_value=False) as mock_heal_sinner,
+    ):
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.return_value = True
+
+        assert shop.in_shop(1) is False
+
+    mock_heal_sinner.assert_called_once_with()
+    mock_auto.find_element.assert_not_called()
+
+
+def test_shop_stops_when_enhancement_returns_failure():
+    shop = Shop(TeamSetting(team_system=0))
+    shop.skill_replacement = False
+    shop.do_not_heal = True
+    shop.do_not_sell = True
+    shop.do_not_buy = True
+    shop.do_not_fuse = True
+    shop.do_not_enhance = False
+
+    with (
+        patch("tasks.mirror.in_shop.auto") as mock_auto,
+        patch("tasks.mirror.in_shop.wait_for_screenshot", return_value=object()),
+        patch("tasks.mirror.in_shop.sleep"),
+        patch("tasks.mirror.in_shop.retry", return_value=True),
+        patch.object(shop, "enhance_gifts", return_value=False) as mock_enhance_gifts,
+        patch("tasks.base.back_init_menu.back_init_menu") as mock_back_init_menu,
+    ):
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.return_value = True
+
+        assert shop.in_shop(1) is False
+
+    mock_enhance_gifts.assert_called_once_with()
+    mock_auto.find_element.assert_not_called()
+    mock_back_init_menu.assert_not_called()
+
+
+def test_shop_returns_failure_when_restart_signal_is_caught():
+    shop = Shop(TeamSetting(team_system=0))
+    shop.skill_replacement = False
+    shop.do_not_heal = True
+    shop.do_not_sell = True
+    shop.do_not_buy = False
+    shop.do_not_fuse = True
+    shop.do_not_enhance = True
+
+    with (
+        patch("tasks.mirror.in_shop.auto") as mock_auto,
+        patch("tasks.mirror.in_shop.wait_for_screenshot", return_value=object()),
+        patch("tasks.mirror.in_shop.sleep"),
+        patch.object(shop, "buy_gifts", side_effect=Shop.RestartGame),
+    ):
+        mock_auto.click_element.return_value = False
+
+        assert shop.in_shop(1) is False
+
+    mock_auto.mouse_click_blank.assert_called_once_with(times=3)
+
+
 def test_shop_exit_caps_repeated_confirm_clicks():
     shop = Shop(TeamSetting(team_system=0))
     shop.ignore_shop = [True] * 5
@@ -474,7 +692,7 @@ def test_shop_exit_caps_repeated_confirm_clicks():
         mock_auto.find_element.return_value = None
         mock_auto.click_element.side_effect = lambda path, **kwargs: path == leave_confirm
 
-        shop.in_shop(1)
+        assert shop.in_shop(1) is False
 
     assert mock_auto.click_element.call_count == 31
     assert all(
@@ -520,6 +738,112 @@ def test_buy_gifts_caps_repeated_level_three_purchases():
             shop.buy_gifts()
 
     assert purchase_attempts == 31
+
+
+def test_buy_gifts_does_not_skip_system_gift_after_level_four_purchase():
+    shop = Shop(
+        TeamSetting(
+            team_system=0,
+            shop_strategy=2,
+            shopping_strategy=True,
+            shopping_strategy_select=4,
+            max_keyword_refresh=0,
+            max_normal_refresh=0,
+        )
+    )
+    level_four = "mirror/shop/level_IV_to_buy.png"
+    system_gift = f"mirror/shop/enhance_gifts/shop_{shop.system}.png"
+    level_four_attempts = 0
+    gift_scans = 0
+
+    def click_element(image_path, **kwargs):
+        nonlocal level_four_attempts
+        if image_path == level_four:
+            level_four_attempts += 1
+            return level_four_attempts == 1
+        if image_path in {
+            "mirror/shop/purchase_assets.png",
+            "mirror/road_in_mir/ego_gift_get_confirm_assets.png",
+        }:
+            return True
+        return False
+
+    def find_element(image_path, *args, **kwargs):
+        nonlocal gift_scans
+        if image_path == system_gift:
+            gift_scans += 1
+            return [(100, 100)] if gift_scans == 1 else []
+        if image_path == "mirror/shop/shop_coins_assets.png":
+            return (20, 20)
+        return None
+
+    with (
+        patch("tasks.mirror.in_shop.auto") as mock_auto,
+        patch("tasks.mirror.in_shop.wait_for_screenshot", return_value=object()),
+        patch("tasks.mirror.in_shop.retry", return_value=True),
+        patch("tasks.mirror.in_shop.sleep"),
+    ):
+        mock_auto.click_element.side_effect = click_element
+        mock_auto.find_element.side_effect = find_element
+        shop._get_cost = lambda: -1
+
+        shop.buy_gifts()
+
+    mock_auto.mouse_action_with_pos.assert_any_call((100, 100), offset=True)
+
+
+def test_buy_gifts_keeps_second_system_candidates_after_primary_purchase():
+    shop = Shop(
+        TeamSetting(
+            team_system=0,
+            shop_strategy=0,
+            second_system=True,
+            second_system_select=1,
+            second_system_setting=1,
+            second_system_action=[0, 1, 0],
+            max_keyword_refresh=0,
+            max_normal_refresh=0,
+        )
+    )
+    primary_gift = f"mirror/shop/enhance_gifts/shop_{shop.system}.png"
+    second_system_gift = (
+        f"mirror/shop/enhance_gifts/shop_{shop.second_system_select}.png"
+    )
+    gift_scans = {primary_gift: 0, second_system_gift: 0}
+
+    def click_element(image_path, **kwargs):
+        return image_path in {
+            "mirror/shop/purchase_assets.png",
+            "mirror/road_in_mir/ego_gift_get_confirm_assets.png",
+        }
+
+    def find_element(image_path, *args, **kwargs):
+        if image_path in gift_scans:
+            gift_scans[image_path] += 1
+            coordinate = (100, 100) if image_path == primary_gift else (200, 200)
+            return [coordinate] if gift_scans[image_path] == 1 else []
+        if image_path == "mirror/shop/shop_coins_assets.png":
+            return (20, 20)
+        return None
+
+    with (
+        patch("tasks.mirror.in_shop.must_purchase", []),
+        patch("tasks.mirror.in_shop.auto") as mock_auto,
+        patch("tasks.mirror.in_shop.cfg") as mock_cfg,
+        patch("tasks.mirror.in_shop.wait_for_screenshot", return_value=object()),
+        patch("tasks.mirror.in_shop.retry", return_value=True),
+        patch("tasks.mirror.in_shop.sleep"),
+    ):
+        mock_cfg.set_win_size = 1440
+        mock_cfg.not_skip_whitegossypium = True
+        mock_auto.click_element.side_effect = click_element
+        mock_auto.find_element.side_effect = find_element
+        shop._get_cost = lambda: -1
+
+        shop.buy_gifts()
+
+    mock_auto.mouse_action_with_pos.assert_any_call((100, 100), offset=True)
+    mock_auto.mouse_action_with_pos.assert_any_call((200, 200), offset=True)
 
 
 def test_sell_gifts_caps_repeated_sell_entry_clicks():

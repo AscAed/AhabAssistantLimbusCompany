@@ -3,7 +3,7 @@
 ## 检出身份与边界
 
 - 仓库：`E:\PUBLIC\Project\AALC\Source Code\AhabAssistantLimbusCompany`
-- 分支：`main`，与 `origin/main` 对齐；审阅时工作区干净。
+- 分支：`main`；审阅时工作区干净。该检出的本地 `origin/main` 缓存比审阅 HEAD 超前 12 个提交；本报告没有 fetch，因此不能据此声称与当前 GitHub 状态同步。
 - HEAD：`2fcb1b4620108c9bb0cf138f82790dd13f46356c`
 - 标签：`V1.6.1`、`V1.6.1-beta.15`
 - 许可证：GNU AGPL v3，见 `LICENSE`。
@@ -82,4 +82,4 @@
 - updater 的下载、替换、回滚与权限边界尚未完成端到端分析。
 - pytest 未在此参考检出运行，CI 配置也未执行；本报告不包含通过率或打包成功率结论。
 
-本检出在后续文档调查中再次确认仍为上述 SHA；具体借鉴取舍和验证门槛见[目标架构与优化](../architecture/target-and-optimization.md)。后续调查未运行参考项目。
+本报告结论仅对应上述审阅 SHA。复核时本地 `origin/main` 缓存为 `ec8aa1750f823f2c5daf76d1807282b17b968a30`，比该 SHA 超前 12 个提交；未联网刷新远端引用，也未运行参考项目。具体借鉴取舍和验证门槛见[目标架构与优化](../architecture/target-and-optimization.md)。

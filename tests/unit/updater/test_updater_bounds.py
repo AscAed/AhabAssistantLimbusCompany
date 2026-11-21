@@ -34,6 +34,80 @@ def test_prepare_update_payload_raises_when_extract_fails():
             updater._prepare_update_payload(False)
 
 
+def test_cli_without_payload_exits_before_stopping_or_starting_application(
+    tmp_path, monkeypatch, capsys
+):
+    from updater import check_temp_dir_and_run
+
+    install_folder = tmp_path / "install"
+    update_temp = install_folder / "update_temp"
+    update_temp.mkdir(parents=True)
+    staged_updater = update_temp / "AALC Updater.exe"
+    staged_updater.write_bytes(b"staged updater")
+
+    monkeypatch.chdir(install_folder)
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "argv", [str(staged_updater)])
+
+    with (
+        patch.object(Updater, "terminate_processes") as terminate,
+        patch("updater.subprocess.Popen") as popen,
+        patch("updater.subprocess.run") as run,
+        patch("builtins.input") as prompt,
+    ):
+        with pytest.raises(SystemExit) as exit_info:
+            check_temp_dir_and_run()
+
+    assert exit_info.value.code == 1
+    assert "更新准备失败" in capsys.readouterr().out
+    terminate.assert_not_called()
+    popen.assert_not_called()
+    run.assert_not_called()
+    prompt.assert_not_called()
+    assert {
+        path.relative_to(install_folder)
+        for path in install_folder.rglob("*")
+        if path.is_file()
+    } == {Path("update_temp") / "AALC Updater.exe"}
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        os.path.join(".", "update_temp", "AALC Updater.exe"),
+        "./UPDATE_TEMP/aalc updater.EXE",
+    ],
+)
+def test_cli_from_relative_staged_path_does_not_copy_to_itself(
+    tmp_path, monkeypatch, relative_path
+):
+    from updater import check_temp_dir_and_run
+
+    install_folder = tmp_path / "install"
+    update_temp = install_folder / "update_temp"
+    update_temp.mkdir(parents=True)
+    staged_updater = update_temp / "AALC Updater.exe"
+    staged_updater.write_bytes(b"staged updater")
+    legacy_launcher = install_folder / "Update.exe"
+    legacy_launcher.write_bytes(b"existing launcher")
+
+    monkeypatch.chdir(install_folder)
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(sys, "argv", [relative_path])
+
+    with (
+        patch("updater.shutil.copy") as copy,
+        patch("updater.subprocess.Popen") as popen,
+        patch.object(Updater, "run", return_value=True) as run,
+    ):
+        check_temp_dir_and_run()
+
+    copy.assert_not_called()
+    popen.assert_not_called()
+    run.assert_called_once_with(apply_mode=False)
+    assert legacy_launcher.read_bytes() == b"existing launcher"
+
+
 def test_terminate_processes_ignores_unavailable_process_name():
     updater = object.__new__(Updater)
     updater.process_names = ["AALC.exe"]
@@ -51,6 +125,25 @@ def test_terminate_processes_ignores_unavailable_process_name():
     unrelated_process.terminate.assert_not_called()
     target_process.terminate.assert_called_once_with()
     target_process.wait.assert_called_once_with(timeout=10)
+
+
+def test_terminate_processes_requires_exact_target_name():
+    updater = object.__new__(Updater)
+    updater.process_names = ["AALC.exe"]
+    prefixed_process = Mock(info={"pid": 104, "name": "NotAALC.exe"})
+    suffixed_process = Mock(info={"pid": 105, "name": "AALC.exe.backup"})
+    case_variant_process = Mock(info={"pid": 106, "name": "aalc.EXE"})
+
+    with patch(
+        "updater.psutil.process_iter",
+        return_value=[prefixed_process, suffixed_process, case_variant_process],
+    ):
+        updater.terminate_processes()
+
+    prefixed_process.terminate.assert_not_called()
+    suffixed_process.terminate.assert_not_called()
+    case_variant_process.terminate.assert_called_once_with()
+    case_variant_process.wait.assert_called_once_with(timeout=10)
 
 
 def test_extract_file_recovers_after_process_exit_during_safe_unpack(tmp_path):

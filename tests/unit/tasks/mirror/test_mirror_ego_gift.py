@@ -35,14 +35,14 @@ def test_acquire_ego_gift_stops_before_input_when_screenshot_wait_fails(
 @patch("tasks.mirror.mirror.sleep", return_value=None)
 @patch("tasks.mirror.mirror.auto")
 @patch("tasks.mirror.mirror.cfg")
-def test_acquire_ego_gift_refuse_path_returns_none(mock_cfg, mock_auto, mock_sleep, mock_time_sleep, mock_retry):
+def test_acquire_ego_gift_refuse_path_returns_true(mock_cfg, mock_auto, mock_sleep, mock_time_sleep, mock_retry):
     mock_cfg.set_win_size = 1440
     mock_auto.find_element.return_value = (1000, 1000)
 
     mirror = object.__new__(Mirror)
     result = mirror.acquire_ego_gift(type=2)
 
-    assert result is None
+    assert result is True
     mock_auto.mouse_click.assert_any_call(500, 500)
     mock_auto.mouse_click.assert_any_call(1000, 500)
     mock_auto.click_element.assert_called_once_with(
@@ -77,7 +77,7 @@ def test_acquire_ego_gift_accepts_confirmation_on_last_iteration(mock_cfg, mock_
     mock_auto.find_element.side_effect = RuntimeError("recognition failed")
     mirror = object.__new__(Mirror)
 
-    assert mirror.acquire_ego_gift() is None
+    assert mirror.acquire_ego_gift() is True
 
     assert mock_wait.call_count == 31
     assert mock_auto.click_element.call_count == 31

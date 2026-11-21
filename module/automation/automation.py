@@ -1033,6 +1033,14 @@ class Automation(metaclass=SingletonMeta):
                 template, bbox = self._load_template_for_path(target, loaded_path, cacheable)
                 if template is None:
                     continue
+                if bbox is not None and crop_offset != (0, 0):
+                    x_offset, y_offset = crop_offset
+                    bbox = (
+                        bbox[0] - x_offset,
+                        bbox[1] - y_offset,
+                        bbox[2] - x_offset,
+                        bbox[3] - y_offset,
+                    )
                 center, matchVal = ImageUtils.match_template(screenshot, template, bbox, model)
                 matched = self._is_valid_match(matchVal, threshold)
                 if 0.70 < matchVal < 0.90 and int(matchVal * 1000 + 1e-9) % 10 >= 5:
@@ -1161,7 +1169,10 @@ class PageStateDispatcher:
         if self.auto.find_element("teams/identify_assets.png", take_screenshot=False):
             return GameState.BATTLE_FORMATION
 
-        if self.auto.find_element("mirror/shop/shop_coins_assets.png", take_screenshot=False):
+        if (
+            self.auto.find_element("mirror/shop/shop_coins_assets.png", take_screenshot=False)
+            or self.auto.find_element("mirror/shop/fuse_to_select_keyword_assets.png", take_screenshot=False)
+        ):
             return GameState.SHOP
 
         if (
