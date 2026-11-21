@@ -134,6 +134,26 @@ def test_load_team_code_capture_failure_stops():
     assert mock_auto.take_screenshot.call_count == 3
 
 
+def test_load_team_code_failure_does_not_log_team_code():
+    team_code = "sensitive-test-team-code"
+    find_results = [True]
+    find_results.extend([True, False] * 3)
+
+    with patch("tasks.teams.team_formation.auto") as mock_auto, patch(
+        "tasks.teams.team_formation.sleep"
+    ), patch("tasks.teams.team_formation.log") as mock_log:
+        mock_auto.find_element.side_effect = find_results
+        mock_auto.take_screenshot.return_value = _frame_with_team_list()
+        mock_auto.click_element.return_value = False
+
+        assert load_team_code_in_game(team_code) is False
+
+    assert mock_auto.take_screenshot.call_count == 3
+    assert mock_auto.input_text.call_args_list == [call(team_code)] * 3
+    mock_log.warning.assert_called_once_with("加载编队码失败，已重试3次")
+    assert team_code not in str(mock_log.warning.call_args)
+
+
 def test_team_selection_scroll_verification_uses_visible_fallback():
     same_frame = _frame_with_team_list()
     changed_frame = _frame_with_team_list(changed=True)

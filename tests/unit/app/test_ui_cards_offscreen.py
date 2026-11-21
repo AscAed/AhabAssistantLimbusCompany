@@ -39,6 +39,10 @@ def test_team_setting_card_constructs_offscreen(app):
     assert widget.sinner_Gregor is not None
     assert widget.burn is not None
     assert widget.blunt is not None
+    gift_order_box = widget.customize_settings_module.opening_items.additional_combo_box.combo_box
+    assert gift_order_box.count() == 15
+    assert gift_order_box.itemText(0) == "1→2→3"
+    assert gift_order_box.itemText(11) == "1→3"
     widget.deleteLater()
 
 

@@ -67,6 +67,24 @@ ALL_SYSTEMS = {
 OBSERVE_SYSTEM = ALL_SYSTEMS | {4: ALL_SYSTEMS[5], 5: ALL_SYSTEMS[4]}
 MAX_OBSERVE_GIFT_SELECTIONS = 3
 
+OPENING_EGO_GIFT_ORDERS = (
+    (1, 2, 3),
+    (1, 3, 2),
+    (2, 1, 3),
+    (2, 3, 1),
+    (3, 1, 2),
+    (3, 2, 1),
+    (1,),
+    (2,),
+    (3,),
+    (1, 2),
+    (2, 1),
+    (1, 3),
+    (3, 1),
+    (2, 3),
+    (3, 2),
+)
+
 SYSTEM_CN_ZH = {
     "burn": "烧伤",
     "bleed": "流血",

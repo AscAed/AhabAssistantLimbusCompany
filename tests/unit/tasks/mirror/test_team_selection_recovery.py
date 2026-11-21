@@ -50,7 +50,7 @@ def test_select_mirror_team_continues_after_team_code_load_failure(
     mirror.team_number = 1
     mirror.team_order = 1
 
-    mirror.select_mirror_team()
+    assert mirror.select_mirror_team() is True
 
     mock_select_team.assert_called_once_with(1)
     mock_load_team_code.assert_called_once_with("test-code")
@@ -58,3 +58,27 @@ def test_select_mirror_team_continues_after_team_code_load_failure(
         "mirror/road_to_mir/dreaming_star/coins_assets.png"
     )
     _sleep.assert_called_once_with(3)
+
+
+def test_select_mirror_team_returns_false_after_entry_attempts_are_exhausted():
+    with (
+        patch("tasks.mirror.mirror.back_init_menu") as mock_back_init_menu,
+        patch("tasks.mirror.mirror.auto") as mock_auto,
+        patch("tasks.mirror.mirror.cfg") as mock_cfg,
+        patch("tasks.mirror.mirror.retry", return_value=True),
+        patch("tasks.mirror.mirror.select_battle_team", return_value=True),
+        patch("tasks.mirror.mirror.time.sleep"),
+        patch("tasks.mirror.mirror.wait_for_screenshot") as mock_wait_for_screenshot,
+    ):
+        mock_cfg.config.teams = {}
+        mock_auto.click_element.return_value = False
+        mock_auto.find_element.return_value = None
+        mock_auto.find_language_text.return_value = False
+        mirror = object.__new__(Mirror)
+        mirror.team_number = 1
+        mirror.team_order = 1
+
+        assert mirror.select_mirror_team() is False
+
+    mock_back_init_menu.assert_called_once_with()
+    assert mock_wait_for_screenshot.call_count == 31

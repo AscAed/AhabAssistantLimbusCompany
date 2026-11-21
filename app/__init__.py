@@ -3,7 +3,7 @@ from enum import Enum
 from PySide6.QtCore import QT_TRANSLATE_NOOP
 
 from app.mediator import Mediator
-from module.domain_constants import ALL_SINNERS_NAME, ALL_SYSTEMS
+from module.domain_constants import ALL_SINNERS_NAME, ALL_SYSTEMS, OPENING_EGO_GIFT_ORDERS
 
 mediator = Mediator()
 
@@ -106,7 +106,10 @@ shopping_strategy = {
     QT_TRANSLATE_NOOP("BaseComboBox", "不购买回血饰品"): 4,
     QT_TRANSLATE_NOOP("BaseComboBox", "启用四级优先时：不购买所有3-4级饰品"): 5,
 }
-start_gift = {"1→2→3": 0, "1→3→2": 1, "2→1→3": 2, "2→3→1": 3, "3→1→2": 4, "3→2→1": 5}
+start_gift = {
+    "→".join(map(str, order)): index
+    for index, order in enumerate(OPENING_EGO_GIFT_ORDERS)
+}
 second_systems = {
     QT_TRANSLATE_NOOP("BaseComboBox", "合成第一体系四级饰品后"): 0,
     QT_TRANSLATE_NOOP("BaseComboBox", "一直"): 1,

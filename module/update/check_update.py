@@ -178,7 +178,10 @@ class UpdateThread(QThread):
             )
         except Exception as e:
             # Mirror酱 失败后自动回退到 GitHub，保持原有软件更新逻辑不变。
-            log.error(f"从Mirror酱源检查更新失败:{e},尝试使用GitHub源检查更新")
+            log.error(
+                "从Mirror酱源检查更新失败 (%s)，尝试使用GitHub源检查更新",
+                type(e).__name__,
+            )
             try:
                 data = self.check_update_info_github()
                 version = data["tag_name"]
@@ -199,7 +202,10 @@ class UpdateThread(QThread):
                 )
             except Exception as e:
                 # 异常处理，发送失败信号
-                log.error(f"Mirror酱源与GitHub源均检查更新失败:{e}")
+                log.error(
+                    "Mirror酱源与GitHub源均检查更新失败 (%s)",
+                    type(e).__name__,
+                )
                 self.updateSignal.emit(UpdateStatus.FAILURE)
 
     def check_update_info_github(self):
@@ -330,7 +336,7 @@ class UpdateThread(QThread):
                 return assets_url
         except Exception as e:
             # 异常处理，发送失败信号
-            log.error(f"更新失败:{e}")
+            log.error("更新失败 (%s)", type(e).__name__)
             self.updateSignal.emit(UpdateStatus.FAILURE)
 
 
@@ -549,7 +555,7 @@ def update(assets_url):
             mediator.download_complete.emit(file_name)
 
     except requests.exceptions.RequestException as e:
-        log.error(f"下载失败，请检查网络: {e}")
+        log.error("下载失败，请检查网络 (请求异常: %s)", type(e).__name__)
         mediator.download_failed.emit("下载失败，请检查网络后重试。")
     except OSError as e:
         log.error(f"文件操作失败: {e}")

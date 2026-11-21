@@ -245,6 +245,16 @@ def test_page_state_dispatcher(mock_automation):
     assert state == GameState.THEME_PACK
 
 
+def test_page_state_dispatcher_classifies_fusion_keyword_prompt_as_shop():
+    auto = _capture_automation()
+    auto.screenshot = Image.new("RGB", (1, 1))
+    auto.find_element = MagicMock(
+        side_effect=lambda target, **kwargs: target == "mirror/shop/fuse_to_select_keyword_assets.png"
+    )
+
+    assert PageStateDispatcher(auto).detect_state() == GameState.SHOP
+
+
 @patch("tasks.mirror.mirror.auto")
 @patch("module.config.cfg")
 def test_check_and_recover_process(mock_cfg, mock_auto):

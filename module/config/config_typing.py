@@ -127,7 +127,7 @@ class TeamSetting(BaseModel):
     """自定义开局道具"""
 
     opening_items_select: int = 0
-    """开局道具选择顺序"""
+    """开局饰品槽位选择及顺序"""
 
     opening_items_system: int = 0
     """开局道具体系"""

@@ -19,12 +19,17 @@ class Game(metaclass=SingletonMeta):
         self.check_in_short_time = 0
 
     def check_game_alive(self):
+        if not isinstance(self.process_name, str) or not self.process_name:
+            return False
+        target_process_name = self.process_name.casefold()
         for proc in psutil.process_iter(["name"]):
             try:
                 # 获取进程的可执行文件名（如 "notepad.exe"）
                 proc_name = proc.info["name"]
-                # 精确匹配进程名（区分大小写，取决于系统）
-                if self.process_name in proc_name:
+                if (
+                    isinstance(proc_name, str)
+                    and proc_name.casefold() == target_process_name
+                ):
                     self.log.debug(
                         f"游戏已启动：{self.process_name}，进程ID：{proc.pid}"
                     )

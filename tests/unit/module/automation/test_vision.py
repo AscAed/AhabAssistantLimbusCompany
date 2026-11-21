@@ -2,8 +2,11 @@ from unittest.mock import patch
 
 import numpy as np
 import pytest
+from PIL import Image
 
 from module.automation.automation import Automation
+from utils.image_utils import ImageUtils
+from utils.path_manager import path_manager
 
 
 @pytest.fixture
@@ -48,6 +51,37 @@ def test_get_default_roi(mock_automation):
 
     # Test unknown element
     assert mock_automation.get_default_roi("unknown_target.png") is None
+
+
+def test_find_element_translates_template_bbox_into_roi_coordinates(monkeypatch):
+    target = "mirror/shop/shop_coins_assets.png"
+    monkeypatch.setattr("module.automation.automation.cfg.set_win_size", 1440)
+    monkeypatch.setattr(path_manager, "active_paths", ["default/share"])
+    monkeypatch.setattr(path_manager, "current_theme", "default")
+    monkeypatch.setattr(path_manager, "current_language", "zh_cn")
+
+    source = ImageUtils.load_from_specific_path(target, "default/share")
+    bbox = ImageUtils.get_bbox(source)
+    icon = ImageUtils.crop(source, bbox)
+    x1, y1, x2, y2 = bbox
+    screenshot = np.zeros((1440, 2560, 3), dtype=np.uint8)
+    screenshot[y1:y2, x1:x2] = icon[:, :, None]
+
+    auto = object.__new__(Automation)
+    auto.model = "clam"
+    auto.screenshot = Image.fromarray(screenshot)
+    auto.screenshot_np = None
+    auto.last_screenshot_time = 0
+    auto.last_memory_check_time = 0
+    auto.memory_protection = False
+    auto.img_cache = {}
+    auto.location_cache = {}
+
+    assert auto.find_element(target, take_screenshot=False) == (
+        (x1 + x2) // 2,
+        (y1 + y2) // 2,
+    )
+
 
 @patch("module.automation.automation.ImageUtils")
 def test_location_matching_cache(mock_image_utils, mock_automation):

@@ -190,6 +190,225 @@ The current official [Limbus Company Terms of Service](https://limbuscompany.com
 
 **Assessment and disposition:** the user-selected preference to save, share, and commit suitable samples records the project direction, but does not establish rights to third-party game content. The 17 branch images remain unqualified for local visual tests and are not accepted for inclusion or distribution in the public AALC repository. Their source attribution and `Software=Snipaste` metadata do not establish original capture context, pixel integrity, privacy status, or permission. No image was copied. Reopen a candidate only when there is an applicable official license/policy or rights-holder authorization covering the intended test use and repository distribution, plus item-specific provenance, integrity, privacy, game version, and language. This is a project risk disposition, not a legal determination.
 
+## 2026-11-16 Current Collection Status and Gaps
+
+This is a documentation cross-check against the `cc9e3724` AALC checkout and the local reference refs recorded above. It does not repeat the native-size image review or copy any asset. The LALC main checkout remains `431b432e22f0b0da08b95d7c478fa213be20b3e8`; its cached `origin/architecture-refactor` ref is `952476cfcd231bd9143cee5766ce2161fb306f89`. The 17 full-frame 1280 x 720 Mirror screens remain candidate leads only. Their original capture context, game version, language, privacy disposition, original-pixel integrity and item-specific permission for test use/repository distribution are unverified. Do not include them in local visual tests or the public repository until those conditions are documented. The five LALC tutorial composites, localized labels, runtime crops/templates and legend remain unsuitable substitutes for complete labeled frames.
+
+The user permits samples to be saved, shared and included in the repository. This records project intent; it does not clear rights to embedded game content or resolve provenance. For candidates from a reference project, obtain an applicable policy/license or rights-holder authorization covering the intended test use and distribution, and record evidence per item. If that cannot be established, keep the candidate excluded and seek permission for a suitable source or a newly captured sample under an applicable use basis. User-provided images in conversation are not repository fixtures unless the actual files and their metadata/permission are separately reviewed. The earlier Daily/Weekly pass screenshots informed code discussion but were not retained; the pass-page sample requirement therefore remains open.
+
+| Workflow/state group | Human collection or confirmation needed | System-assisted capture after authorization | Current status |
+| --- | --- | --- | --- |
+| Team selection | Reach and confirm normal, missing-anchor, selected-team and failure states; label intended team and anchors. | Capture complete frames and metadata during an authorized session after the human confirms the visible state and target labels. | No qualifying full-frame fixture recorded. |
+| Initial/observed EGO | Confirm normal, no-match, confusable-gift and final-scroll states and which gift should be selected. | Capture ordered frames and annotate target/no-match regions after state confirmation. | Reference images offer leads, not accepted fixtures; recognition remains unqualified. |
+| Shop/fusion | Reach normal, empty, selected, missing-row-anchor, confirmation and failed-transition states; identify expected safe outcome. | Capture each confirmed state with candidate gifts, anchors and expected detection labels. | Runtime resources are crops/templates; no accepted full-frame samples. |
+| Route/event | Confirm similar-looking route nodes, route choices and event transitions with expected selection labels. | Capture full frames and annotate route/event targets and no-match cases. | 17 LALC screens include route/event leads but remain rights/provenance blocked. |
+| Scroll/layout | Human confirms first/middle/last/no-further-scroll positions and the supported resolution/scale. | Capture ordered frames with position, window size, display scale and language metadata. | Static frames can validate recognition/coordinates only, not actual drag distance or scroll effect. |
+| Failure/recovery | Reproduce or deliberately reach the failure state and confirm the desired terminal/recovery outcome; do not fabricate failure labels from normal screenshots. | Capture the visible state and diagnostic context in an authorized session; avoid saving unrelated personal data. | No accepted representative failure-state set. |
+| Pass Daily/Weekly | Provide/reconfirm full-frame current pages and expected loaded/no-claim behavior; avoid retaining identifiers. | Capture after the person confirms the selected tab and mission-list state. | Prior conversational samples were not persisted; current synthetic tests are not image fixtures. |
+
+Before any collection, preserve full-frame pixels for tested regions: do not cover or blur targets used for recognition acceptance. If privacy redaction must touch a tested region, mark that region ineligible and do not use it to claim accuracy. Keep a manifest with per-image source, permission basis, capture date/context, game version, language, dimensions, display/window scale, UI state, privacy disposition, SHA-256 and expected labels. A human must confirm state/labels; batch capture or annotation can then be system-assisted. No game session or automated capture was run for this update.
+
+## 2026-11-16 Human Sample Request Checklist
+
+This section is the practical collection request prepared before the latest user-provided images arrived. At that time, the repository had no full-frame raster fixtures under `tests/`; runtime templates/crops and LALC reference images were not substitutes. The user has since added candidate frames under `tests/fixtures/visual/`; their current inventory and review status are recorded below. The proposed categorized layout remains a future organization option; no supplied image was moved or renamed.
+
+### Where to Save
+
+For images you are preparing to send for review, keep the originals outside the Git repository until each file's source, privacy, integrity and intended-use basis have been recorded. A suggested intake folder is `E:\PUBLIC\Project\AALC\_mirror-sample-intake\` with `mirror\` and `pass\` subfolders; this folder is proposed and was not created. After acceptance, use this proposed repository layout:
+
+```text
+tests/fixtures/visual/
+  README.md
+  manifest.yaml
+  mirror/
+    team/
+    ego/
+    theme-pack/
+    shop-fusion/
+    route-event/
+    scroll/
+    failure-recovery/
+  pass/
+    daily/
+    weekly/
+```
+
+The folder names are proposed; no files should be moved or committed by following this checklist alone. Keep one unaltered full-frame PNG per capture. Do not crop, scale, annotate, or overwrite the original. Put any explanatory target boxes in the manifest or a separate review copy, never over the pixels used for recognition acceptance.
+
+Use this filename pattern (ASCII, lowercase, no spaces):
+
+```text
+YYYYMMDD_<area>_<state>_<lang>_<width>x<height>_scale-<percent>_game-<version>_<sequence>.png
+```
+
+Examples (replace placeholders with the actual values; do not guess a game version):
+
+```text
+20261116_mirror-team_normal_zh-cn_1920x1080_scale-100_game-unknown_01.png
+20261116_mirror-shop-fusion_no-anchor_zh-cn_1920x1080_scale-100_game-unknown_01.png
+20261116_pass-daily_claimable_zh-cn_1920x1080_scale-100_game-unknown_01.png
+```
+
+For example, an unreviewed Mirror team capture would first be placed at `E:\PUBLIC\Project\AALC\_mirror-sample-intake\mirror\20261116_mirror-team_normal_zh-cn_1920x1080_scale-100_game-unknown_01.png`. Only after review should an accepted copy be placed under `E:\PUBLIC\Project\AALC\AhabAssistantLimbusCompany\tests\fixtures\visual\mirror\team\` using the same filename.
+
+If the game version is unknown, use `game-unknown` and record why in the manifest. “Scale” means the Windows display scaling used for the capture; also record the game window/client size if it is not full-screen.
+
+For every image, include a manifest entry with: filename; state and whether it is before/after an action; expected visible targets and expected no-match result; game version/build (or unknown); language; pixel dimensions; Windows display scale and game window/client size; capture date and whether manually captured or system-assisted; source/permission basis and intended scope (private review, local tests, repository distribution); any redaction and the exact affected region; and SHA-256 if readily available. Do not include account names, IDs, chat overlays, desktop notifications or unrelated personal data.
+
+### Priority 0: Small Baseline
+
+Please start with one full-frame image for each row below where the state is naturally available. If a state is not available, mark it “not captured”; do not manufacture it by editing another screenshot. These eight images establish an initial visual baseline, not broad accuracy coverage.
+
+| ID | Suggested filename stem | What the full screen should show | Label to provide | Collection |
+| --- | --- | --- | --- | --- |
+| M-01 | `mirror-team_normal` | Mirror team-formation page with the selected sinners/slots visible and the control used to continue into Mirror visible. Include surrounding UI, not just the team grid. | Which team/slots are valid and the intended continue control. | Human confirms the screen and labels; manual screenshot is sufficient. |
+| M-02 | `mirror-ego_initial` | Initial EGO gift-selection page with all visible gift cards and the selection/continue controls. | Intended gift if there is a preferred match; otherwise expected no-match/leave-unchanged result. | Human confirms target; manual screenshot. |
+| M-03 | `mirror-theme-pack_normal` | Theme-pack/difficulty selection page with the available choices and current selection visible. | Expected pack/difficulty choice or expected no-match. | Human confirms labels; manual screenshot. |
+| M-04 | `mirror-shop_normal` | Shop screen showing the gift grid, visible row boundaries/anchors and shop action controls. | Which gifts and row anchors the current recognition is expected to find. | Human confirms labels; manual screenshot. |
+| M-05 | `mirror-shop-fusion_ready` | Fusion screen with candidate gifts arranged in the normal usable layout and the relevant fuse/confirm control visible. | Candidate gift locations, row anchor and expected selection outcome. | Human confirms labels; manual screenshot. |
+| M-06 | `mirror-route_choices` | Route map with multiple visible nodes, including at least two visually similar choices if naturally present. | Intended node and labels for the other visible node types. | Human confirms route state/targets; manual screenshot. |
+| P-01 | `pass-daily_loaded` | Daily pass mission-list page after the list has finished loading, with the tab and mission rows visible. | Confirm selected Daily tab and whether the page is loaded; do not infer claimability from coin artwork alone. | Human confirms state; manual screenshot. |
+| P-02 | `pass-weekly_loaded` | Weekly pass mission-list page after loading, with tab and mission rows visible. | Confirm selected Weekly tab, loaded state and visible mission progress. | Human confirms state; manual screenshot. |
+
+If only a minimal upload is practical, prioritize M-01 through M-06 and the two pass pages above. For pass pages, a loaded screen alone does not establish the claim/no-claim behavior; the follow-up states below are needed before qualifying those branches.
+
+### Priority 1: High-Risk and Easily Confused States
+
+Collect these after the baseline, when the state can be reached without risking account or user data. These are separate images, not edits of the baseline.
+
+| ID | Suggested filename stem | What is missing and what to capture | Label to provide | Collection |
+| --- | --- | --- | --- | --- |
+| M-07 | `mirror-team_missing-anchor` | Team page where the expected row/anchor is absent or visually different, if this can occur naturally. | Which anchor is absent and the expected safe outcome (no selection/stop). | Human must confirm the actual state; system-assisted capture may save the full frame after confirmation. |
+| M-08 | `mirror-ego_confusable` | Gift choices with similar artwork/text or a target partly near the edge. | Correct target, confusing alternatives and expected no-match if the target cannot be distinguished. | Human confirms labels; capture may be system-assisted. |
+| M-09 | `mirror-ego_last-scroll` | Last visible gift row after scrolling, including the end-of-list boundary. | Visible gifts, intended target if any, and whether more scrolling is expected. | Capture an ordered set; system-assisted capture is useful once a human confirms each position. |
+| M-10 | `mirror-shop-fusion_missing-anchor` | Fusion/shop state where the row anchor or expected reference is absent; do not edit a normal image to simulate absence. | Missing anchor and expected fail-closed result. | Only collect if naturally reachable; otherwise keep the visual case blocked and use a separately labeled synthetic test for control flow. |
+| M-11 | `mirror-shop-fusion_after-selection` | Screen after selecting one or more fusion gifts, before final confirmation, with selected state visible. | Which gifts are selected and which next action is expected. | Human confirms action/state; system-assisted sequence capture can preserve before/after ordering. |
+| M-12 | `mirror-shop-fusion_result` | Result page after a completed fusion, if available. | Expected result marker and return/continue control. | Human confirms result; system-assisted capture may record the transition. |
+| M-13 | `mirror-route_event_choice` | Event-choice page with the choices fully visible, preferably including one misleading/similar choice. | Intended choice and alternatives; mark any unknown/no-match case. | Human confirms event text/choice; manual or authorized system-assisted capture. |
+| M-14 | `mirror-route_transition` | Route/event transition page after an action, not just a static route map. | Before/after state and expected next page. | Ordered capture after human confirmation; a static image cannot prove the transition occurred. |
+| M-15 | `mirror-scroll_first` / `mirror-scroll_middle` / `mirror-scroll_last` | Three full frames of the same scrollable page at the top, middle and end; capture them in order without changing scale or window size. | Order, visible item identities and whether the end has been reached. | Best captured as an authorized sequence; manual images are acceptable if the order is recorded. These do not alone verify drag distance. |
+| P-03 | `pass-daily_claimable` | Daily page with a reward that the UI actually presents as claimable and the relevant row/control visible. | Which row is claimable and the visible evidence for that state. | Human must confirm claimability from the actual UI; do not use the coin icon alone as proof. |
+| P-04 | `pass-daily_no-claim` | Daily page with no currently claimable reward, or all visible eligible rewards already claimed. | Why no claim should occur and expected no-op result. | Human confirms progress/claimed state; manual screenshot. |
+| P-05 | `pass-weekly_claimable` | Weekly equivalent of P-03. | Claimable row and its visible state. | Human confirms; manual screenshot. |
+| P-06 | `pass-weekly_no-claim` | Weekly equivalent of P-04. | Expected no-op and why. | Human confirms; manual screenshot. |
+| R-01 | `mirror_failure_loading` | A genuine loading/wait state that can be captured without interrupting or damaging the session. | What is still loading and the safe expected behavior (wait, timeout or stop). | Do not deliberately force a failure; system-assisted capture only in an authorized session. |
+| R-02 | `mirror_failure_no-match` | A genuine unsupported/unknown page or no-match state, if encountered. | Expected no-click/stop result and why the state is unknown. | Human identifies the state; otherwise use a synthetic fixture labeled synthetic, not as live visual evidence. |
+
+### Human-Provided Versus System-Assisted Work
+
+- **Needs human capture or confirmation:** confirm that the screenshot really shows the named game state; identify the intended team, card, route node or reward row; confirm Daily/Weekly tab and claimability; state the game version/language if known; confirm the source and permission scope; review privacy/redactions. A script cannot infer these labels reliably from the filename.
+- **Can be system-assisted after confirmation:** save full frames in a consistent format; capture before/after or first/middle/last sequences; record timestamps and dimensions; compute hashes; batch-annotate target boxes in a sidecar manifest. Capture must use an authorized game session and must not click, navigate or collect data as part of this sample request.
+- **Do not collect by intentionally causing:** account/network failures, data loss, updater interruption, or other damaging states. For rare failures, use labeled synthetic images for control-flow tests and keep them distinct from real-game visual samples.
+
+### Permissions and Current Candidate Status
+
+Your “批准授权” confirms that you are willing for suitable samples to be received, saved and considered for project tests/repository inclusion. It is not recorded as a rights-holder grant for third-party game artwork. For the 17 LALC reference frames, the local repository history identifies candidate files but not original capture provenance or an applicable item-specific permission for local testing and repository distribution; they remain excluded unless that evidence is supplied. The easiest path is to provide new full-frame captures with their own source/context and permission scope, then review them one by one. A user-provided image is still pending review until its file, tested-region integrity, privacy and intended distribution scope are checked.
+
+No images were requested from, extracted from, or copied out of the reference repositories in this update. No game, application, build, updater or capture process was run.
+
+## 2026-11-16 User-supplied Frame Review
+
+The user reported adding eight full-frame images under `tests/fixtures/visual/`. A read-only directory listing found **nine** PNG files. All nine decode as **2560 x 1440**; SHA-256 values below bind this review to the exact files inspected. The extra file is the Hard theme-pack page. Visual inspection found complete 16:9 game screens with the named workflow visible. Several images show a `CUSTOM LANGUAGE` footer; its source and effect on the tested UI are not established. The initial visual spot check found no obvious account identifier or desktop notification; the later full-frame and metadata privacy screen is recorded under `User Screenshot Privacy Screen (2026-11-16)`.
+
+| File | SHA-256 | Observed screen and disposition |
+| --- | --- | --- |
+| `mirror-team_normal.png` | `4D2E4DA7E5CEA74195BD23EDC41CD8C68825AE34DF041474C1CD8235998F1BB7` | Full team/preset screen, roster and confirmation control visible. User-defined behavior: identify the team by its order in the left-side formation list, verify it, then click the bottom-right confirmation control. |
+| `mirror-ego_initial.png` | `8B00B916C5FFF3D2D42970F0E2900A626F03D3B613BA65DAC45B9CD7B5640A29` | Full initial EGO decoration/gift-selection page. User-defined behavior: choose the configured category on the left, then select the configured number and order from the three gifts on the right; selection order may be non-contiguous. Apply the observation toggle according to configured observation gifts. |
+| `mirror-theme-pack_normal.png` | `EDFDAB76D78AED2EED5896199F655216EC30A478ED7C710C24C59FFD98EAA169` | Full Normal theme-pack selection page. Expected selection is derived from the Normal priority configuration for the selected team/floor. |
+| `mirror-theme-pack_hard.png` | `0ACC8D03CDC0D020168843813BEAEBA638EF30358DC7A85189DA7B84130E805F` | Full Hard theme-pack selection page; additional coverage beyond the original eight requested frames. Expected selection is derived from the Hard priority configuration for the selected team/floor. |
+| `mirror-shop_normal.png` | `1BFF05D84DC8047E05C40A814AC3776D35DE09DE3E0CDC4744DC1E1464AAED86` | Full shop screen with gift grid and shop controls. The user confirmed the black bars are original screen content and do not obscure item names or prices; treat those visible rows as usable candidates. |
+| `mirror-shop-fusion_ready.png` | `BB20F229855B62E9DC3A412BA2A639F96D20823689EFB78A1FE9FFAAB8371A9E` | Full fusion overlay with candidate gifts and fusion controls, but formula slots are empty and the screen says to select keywords. User-defined next action: click the left fusion area to open keyword selection, then choose configured fusion categories. The file depicts the pre-keyword state; filename is preserved. |
+| `mirror-route_choices.png` | `60A50A9156803ECC2A96914E9631A794EF78636CDC3EE2A6D318445EA261C827` | Full route map with multiple route nodes and current position. User-defined behavior: zoom out by mouse wheel until all nodes are visible, plan by node priority, then navigate with directional keys. The current test configuration must explicitly enable keyboard navigation. |
+| `pass-daily_loaded.png` | `54A4A2B89C9E33470D8E597EF924555A587DF5A30A3FC4B5E99878A52159B6C5` | Full Daily mission page with selected tab, loaded rows and progress. Supports loaded-page state only; it does not establish a claimable reward or no-claim completion behavior. |
+| `pass-weekly_loaded.png` | `E9CA9EA02BF488089726D4EF94618813C7A9518CD0E1D66F2150213B36F4E59F` | Full Weekly mission page with selected tab, loaded rows and progress. Supports loaded-page state only; it does not establish a claimable reward or no-claim completion behavior. |
+
+**Evidence status:** these are user-supplied candidate fixtures and are present as untracked files in the current worktree. Their visual completeness and dimensions are verified; the later persistent tests that reference them are listed under `Persistent Workflow Recognition Regressions (2026-11-16)`. The user reports Season 8/new-season imagery, capture on November 16 using a screenshot tool, a 32-inch 2560x1440 monitor at 100% Windows scale, and full-screen mode. Exact game build/version and screenshot-tool name remain unspecified. The user confirmed that the shop black bars are original content and do not obscure prices or names. The user authorizes public repository inclusion if a recognition workflow needs the screenshots. This records provenance and project-use intent; the applicable rights basis for public distribution of embedded game content remains a separate project review item.
+
+**User-confirmed expected flows and implementation cross-check (2026-11-16):** the project should not ask the user to restate expected pack names or routes when those can be derived from an explicit fixture-test configuration. Current AALC supports selecting teams by order (`select_team_by_order`), choosing configured initial EGO categories/orders, applying the observation-gift toggle, choosing theme packs by Normal/Hard priority configuration, and planning routes from recognized graph nodes. `mirror_keyboard_navigation` is a separate switch and is `False` in the example config; the test config must set it to `True` to assert the user's described keyboard-navigation path. Current fusion flow recognizes the initial keyword prompt and proceeds to keyword selection; the supplied image labels the state before that interaction. The local AALC reference at `2fcb1b4620108c9bb0cf138f82790dd13f46356c` is the closest implementation reference for these Python/config patterns. LALC `431b432e22f0b0da08b95d7c478fa213be20b3e8` also uses config-driven theme/gift decisions, but its Flutter/backend workflow and fixed coordinates are not a drop-in source of AALC coordinates. These are static code/config checks, not visual or live-game validation.
+
+The screen banner reads `2026.09.17 (KST) - until Season 9 begins`, while the user identifies the screenshots as newly captured Season 8 screens on November 16, 2026. The banner is not treated as capture metadata. The unresolved discrepancy is within the banner's stated date/Season 9 meaning, not between the user-provided capture date and Season 8 label.
+
+### 2026-11-17 Official Season-context Recheck
+
+The official [Limbus Company Steam news feed](https://store.steampowered.com/news/posts/?enddate=1788771604&feed=steam_community_announcements) lists `Guide on Season 8: Punctum` dated September 7, 2026. An [independent archive transcription](https://lcna.whosmalikx.com/notices/2026-09-16-guide-on-season-8-punctum/) attributed to Project Moon states that Season 8 commences on September 17, 2026, at 12:00 KST. This establishes the scheduled Season 8 start date, not the screenshot capture date, the current season on November 16, or the screenshots' installed client version. The user's Season 8/capture-date statements remain user-provided metadata. The banner's association of September 17 with Season 9 remains unexplained; do not treat it as capture metadata or proof of a client version.
+
+### 2026-11-16 Offline Page-state Probe
+
+The current full-frame candidates were evaluated locally in a disposable source snapshot based on `cc9e3724876b81be7bbb201c1bb25d2d008c5c57`, with the current `module/automation/automation.py` worktree overlay (`50D6255DD162FC83532F2696366C7768D79A425CFB1631ECAB00B54D8F94D2C0`) and the nine user-supplied PNGs. The probe initialized the image search paths, set the 1440-pixel reference height, preloaded each PNG as the current screenshot, and invoked `PageStateDispatcher.detect_state()`. It did not invoke OCR, task workflows, mouse/keyboard input, the application, or the game.
+
+| Fixture | Result after the current overlay |
+| --- | --- |
+| `mirror-team_normal.png` | `MIRROR_TEAM_SELECT` |
+| `mirror-ego_initial.png` | `UNKNOWN` |
+| `mirror-theme-pack_normal.png` | `THEME_PACK` |
+| `mirror-theme-pack_hard.png` | `THEME_PACK` |
+| `mirror-shop_normal.png` | `SHOP` |
+| `mirror-shop-fusion_ready.png` | `SHOP` |
+| `mirror-route_choices.png` | `ROAD_MAP` |
+| `pass-daily_loaded.png` | `UNKNOWN` |
+| `pass-weekly_loaded.png` | `UNKNOWN` |
+
+Before the overlay, the team, route, and both theme-pack frames were recognized, while both shop frames returned `UNKNOWN`. The `shop_coins_assets.png` template scored 0.9935 against the full normal-shop frame but failed when matched inside the dispatcher's default shop ROI: the template's screen-relative bounding box was not translated into cropped-frame coordinates. A synthetic full-size frame reproduced the same failure. The overlay translates the bounding box by the ROI origin before matching. The fusion frame contains `fuse_to_select_keyword_assets.png` at a full-frame match score of 0.9174, but that anchor was not part of the shop state check; it is now included.
+
+Focused tests were run in the isolated snapshot with the three current source/test overlays: `tests/unit/module/automation/test_state_flow.py` and `tests/unit/module/automation/test_vision.py` passed **20 tests** on Python 3.12.13. The new ROI regression synthesizes a frame from the tracked shop-currency runtime template; it does not load the user screenshots. The screenshot result table is a one-off offline characterization, not a persistent test oracle. EGO initial and pass pages remain unclassified by the Mirror dispatcher and need separate workflow/state analysis before adding labels or changing task behavior.
+
+These results establish recognition only for the displayed state labels and current templates. They do not verify target choices, OCR, coordinates for user actions, fusion selection, pass claimability, scrolling, transition timing, or live input. The screenshots remain untracked. Their exact game build, the Season 8/Season 9 banner discrepancy, and a suitable basis for public distribution of game imagery remain open.
+
+### 2026-11-16 Persistent Workflow Recognition Regressions
+
+The user explicitly approved repository inclusion when recognition tests need these screenshots. The current worktree now has `tests/unit/module/automation/test_visual_fixture_recognition.py`, which directly loads all nine PNGs in grayscale to match the application's default screenshot format. Six Mirror frames assert their existing `PageStateDispatcher` labels. The initial EGO frame asserts the configured Burn category, observation-off toggle, and three Burn gift targets in their expected broad screen regions. The Daily and Weekly frames exercise the same `image_with_multiple_targets` matcher used by `get_pass_prize()`.
+
+On both pass frames, the current `pass_coin.png` matcher returns five row-icon locations, including the two visually incomplete mission rows. This confirms the icon is not a claimability signal. The new test records template behavior only; it does not call `get_pass_prize()`, click, OCR, or assert which rewards should be claimed. No behavioral change is made to pass rewards without a representative claimable state and a reliable claimability cue.
+
+The current regression test does not change the one-off state-dispatch results above: initial EGO and Daily/Weekly still return `UNKNOWN` from the Mirror dispatcher because their workflows use dedicated task anchors. The tests validate only page labels and the named target matches. They do not validate live selection, config interpretation, OCR, scrolling, animation, click effects, or real-game transitions. The nine PNGs remain user-provided, uncommitted worktree files; the user has approved their inclusion if required. The exact game build, Season 8/banner-date discrepancy, formal rights basis for game artwork, and complete privacy review remain open and are not inferred from the test pass.
+
+**Still missing for the first visual baseline:** exact game build/version and resolution of the in-game Season 9 banner discrepancy; a fusion frame after the keyword window opens/selection (and ideally a result frame); and Daily/Weekly claimable plus no-claim examples. Scrolling, confusable/no-match and genuine failure/recovery states remain later coverage. The initial visual spot-check did not run game, application, tests, build or capture; the later offline probe and focused tests are recorded above. The supplied frames still do not prove OCR/recognition accuracy, click effects, scrolling, live transitions or application behavior.
+
 ### Terms Scope Recheck (2026-11-15)
 
 The current official [Terms of Service](https://limbuscompany.com/terms-of-service/) also contains Article 16-1, which permits qualifying gameplay videos subject to its conditions. It limits use in those videos to non-commercial purposes while separately allowing specified platform advertising and viewer donations. It prohibits unoriginal videos made from game-screen cuts or soundtrack without a specific explanation, bars unauthorized videos from implying Project Moon's endorsement, and requires a specified ownership/disclaimer notice. This is a limited video policy; it does not expressly grant permission to distribute standalone screenshot files as test fixtures in a public source repository. Article 4.7 says Korean is the original language and translations are for reference, so this scope check relies on the English page as a reference. The 2025-09-26 notice said the Fanwork Guidelines would be updated and identified unauthorized sharing of game resources as a concern; a scoped search of official terms and Limbus Company announcements did not surface a later published update. That search is limited and does not establish that no separate permission or later policy exists. The fixture disposition above therefore remains unchanged pending an applicable permission basis and item-specific evidence. This is a project risk assessment, not a legal determination.
+
+### Official Policy Recheck (2026-11-16)
+
+The official [Terms of Service](https://limbuscompany.com/terms-of-service/) page was rechecked on 2026-11-16. It still states an effective date of 2023-02-27. Article 16 assigns rights in company-produced service content to Project Moon and restricts making service information available to others by reproduction or distribution without prior consent. Article 16-1 expressly describes a conditional permission for gameplay videos; it does not expressly address standalone PNG files distributed as public-repository test fixtures. Article 4.6 says country-specific supplementary provisions may apply based on residence and may supersede these terms; the scoped official-site search did not identify a U.S.-specific addendum, so the applicable U.S. terms remain unverified. Article 4.7 says Korean is the original language and the English text is for reference.
+
+The official [2025-09-26 announcement](https://store.steampowered.com/news/app/1973530/view/525355229451911687) says Project Moon planned to update its Fanwork Guidelines and names unauthorized sharing of relevant resources among the concerns. A scoped search of official Limbus Company Terms and Steam announcements did not locate a later published guideline or an explicit grant covering public-repository screenshot fixtures. Search failure does not prove no separate policy or permission exists. Keep the user screenshots untracked and out of public commits until an applicable permission basis is documented. This remains a project risk disposition, not a legal determination.
+
+### User Screenshot Privacy Screen (2026-11-16)
+
+All nine original 2560 x 1440 user-provided frames were reviewed individually at full-frame view for account names or IDs, chat overlays, desktop notifications, and unrelated application windows. None were observed. A read-only Pillow metadata inventory of `tests/fixtures/visual/*.png` found `Image.info` empty and no EXIF items in all nine files. This is a visual-content and embedded-metadata screen; it does not establish pixel-edit history, identify the source of the `CUSTOM LANGUAGE` footer, or determine rights to reproduce game artwork.
+
+**Disposition:** the visible-personal-data screening is complete for these exact nine files as currently present. Keep image hashes as the binding identity and repeat this screen if a file changes. The formal public-distribution basis remains unresolved despite the user's project-use approval; retain the images as untracked local test fixtures and do not publish them until an applicable policy/license or rights-holder authorization is documented. This is a project privacy/risk record, not a legal determination.
+
+### Official Policy Recheck (2026-11-17)
+
+The current official [Terms of Service](https://limbuscompany.com/terms-of-service/) page was rechecked on November 17, 2026. It states that company-produced service content belongs to Project Moon and Article 16.2 restricts reproduction, publication, or distribution to others without prior consent. Article 16-1 expressly permits qualifying gameplay videos under conditions, including restrictions on unoriginal videos made from game-screen cuts without specific explanation; it does not expressly grant permission for standalone PNG screenshots as public-repository test fixtures.
+
+Article 4.6 says country-specific supplementary provisions may apply based on a member's residence and may supersede the main terms. Article 4.7 says Korean is the original language and translations are for reference. The user's applicable residence-based addendum has not been established. A scoped search of official terms and Limbus Company Steam announcements found the 2025-09-26 notice that Fanwork Guidelines would be updated and raised unauthorized sharing of relevant resources as a concern, but did not locate a later published guideline or explicit grant for public-repository screenshot fixtures. Search absence is not proof that no separate policy or permission exists.
+
+**Disposition:** keep the nine screenshots local and untracked. Do not include them in public commits until an applicable permission basis is documented. User capture and project-use intent do not independently resolve redistribution rights. This is a risk assessment, not a legal determination.
+
+### 2026-11-17 Pass List Region Fixture Baseline
+
+The persistent visual regression now loads `pass-daily_loaded.png` and `pass-weekly_loaded.png` as grayscale frames and passes them to the existing `_has_meaningful_mission_list_change()` helper. In the current isolated source copy, Daily-to-Weekly returned `True`; Daily-to-Daily and Weekly-to-Weekly returned `False`. This grounds the existing mission-list ROI threshold against the two available labeled full frames, but the pair is not a temporal capture sequence and does not show that a click caused the difference.
+
+The test module passed **10 tests** and the complete config-free snapshot passed **533 tests, 2 Windows symlink skips of 535 collected**, with Ruff and compileall passing. The regression test SHA-256 is `87BC1D8E129666402BA72D4CB3EBB69D5932E97AC70CD7134D627814201270B9`; the fixture README SHA-256 is `44AB6A68530ED2FADE3E4F8306FE3AE8B73AE46A8BA2C186647B9FD569951635`. The samples remain untracked. This check does not establish transition timing, reward claimability, OCR correctness, or live task behavior.
+
+### 2026-11-17 Claimability Behavior Review
+
+Current source review confirms `get_pass_prize()` clicks every coordinate returned by `auto.find_element("pass/pass_coin.png", find_type="image_with_multiple_targets")` on both the Daily and Weekly pages. The persistent fixture test asserts five matches on each supplied frame, including positions on rows with visible incomplete progress. The two screenshots are static loaded-page examples; neither provides a confirmed completed-but-unclaimed state. Therefore, existing tests establish template presence and mission-list image differences only; they do not establish safe reward selection. Current code attempts clicks on incomplete-row matches, although this offline review cannot establish whether the game accepts or ignores those clicks.
+
+**Implementation gate:** obtain full-frame, manually labeled examples for incomplete, completed-but-claimable, and already-claimed rows. Then compare a state detector against all three groups and assert that only confirmed claimable rows receive input. Also decide the no-claim outcome: return success when the page is verified and no claimable row exists, or fail when claimability cannot be determined. Preserve current behavior only as an explicitly accepted interim policy; do not infer the user's preference from the loaded-page fixtures. No code, screenshots, or game state were changed or collected for this review.
+
+### 2026-11-17 External Pass Candidate Intake Recheck
+
+Read-only inspection of `E:\PUBLIC\Project\AALC\.codex_pass_page_samples_2026-11-15` found exactly two files and no manifest:
+
+| External filename | Bytes | SHA-256 | Pillow format and dimensions |
+| --- | ---: | --- | --- |
+| `daily_loaded_claimable.png` | 291,446 | `2CC2F77775D9D5B27A081253D1AAE2520274C55B0CCCA21EAEBEB5DDA2345AE8` | JPEG, 1920 x 1080, RGB |
+| `weekly_loaded_claimable.png` | 290,699 | `0B0725A15C56570A47F05C405004DD539D04B8A0EDCD94DB04E7FA64734F3EA7` | JPEG, 1920 x 1080, RGB |
+
+Both files have JPEG content despite their `.png` extensions. Pillow reported no EXIF data. Manual full-frame review found visible `CLEAR` rows and incomplete counters: Daily has `0/1`, `0/1`, `0/2`, and `0/10` rows; Weekly has `1/5` and `3/5` rows. Neither image shows a visibly completed-but-unclaimed row. The filenames are not verified state labels and do not make these positive claimability samples.
+
+**Disposition:** retain these candidates outside the repository and do not rename, copy, or use them to calibrate a claimability detector. They may document loaded-page appearance and incomplete rows only; the meaning of the `CLEAR` rows was not independently confirmed. Request full-frame Daily and Weekly examples with a human-confirmed state label, capture context, and manifest before implementing reward selection. The explicit no-claim outcome and applicable screenshot-use/distribution basis remain unresolved. No application, game, source code, fixture, or runtime state was changed during this intake recheck.

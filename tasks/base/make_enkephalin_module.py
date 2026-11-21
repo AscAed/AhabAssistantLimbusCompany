@@ -1,3 +1,5 @@
+import time
+
 from module.automation import auto
 from module.config import cfg
 from module.decorator.decorator import begin_and_finish_time_log
@@ -5,7 +7,9 @@ from module.logger import log
 from module.my_error.my_error import userStopError
 
 ENKEPHALIN_PREPARATION_TIMEOUT_SECONDS = 60
+GRANDET_TIMING_TIMEOUT_SECONDS = 90
 MAX_ENKEPHALIN_POPUP_RECOVERIES = 3
+MAX_LUNACY_SCREENSHOT_ATTEMPTS = 5
 
 
 class EnkephalinPreparationError(RuntimeError):
@@ -20,6 +24,25 @@ def _check_stop_requested() -> None:
     auto.sleep_with_stop_check(0)
 
 
+def _wait_for_grandet_timing(already_qualified: bool) -> bool:
+    start_time = time.monotonic()
+    while True:
+        _check_stop_requested()
+        if time.monotonic() - start_time >= GRANDET_TIMING_TIMEOUT_SECONDS:
+            raise EnkephalinPreparationTimeout(
+                "葛朗台模式等待体力计时器超时"
+                f"（{GRANDET_TIMING_TIMEOUT_SECONDS}秒）"
+            )
+        timing_ready = get_the_timing()
+        if timing_ready is None:
+            raise EnkephalinPreparationError(
+                "葛朗台模式无法识别体力回复计时器，已停止狂气消耗"
+            )
+        if timing_ready is True or already_qualified:
+            return True
+        auto.sleep_with_stop_check(2)
+
+
 def get_the_timing(return_time=False):
     if module_position := auto.find_element(
         "enkephalin/lunacy_assets.png", take_screenshot=True
@@ -32,25 +55,26 @@ def get_the_timing(return_time=False):
             module_position[1] + 220 * my_scale,
         )
         ocr_result = auto.find_text_element(None, my_crop=bbox, only_text=True)
-        s = ""
-        if ocr_result is not None:
-            try:
-                for ocr in ocr_result:
-                    s += str(ocr)
-                if ":" in s:
-                    parts = s.split(":")
-                    minute = int(parts[0][-2:])
-                    seconds = int(parts[1][:2])
-                    if return_time:
-                        return minute * 60 + seconds
-                    if minute >= 5 and seconds >= 20:
-                        log.debug(
-                            f"生成下一点体力的时间为{minute}分{seconds}秒，符合葛朗台模式操作"
-                        )
-                        return True
-            except Exception:
-                return False
-        return False
+        if ocr_result is None:
+            return None
+        try:
+            s = "".join(str(ocr) for ocr in ocr_result)
+            if ":" not in s:
+                return None
+            parts = s.split(":")
+            minute = int(parts[0][-2:])
+            seconds = int(parts[1][:2])
+            if return_time:
+                return minute * 60 + seconds
+            if minute >= 5 and seconds >= 20:
+                log.debug(
+                    f"生成下一点体力的时间为{minute}分{seconds}秒，符合葛朗台模式操作"
+                )
+                return True
+            return False
+        except Exception:
+            return None
+    return None
 
 
 def get_current_enkephalin():
@@ -236,55 +260,49 @@ def lunacy_to_enkephalin(times=0):
     auto.click_element("enkephalin/use_lunacy_assets.png")
     auto.sleep_with_stop_check(0.5)
     Grandet = False
-    while times > 0:
+    remaining_times = times
+    while remaining_times > 0:
         _check_stop_requested()
         auto.mouse_to_blank(move_back=False)
-        # 自动截图
-        if auto.take_screenshot() is None:
-            continue
+        for attempt in range(MAX_LUNACY_SCREENSHOT_ATTEMPTS):
+            _check_stop_requested()
+            if auto.take_screenshot() is not None:
+                break
+            if attempt + 1 < MAX_LUNACY_SCREENSHOT_ATTEMPTS:
+                auto.sleep_with_stop_check(0.1)
+        else:
+            raise EnkephalinPreparationError(
+                "狂气换体连续截图失败，已停止后续操作"
+            )
         _check_stop_requested()
-        if times > 0 and auto.find_element("enkephalin/lunacy_spend_26_assets.png"):
+        if auto.find_element("enkephalin/lunacy_spend_26_assets.png"):
             # 葛朗台模式
             if cfg.Dr_Grandet_mode:
-                while True:
-                    _check_stop_requested()
-                    if get_the_timing() is not False:
-                        break
-                    if Grandet:
-                        break
-                    auto.sleep_with_stop_check(2)
-                Grandet = True
+                Grandet = _wait_for_grandet_timing(Grandet)
             _check_stop_requested()
             auto.click_element("enkephalin/enkephalin_confirm_assets.png")
             auto.sleep_with_stop_check(1)
+            remaining_times -= 1
             continue
-        if times >= 2 and auto.find_element("enkephalin/lunacy_spend_52_assets.png"):
+        if remaining_times >= 2 and auto.find_element(
+            "enkephalin/lunacy_spend_52_assets.png"
+        ):
             if cfg.Dr_Grandet_mode:
-                while True:
-                    _check_stop_requested()
-                    if get_the_timing() is not False:
-                        break
-                    if Grandet:
-                        break
-                    auto.sleep_with_stop_check(2)
-                    Grandet = True
+                Grandet = _wait_for_grandet_timing(Grandet)
             _check_stop_requested()
             auto.click_element("enkephalin/enkephalin_confirm_assets.png")
             auto.sleep_with_stop_check(1)
+            remaining_times -= 2
             continue
-        if times >= 3 and auto.find_element("enkephalin/lunacy_spend_78_assets.png"):
+        if remaining_times >= 3 and auto.find_element(
+            "enkephalin/lunacy_spend_78_assets.png"
+        ):
             if cfg.Dr_Grandet_mode:
-                while True:
-                    _check_stop_requested()
-                    if get_the_timing() is not False:
-                        break
-                    if Grandet:
-                        break
-                    auto.sleep_with_stop_check(2)
-                    Grandet = True
+                Grandet = _wait_for_grandet_timing(Grandet)
             _check_stop_requested()
             auto.click_element("enkephalin/enkephalin_confirm_assets.png")
             auto.sleep_with_stop_check(1)
+            remaining_times -= 3
             continue
         break
     _check_stop_requested()

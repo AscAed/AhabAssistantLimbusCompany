@@ -10,13 +10,33 @@ from utils.image_utils import ImageUtils
 from utils.path_manager import path_manager
 
 _MAX_THEME_PACK_ITERATIONS = 32
+_ROAD_MAP_CONFIRMATION_ATTEMPTS = 5
+
+
+def _confirm_road_map_after_selection() -> bool:
+    road_map_asset = "mirror/road_in_mir/legend_assets.png"
+    for attempt in range(_ROAD_MAP_CONFIRMATION_ATTEMPTS):
+        try:
+            wait_for_screenshot()
+            if auto.find_element(road_map_asset):
+                return True
+        except Exception as error:
+            log.error(
+                f"主题包拖拽后路线图确认失败，已停止后续操作: {type(error).__name__}"
+            )
+            return False
+        if attempt + 1 < _ROAD_MAP_CONFIRMATION_ATTEMPTS:
+            sleep(1)
+
+    log.error("主题包拖拽后未确认路线图，已停止后续操作")
+    return False
 
 
 @begin_and_finish_time_log(task_name="选择镜牢主题包")
 # 选择镜牢主题包
 def select_theme_pack(
     hard_switch=False, floor=None, team_num=None, use_custom_theme_pack_weight=False
-):
+) -> bool:
     loop_count = 30
     auto.model = "clam"
     scale = cfg.set_win_size / 1080
@@ -41,11 +61,15 @@ def select_theme_pack(
     difficulty = None
     iteration_count = 0
     # 如果检测到卡包选择界面指示图，不执行因图例检测（兜底误匹配）而触发的提前返回
-    if not (auto.find_element("mirror/theme_pack/feature_theme_pack_assets.png", take_screenshot=True) or
-            auto.find_element("mirror/theme_pack/normal_assets.png") or
-            auto.find_element("mirror/theme_pack/hard_assets.png")):
+    if not (
+        auto.find_element(
+            "mirror/theme_pack/feature_theme_pack_assets.png", take_screenshot=True
+        )
+        or auto.find_element("mirror/theme_pack/normal_assets.png")
+        or auto.find_element("mirror/theme_pack/hard_assets.png")
+    ):
         if auto.find_element("mirror/road_in_mir/legend_assets.png"):
-            return
+            return True
     while True:
         if iteration_count >= _MAX_THEME_PACK_ITERATIONS:
             log.error("主题包选择操作次数超限，尝试回到初始界面")
@@ -87,7 +111,7 @@ def select_theme_pack(
                 elif any(isinstance(text, str) and "hard" in text for text in ocr_texts):
                     difficulty = "hard"
                 if difficulty is None and auto.find_element("mirror/road_in_mir/legend_assets.png"):
-                    return
+                    return True
             loop_count -= 1
             sleep(1)
             continue
@@ -125,10 +149,9 @@ def select_theme_pack(
                     all_theme_pack.sort(key=lambda pos: (pos[0], pos[1]))
                     auto.mouse_drag_down(all_theme_pack[0][0], all_theme_pack[0][1])
                     log.debug(f"选择卡包: {all_theme_pack[0]}")
-                    sleep(3)
                     msg = "此次主题包选择了最左边的（活动）卡包"
                     log.info(msg)
-                    return
+                    return _confirm_road_map_after_selection()
             weight_list = []
             pack_name = []
             if all_theme_pack := auto.find_element(
@@ -172,10 +195,9 @@ def select_theme_pack(
                     pack = all_theme_pack[max_index]
                     auto.mouse_drag_down(pack[0], pack[1])
                     log.debug(f"选择卡包: {pack}")
-                    sleep(3)
                     msg = f"此次选择卡包关键词：{pack_name[max_index]}"
                     log.info(msg)
-                    return
+                    return _confirm_road_map_after_selection()
 
         except Exception as e:
             log.error(f"识别主题包出错:{e}")
@@ -199,14 +221,12 @@ def select_theme_pack(
                 pack = all_theme_pack[max_index]
                 auto.mouse_drag_down(pack[0], pack[1])
                 log.debug(f"选择卡包: {pack}")
-                sleep(3)
                 log.debug("无匹配最低阈值的主题包，选择最高权重主题包")
                 msg = f"无匹配最低阈值的主题包，选择最高权重主题包\n此次选择卡包关键词：{pack_name[max_index]}"
                 log.info(msg)
-                return
+                return _confirm_road_map_after_selection()
             except Exception as e:
                 log.error(f"选择主题包出错:{e},尝试回到初始界面")
-                back_init_menu()
                 break
 
         loop_count -= 1
@@ -216,7 +236,7 @@ def select_theme_pack(
             auto.model = "aggressive"
         if loop_count < 0:
             log.error("无法选取主题包,尝试回到初始界面")
-            back_init_menu()
             break
     log.error("无法选取主题包,尝试回到初始界面")
     back_init_menu()
+    return False

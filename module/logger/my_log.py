@@ -76,12 +76,7 @@ class UILogHandler(logging.Handler):
 
 
 class SettingConcurrentRotatingFileHandler(ConcurrentRotatingFileHandler):
-    """自动输出设置文件内容在日志开头"""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.version = "未知"
-        self.config = {}
+    """在新日志文件开头记录非敏感配置摘要"""
 
     def __read_config(self):
         yaml = YAML()
@@ -91,10 +86,7 @@ class SettingConcurrentRotatingFileHandler(ConcurrentRotatingFileHandler):
             config_data: dict = yaml.load(f)
             if config_data is None:
                 raise ValueError("配置文件内容为空或格式错误")
-            config = config_data
-
-        self.version = version
-        self.config = config
+        return version, config_data
 
     def do_open(self, mode: str | None = None):
         stream = super().do_open(mode)
@@ -102,13 +94,12 @@ class SettingConcurrentRotatingFileHandler(ConcurrentRotatingFileHandler):
             return stream
         if stream.tell() == 0:
             try:
-                self.__read_config()
-                msg = f"""新文件创建, 当前配置文件内容如下: 
-AALC 版本: {self.version}, 配置文件版本: {self.config.get("config_version", "未知")}
-游戏分辨率: {self.config.get("set_win_size")}, 截图间隔: {self.config.get("screenshot_interval")}, 鼠标间隔 {self.config.get("mouse_action_interval")}
-详细内容: {self.config}"""
+                version, config_data = self.__read_config()
+                msg = f"""新文件创建, 非敏感配置摘要如下:
+AALC 版本: {version}, 配置文件版本: {config_data.get("config_version", "未知")}
+游戏分辨率: {config_data.get("set_win_size")}, 截图间隔: {config_data.get("screenshot_interval")}, 鼠标间隔 {config_data.get("mouse_action_interval")}"""
             except Exception as e:
-                msg = f"新文件创建, 但读取配置文件内容时发生错误: {e}"
+                msg = f"新文件创建, 读取配置摘要失败 ({type(e).__name__})"
             stream.write(msg + "\n")
         return stream
 

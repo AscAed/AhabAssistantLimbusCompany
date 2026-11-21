@@ -45,6 +45,7 @@ from utils.path_manager import path_manager
 from utils.utils import calculate_the_teams, check_hard_mirror_time, get_day_of_week
 
 MAX_CONSECUTIVE_MIRROR_FAILURES = 3
+MAX_INCOMPATIBLE_TEAM_ROTATIONS = 31
 
 
 class MirrorRunOutcome(Enum):
@@ -356,6 +357,7 @@ def Mirror_task(thread=None):
         mir_times = 1
     finish_times = 0
     consecutive_failures = 0
+    incompatible_team_rotations = 0
     failed = False
     mediator.mirror_signal.emit(0, mir_times)
     cfg.normalize_and_sync_team_state(persist=False)
@@ -379,9 +381,13 @@ def Mirror_task(thread=None):
                 useful = True
                 break
         if useful is False:
+            log.error("没有可用的镜牢队伍，停止镜牢任务")
+            failed = True
             break
 
         if not cfg.teams_active_queue:
+            log.error("镜牢活动队伍队列为空，停止镜牢任务")
+            failed = True
             break
 
         team_num = cfg.teams_active_queue[0]
@@ -391,8 +397,17 @@ def Mirror_task(thread=None):
             if (team_setting.fixed_team_use_select == 0 and not cfg.hard_mirror) or (
                 team_setting.fixed_team_use_select == 1 and cfg.hard_mirror
             ):
+                incompatible_team_rotations += 1
+                if incompatible_team_rotations >= min(
+                    MAX_INCOMPATIBLE_TEAM_ROTATIONS,
+                    max(1, len(cfg.teams_active_queue)),
+                ):
+                    log.error("镜牢活动队伍队列中没有适用于当前难度的队伍")
+                    failed = True
+                    break
                 cfg.rotate_team_queue()
                 continue
+        incompatible_team_rotations = 0
         # 执行一次镜牢任务，根据执行结果进行处理
         try:
             mirror_result = onetime_mir_process(team_setting, team_num)
