@@ -46,6 +46,6 @@ Unit tests must use mocks and offline fixtures. Do not use live game interaction
 ## Current Boundaries
 
 - A passing test, process query, archive hash, or source inspection does not prove live-game behavior, installed identity, packaged startup, or deployment.
-- Full-frame screenshots under `tests/fixtures/visual/` are optional local candidates. Tests skip missing images. Keep them out of public commits until the applicable distribution basis is resolved.
+- Nine user-captured full-frame samples under `tests/fixtures/visual/` are included by explicit user direction because image-regression tests consume them. A prior policy review did not establish a separate game-content license for standalone public PNG fixtures; see the fixture README and audit for provenance and this remaining rights uncertainty.
 - `get_pass_prize()` currently matches the generic pass-coin template, which also appears on visibly incomplete mission rows. Do not treat it as a verified claimability signal; see the [fixture audit](audits/2026-11-13-mirror-fixture-inventory.md) and current self-audit.
 - The [implementation roadmap](development/implementation-roadmap.md) owns stage and acceptance status. The [architecture overview](architecture/overview.md) records current module/data flow; the [target design](architecture/target-and-optimization.md) is a proposal. Dated audits and the [implementation handoff](audits/2026-11-14-implementation-handoff.md) retain evidence and history.

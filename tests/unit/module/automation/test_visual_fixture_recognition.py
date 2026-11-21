@@ -16,7 +16,7 @@ def _load_visual_fixture(filename):
     if not fixture_path.is_file():
         pytest.skip(
             f"Visual fixture {filename} is absent from this checkout; "
-            "user-supplied screenshots remain local pending distribution review"
+            "this image-based regression assertion requires the optional fixture"
         )
     with Image.open(fixture_path) as frame:
         return frame.convert("L")
